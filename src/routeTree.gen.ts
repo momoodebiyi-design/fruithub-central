@@ -15,6 +15,7 @@ import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedUsersRouteImport } from './routes/_authenticated/users'
 import { Route as AuthenticatedShopsRouteImport } from './routes/_authenticated/shops'
+import { Route as AuthenticatedShopCountsRouteImport } from './routes/_authenticated/shop-counts'
 import { Route as AuthenticatedRequestsRouteImport } from './routes/_authenticated/requests'
 import { Route as AuthenticatedReportsRouteImport } from './routes/_authenticated/reports'
 import { Route as AuthenticatedProductionRouteImport } from './routes/_authenticated/production'
@@ -23,8 +24,10 @@ import { Route as AuthenticatedNotificationsRouteImport } from './routes/_authen
 import { Route as AuthenticatedInventoryRouteImport } from './routes/_authenticated/inventory'
 import { Route as AuthenticatedDispatchesRouteImport } from './routes/_authenticated/dispatches'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
+import { Route as AuthenticatedClientsRouteImport } from './routes/_authenticated/clients'
 import { Route as AuthenticatedAuditRouteImport } from './routes/_authenticated/audit'
 import { Route as AuthenticatedInventoryIndexRouteImport } from './routes/_authenticated/inventory/index'
+import { Route as AuthenticatedShopCountsCountIdRouteImport } from './routes/_authenticated/shop-counts.$countId'
 import { Route as AuthenticatedSettingsProfileRouteImport } from './routes/_authenticated/settings/profile'
 import { Route as AuthenticatedInventoryItemIdRouteImport } from './routes/_authenticated/inventory/$itemId'
 
@@ -55,6 +58,11 @@ const AuthenticatedUsersRoute = AuthenticatedUsersRouteImport.update({
 const AuthenticatedShopsRoute = AuthenticatedShopsRouteImport.update({
   id: '/shops',
   path: '/shops',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedShopCountsRoute = AuthenticatedShopCountsRouteImport.update({
+  id: '/shop-counts',
+  path: '/shop-counts',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedRequestsRoute = AuthenticatedRequestsRouteImport.update({
@@ -99,6 +107,11 @@ const AuthenticatedDashboardRoute = AuthenticatedDashboardRouteImport.update({
   path: '/dashboard',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedClientsRoute = AuthenticatedClientsRouteImport.update({
+  id: '/clients',
+  path: '/clients',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedAuditRoute = AuthenticatedAuditRouteImport.update({
   id: '/audit',
   path: '/audit',
@@ -109,6 +122,12 @@ const AuthenticatedInventoryIndexRoute =
     id: '/',
     path: '/',
     getParentRoute: () => AuthenticatedInventoryRoute,
+  } as any)
+const AuthenticatedShopCountsCountIdRoute =
+  AuthenticatedShopCountsCountIdRouteImport.update({
+    id: '/$countId',
+    path: '/$countId',
+    getParentRoute: () => AuthenticatedShopCountsRoute,
   } as any)
 const AuthenticatedSettingsProfileRoute =
   AuthenticatedSettingsProfileRouteImport.update({
@@ -128,6 +147,7 @@ export interface FileRoutesByFullPath {
   '/auth': typeof AuthRoute
   '/reset-password': typeof ResetPasswordRoute
   '/audit': typeof AuthenticatedAuditRoute
+  '/clients': typeof AuthenticatedClientsRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/dispatches': typeof AuthenticatedDispatchesRoute
   '/inventory': typeof AuthenticatedInventoryRouteWithChildren
@@ -136,10 +156,12 @@ export interface FileRoutesByFullPath {
   '/production': typeof AuthenticatedProductionRoute
   '/reports': typeof AuthenticatedReportsRoute
   '/requests': typeof AuthenticatedRequestsRoute
+  '/shop-counts': typeof AuthenticatedShopCountsRouteWithChildren
   '/shops': typeof AuthenticatedShopsRoute
   '/users': typeof AuthenticatedUsersRoute
   '/inventory/$itemId': typeof AuthenticatedInventoryItemIdRoute
   '/settings/profile': typeof AuthenticatedSettingsProfileRoute
+  '/shop-counts/$countId': typeof AuthenticatedShopCountsCountIdRoute
   '/inventory/': typeof AuthenticatedInventoryIndexRoute
 }
 export interface FileRoutesByTo {
@@ -147,6 +169,7 @@ export interface FileRoutesByTo {
   '/auth': typeof AuthRoute
   '/reset-password': typeof ResetPasswordRoute
   '/audit': typeof AuthenticatedAuditRoute
+  '/clients': typeof AuthenticatedClientsRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/dispatches': typeof AuthenticatedDispatchesRoute
   '/notifications': typeof AuthenticatedNotificationsRoute
@@ -154,10 +177,12 @@ export interface FileRoutesByTo {
   '/production': typeof AuthenticatedProductionRoute
   '/reports': typeof AuthenticatedReportsRoute
   '/requests': typeof AuthenticatedRequestsRoute
+  '/shop-counts': typeof AuthenticatedShopCountsRouteWithChildren
   '/shops': typeof AuthenticatedShopsRoute
   '/users': typeof AuthenticatedUsersRoute
   '/inventory/$itemId': typeof AuthenticatedInventoryItemIdRoute
   '/settings/profile': typeof AuthenticatedSettingsProfileRoute
+  '/shop-counts/$countId': typeof AuthenticatedShopCountsCountIdRoute
   '/inventory': typeof AuthenticatedInventoryIndexRoute
 }
 export interface FileRoutesById {
@@ -167,6 +192,7 @@ export interface FileRoutesById {
   '/auth': typeof AuthRoute
   '/reset-password': typeof ResetPasswordRoute
   '/_authenticated/audit': typeof AuthenticatedAuditRoute
+  '/_authenticated/clients': typeof AuthenticatedClientsRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/dispatches': typeof AuthenticatedDispatchesRoute
   '/_authenticated/inventory': typeof AuthenticatedInventoryRouteWithChildren
@@ -175,10 +201,12 @@ export interface FileRoutesById {
   '/_authenticated/production': typeof AuthenticatedProductionRoute
   '/_authenticated/reports': typeof AuthenticatedReportsRoute
   '/_authenticated/requests': typeof AuthenticatedRequestsRoute
+  '/_authenticated/shop-counts': typeof AuthenticatedShopCountsRouteWithChildren
   '/_authenticated/shops': typeof AuthenticatedShopsRoute
   '/_authenticated/users': typeof AuthenticatedUsersRoute
   '/_authenticated/inventory/$itemId': typeof AuthenticatedInventoryItemIdRoute
   '/_authenticated/settings/profile': typeof AuthenticatedSettingsProfileRoute
+  '/_authenticated/shop-counts/$countId': typeof AuthenticatedShopCountsCountIdRoute
   '/_authenticated/inventory/': typeof AuthenticatedInventoryIndexRoute
 }
 export interface FileRouteTypes {
@@ -188,6 +216,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/reset-password'
     | '/audit'
+    | '/clients'
     | '/dashboard'
     | '/dispatches'
     | '/inventory'
@@ -196,10 +225,12 @@ export interface FileRouteTypes {
     | '/production'
     | '/reports'
     | '/requests'
+    | '/shop-counts'
     | '/shops'
     | '/users'
     | '/inventory/$itemId'
     | '/settings/profile'
+    | '/shop-counts/$countId'
     | '/inventory/'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -207,6 +238,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/reset-password'
     | '/audit'
+    | '/clients'
     | '/dashboard'
     | '/dispatches'
     | '/notifications'
@@ -214,10 +246,12 @@ export interface FileRouteTypes {
     | '/production'
     | '/reports'
     | '/requests'
+    | '/shop-counts'
     | '/shops'
     | '/users'
     | '/inventory/$itemId'
     | '/settings/profile'
+    | '/shop-counts/$countId'
     | '/inventory'
   id:
     | '__root__'
@@ -226,6 +260,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/reset-password'
     | '/_authenticated/audit'
+    | '/_authenticated/clients'
     | '/_authenticated/dashboard'
     | '/_authenticated/dispatches'
     | '/_authenticated/inventory'
@@ -234,10 +269,12 @@ export interface FileRouteTypes {
     | '/_authenticated/production'
     | '/_authenticated/reports'
     | '/_authenticated/requests'
+    | '/_authenticated/shop-counts'
     | '/_authenticated/shops'
     | '/_authenticated/users'
     | '/_authenticated/inventory/$itemId'
     | '/_authenticated/settings/profile'
+    | '/_authenticated/shop-counts/$countId'
     | '/_authenticated/inventory/'
   fileRoutesById: FileRoutesById
 }
@@ -290,6 +327,13 @@ declare module '@tanstack/react-router' {
       path: '/shops'
       fullPath: '/shops'
       preLoaderRoute: typeof AuthenticatedShopsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/shop-counts': {
+      id: '/_authenticated/shop-counts'
+      path: '/shop-counts'
+      fullPath: '/shop-counts'
+      preLoaderRoute: typeof AuthenticatedShopCountsRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/requests': {
@@ -348,6 +392,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedDashboardRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/clients': {
+      id: '/_authenticated/clients'
+      path: '/clients'
+      fullPath: '/clients'
+      preLoaderRoute: typeof AuthenticatedClientsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/audit': {
       id: '/_authenticated/audit'
       path: '/audit'
@@ -361,6 +412,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/inventory/'
       preLoaderRoute: typeof AuthenticatedInventoryIndexRouteImport
       parentRoute: typeof AuthenticatedInventoryRoute
+    }
+    '/_authenticated/shop-counts/$countId': {
+      id: '/_authenticated/shop-counts/$countId'
+      path: '/$countId'
+      fullPath: '/shop-counts/$countId'
+      preLoaderRoute: typeof AuthenticatedShopCountsCountIdRouteImport
+      parentRoute: typeof AuthenticatedShopCountsRoute
     }
     '/_authenticated/settings/profile': {
       id: '/_authenticated/settings/profile'
@@ -395,8 +453,23 @@ const AuthenticatedInventoryRouteWithChildren =
     AuthenticatedInventoryRouteChildren,
   )
 
+interface AuthenticatedShopCountsRouteChildren {
+  AuthenticatedShopCountsCountIdRoute: typeof AuthenticatedShopCountsCountIdRoute
+}
+
+const AuthenticatedShopCountsRouteChildren: AuthenticatedShopCountsRouteChildren =
+  {
+    AuthenticatedShopCountsCountIdRoute: AuthenticatedShopCountsCountIdRoute,
+  }
+
+const AuthenticatedShopCountsRouteWithChildren =
+  AuthenticatedShopCountsRoute._addFileChildren(
+    AuthenticatedShopCountsRouteChildren,
+  )
+
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedAuditRoute: typeof AuthenticatedAuditRoute
+  AuthenticatedClientsRoute: typeof AuthenticatedClientsRoute
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
   AuthenticatedDispatchesRoute: typeof AuthenticatedDispatchesRoute
   AuthenticatedInventoryRoute: typeof AuthenticatedInventoryRouteWithChildren
@@ -405,6 +478,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedProductionRoute: typeof AuthenticatedProductionRoute
   AuthenticatedReportsRoute: typeof AuthenticatedReportsRoute
   AuthenticatedRequestsRoute: typeof AuthenticatedRequestsRoute
+  AuthenticatedShopCountsRoute: typeof AuthenticatedShopCountsRouteWithChildren
   AuthenticatedShopsRoute: typeof AuthenticatedShopsRoute
   AuthenticatedUsersRoute: typeof AuthenticatedUsersRoute
   AuthenticatedSettingsProfileRoute: typeof AuthenticatedSettingsProfileRoute
@@ -412,6 +486,7 @@ interface AuthenticatedRouteRouteChildren {
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedAuditRoute: AuthenticatedAuditRoute,
+  AuthenticatedClientsRoute: AuthenticatedClientsRoute,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
   AuthenticatedDispatchesRoute: AuthenticatedDispatchesRoute,
   AuthenticatedInventoryRoute: AuthenticatedInventoryRouteWithChildren,
@@ -420,6 +495,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedProductionRoute: AuthenticatedProductionRoute,
   AuthenticatedReportsRoute: AuthenticatedReportsRoute,
   AuthenticatedRequestsRoute: AuthenticatedRequestsRoute,
+  AuthenticatedShopCountsRoute: AuthenticatedShopCountsRouteWithChildren,
   AuthenticatedShopsRoute: AuthenticatedShopsRoute,
   AuthenticatedUsersRoute: AuthenticatedUsersRoute,
   AuthenticatedSettingsProfileRoute: AuthenticatedSettingsProfileRoute,
