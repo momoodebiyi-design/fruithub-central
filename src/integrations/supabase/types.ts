@@ -795,6 +795,7 @@ export type Database = {
         | "event_team"
         | "sales"
         | "readonly"
+        | "shop_supervisor"
       batch_status:
         | "planned"
         | "in_progress"
@@ -967,6 +968,7 @@ export const Constants = {
         "event_team",
         "sales",
         "readonly",
+        "shop_supervisor",
       ],
       batch_status: [
         "planned",
