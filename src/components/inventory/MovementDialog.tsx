@@ -22,14 +22,14 @@ import { toast } from "sonner";
 
 type MovementType = "stock_in" | "stock_out" | "adjustment" | "damaged" | "expired" | "wastage" | "transfer";
 
-const TYPES: { v: MovementType; label: string }[] = [
-  { v: "stock_in", label: "Stock in (receipt)" },
-  { v: "stock_out", label: "Stock out" },
-  { v: "adjustment", label: "Adjustment" },
-  { v: "wastage", label: "Wastage" },
-  { v: "damaged", label: "Damaged" },
-  { v: "expired", label: "Expired" },
-  { v: "transfer", label: "Transfer" },
+const TYPES: { v: MovementType; label: string; hint: string }[] = [
+  { v: "stock_in", label: "Receive stock (+)", hint: "Goods received from supplier or return" },
+  { v: "stock_out", label: "Use / Stock out (−)", hint: "General consumption not tied to production" },
+  { v: "transfer", label: "Dispatch / Transfer (−)", hint: "Send to a shop or another location" },
+  { v: "damaged", label: "Damaged (−)", hint: "Breakage, spoilage, unusable" },
+  { v: "expired", label: "Expired (−)", hint: "Past expiry, discarded" },
+  { v: "wastage", label: "Wasted (−)", hint: "Production spillage, loss" },
+  { v: "adjustment", label: "Adjustment (+/−)", hint: "Manual correction — enter signed quantity" },
 ];
 
 export function MovementDialog({
