@@ -24,6 +24,7 @@ import { Route as AuthenticatedDashboardRouteImport } from './routes/_authentica
 import { Route as AuthenticatedAuditRouteImport } from './routes/_authenticated/audit'
 import { Route as AuthenticatedInventoryIndexRouteImport } from './routes/_authenticated/inventory/index'
 import { Route as AuthenticatedSettingsProfileRouteImport } from './routes/_authenticated/settings/profile'
+import { Route as AuthenticatedInventoryItemIdRouteImport } from './routes/_authenticated/inventory/$itemId'
 
 const ResetPasswordRoute = ResetPasswordRouteImport.update({
   id: '/reset-password',
@@ -103,6 +104,12 @@ const AuthenticatedSettingsProfileRoute =
     path: '/settings/profile',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedInventoryItemIdRoute =
+  AuthenticatedInventoryItemIdRouteImport.update({
+    id: '/$itemId',
+    path: '/$itemId',
+    getParentRoute: () => AuthenticatedInventoryRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -117,6 +124,7 @@ export interface FileRoutesByFullPath {
   '/production': typeof AuthenticatedProductionRoute
   '/reports': typeof AuthenticatedReportsRoute
   '/users': typeof AuthenticatedUsersRoute
+  '/inventory/$itemId': typeof AuthenticatedInventoryItemIdRoute
   '/settings/profile': typeof AuthenticatedSettingsProfileRoute
   '/inventory/': typeof AuthenticatedInventoryIndexRoute
 }
@@ -132,6 +140,7 @@ export interface FileRoutesByTo {
   '/production': typeof AuthenticatedProductionRoute
   '/reports': typeof AuthenticatedReportsRoute
   '/users': typeof AuthenticatedUsersRoute
+  '/inventory/$itemId': typeof AuthenticatedInventoryItemIdRoute
   '/settings/profile': typeof AuthenticatedSettingsProfileRoute
   '/inventory': typeof AuthenticatedInventoryIndexRoute
 }
@@ -150,6 +159,7 @@ export interface FileRoutesById {
   '/_authenticated/production': typeof AuthenticatedProductionRoute
   '/_authenticated/reports': typeof AuthenticatedReportsRoute
   '/_authenticated/users': typeof AuthenticatedUsersRoute
+  '/_authenticated/inventory/$itemId': typeof AuthenticatedInventoryItemIdRoute
   '/_authenticated/settings/profile': typeof AuthenticatedSettingsProfileRoute
   '/_authenticated/inventory/': typeof AuthenticatedInventoryIndexRoute
 }
@@ -168,6 +178,7 @@ export interface FileRouteTypes {
     | '/production'
     | '/reports'
     | '/users'
+    | '/inventory/$itemId'
     | '/settings/profile'
     | '/inventory/'
   fileRoutesByTo: FileRoutesByTo
@@ -183,6 +194,7 @@ export interface FileRouteTypes {
     | '/production'
     | '/reports'
     | '/users'
+    | '/inventory/$itemId'
     | '/settings/profile'
     | '/inventory'
   id:
@@ -200,6 +212,7 @@ export interface FileRouteTypes {
     | '/_authenticated/production'
     | '/_authenticated/reports'
     | '/_authenticated/users'
+    | '/_authenticated/inventory/$itemId'
     | '/_authenticated/settings/profile'
     | '/_authenticated/inventory/'
   fileRoutesById: FileRoutesById
@@ -318,15 +331,24 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedSettingsProfileRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/inventory/$itemId': {
+      id: '/_authenticated/inventory/$itemId'
+      path: '/$itemId'
+      fullPath: '/inventory/$itemId'
+      preLoaderRoute: typeof AuthenticatedInventoryItemIdRouteImport
+      parentRoute: typeof AuthenticatedInventoryRoute
+    }
   }
 }
 
 interface AuthenticatedInventoryRouteChildren {
+  AuthenticatedInventoryItemIdRoute: typeof AuthenticatedInventoryItemIdRoute
   AuthenticatedInventoryIndexRoute: typeof AuthenticatedInventoryIndexRoute
 }
 
 const AuthenticatedInventoryRouteChildren: AuthenticatedInventoryRouteChildren =
   {
+    AuthenticatedInventoryItemIdRoute: AuthenticatedInventoryItemIdRoute,
     AuthenticatedInventoryIndexRoute: AuthenticatedInventoryIndexRoute,
   }
 
