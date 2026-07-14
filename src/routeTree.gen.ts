@@ -13,11 +13,17 @@ import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AuthenticatedUsersRouteImport } from './routes/_authenticated/users'
+import { Route as AuthenticatedReportsRouteImport } from './routes/_authenticated/reports'
 import { Route as AuthenticatedProductionRouteImport } from './routes/_authenticated/production'
 import { Route as AuthenticatedProcurementRouteImport } from './routes/_authenticated/procurement'
+import { Route as AuthenticatedNotificationsRouteImport } from './routes/_authenticated/notifications'
 import { Route as AuthenticatedInventoryRouteImport } from './routes/_authenticated/inventory'
+import { Route as AuthenticatedEventsRouteImport } from './routes/_authenticated/events'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
+import { Route as AuthenticatedAuditRouteImport } from './routes/_authenticated/audit'
 import { Route as AuthenticatedInventoryIndexRouteImport } from './routes/_authenticated/inventory/index'
+import { Route as AuthenticatedSettingsProfileRouteImport } from './routes/_authenticated/settings/profile'
 
 const ResetPasswordRoute = ResetPasswordRouteImport.update({
   id: '/reset-password',
@@ -38,6 +44,16 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuthenticatedUsersRoute = AuthenticatedUsersRouteImport.update({
+  id: '/users',
+  path: '/users',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedReportsRoute = AuthenticatedReportsRouteImport.update({
+  id: '/reports',
+  path: '/reports',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedProductionRoute = AuthenticatedProductionRouteImport.update({
   id: '/production',
   path: '/production',
@@ -49,14 +65,30 @@ const AuthenticatedProcurementRoute =
     path: '/procurement',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedNotificationsRoute =
+  AuthenticatedNotificationsRouteImport.update({
+    id: '/notifications',
+    path: '/notifications',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedInventoryRoute = AuthenticatedInventoryRouteImport.update({
   id: '/inventory',
   path: '/inventory',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedEventsRoute = AuthenticatedEventsRouteImport.update({
+  id: '/events',
+  path: '/events',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedDashboardRoute = AuthenticatedDashboardRouteImport.update({
   id: '/dashboard',
   path: '/dashboard',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedAuditRoute = AuthenticatedAuditRouteImport.update({
+  id: '/audit',
+  path: '/audit',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedInventoryIndexRoute =
@@ -65,24 +97,42 @@ const AuthenticatedInventoryIndexRoute =
     path: '/',
     getParentRoute: () => AuthenticatedInventoryRoute,
   } as any)
+const AuthenticatedSettingsProfileRoute =
+  AuthenticatedSettingsProfileRouteImport.update({
+    id: '/settings/profile',
+    path: '/settings/profile',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/reset-password': typeof ResetPasswordRoute
+  '/audit': typeof AuthenticatedAuditRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
+  '/events': typeof AuthenticatedEventsRoute
   '/inventory': typeof AuthenticatedInventoryRouteWithChildren
+  '/notifications': typeof AuthenticatedNotificationsRoute
   '/procurement': typeof AuthenticatedProcurementRoute
   '/production': typeof AuthenticatedProductionRoute
+  '/reports': typeof AuthenticatedReportsRoute
+  '/users': typeof AuthenticatedUsersRoute
+  '/settings/profile': typeof AuthenticatedSettingsProfileRoute
   '/inventory/': typeof AuthenticatedInventoryIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/reset-password': typeof ResetPasswordRoute
+  '/audit': typeof AuthenticatedAuditRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
+  '/events': typeof AuthenticatedEventsRoute
+  '/notifications': typeof AuthenticatedNotificationsRoute
   '/procurement': typeof AuthenticatedProcurementRoute
   '/production': typeof AuthenticatedProductionRoute
+  '/reports': typeof AuthenticatedReportsRoute
+  '/users': typeof AuthenticatedUsersRoute
+  '/settings/profile': typeof AuthenticatedSettingsProfileRoute
   '/inventory': typeof AuthenticatedInventoryIndexRoute
 }
 export interface FileRoutesById {
@@ -91,10 +141,16 @@ export interface FileRoutesById {
   '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
   '/auth': typeof AuthRoute
   '/reset-password': typeof ResetPasswordRoute
+  '/_authenticated/audit': typeof AuthenticatedAuditRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
+  '/_authenticated/events': typeof AuthenticatedEventsRoute
   '/_authenticated/inventory': typeof AuthenticatedInventoryRouteWithChildren
+  '/_authenticated/notifications': typeof AuthenticatedNotificationsRoute
   '/_authenticated/procurement': typeof AuthenticatedProcurementRoute
   '/_authenticated/production': typeof AuthenticatedProductionRoute
+  '/_authenticated/reports': typeof AuthenticatedReportsRoute
+  '/_authenticated/users': typeof AuthenticatedUsersRoute
+  '/_authenticated/settings/profile': typeof AuthenticatedSettingsProfileRoute
   '/_authenticated/inventory/': typeof AuthenticatedInventoryIndexRoute
 }
 export interface FileRouteTypes {
@@ -103,19 +159,31 @@ export interface FileRouteTypes {
     | '/'
     | '/auth'
     | '/reset-password'
+    | '/audit'
     | '/dashboard'
+    | '/events'
     | '/inventory'
+    | '/notifications'
     | '/procurement'
     | '/production'
+    | '/reports'
+    | '/users'
+    | '/settings/profile'
     | '/inventory/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/auth'
     | '/reset-password'
+    | '/audit'
     | '/dashboard'
+    | '/events'
+    | '/notifications'
     | '/procurement'
     | '/production'
+    | '/reports'
+    | '/users'
+    | '/settings/profile'
     | '/inventory'
   id:
     | '__root__'
@@ -123,10 +191,16 @@ export interface FileRouteTypes {
     | '/_authenticated'
     | '/auth'
     | '/reset-password'
+    | '/_authenticated/audit'
     | '/_authenticated/dashboard'
+    | '/_authenticated/events'
     | '/_authenticated/inventory'
+    | '/_authenticated/notifications'
     | '/_authenticated/procurement'
     | '/_authenticated/production'
+    | '/_authenticated/reports'
+    | '/_authenticated/users'
+    | '/_authenticated/settings/profile'
     | '/_authenticated/inventory/'
   fileRoutesById: FileRoutesById
 }
@@ -167,6 +241,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_authenticated/users': {
+      id: '/_authenticated/users'
+      path: '/users'
+      fullPath: '/users'
+      preLoaderRoute: typeof AuthenticatedUsersRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/reports': {
+      id: '/_authenticated/reports'
+      path: '/reports'
+      fullPath: '/reports'
+      preLoaderRoute: typeof AuthenticatedReportsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/production': {
       id: '/_authenticated/production'
       path: '/production'
@@ -181,11 +269,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedProcurementRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/notifications': {
+      id: '/_authenticated/notifications'
+      path: '/notifications'
+      fullPath: '/notifications'
+      preLoaderRoute: typeof AuthenticatedNotificationsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/inventory': {
       id: '/_authenticated/inventory'
       path: '/inventory'
       fullPath: '/inventory'
       preLoaderRoute: typeof AuthenticatedInventoryRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/events': {
+      id: '/_authenticated/events'
+      path: '/events'
+      fullPath: '/events'
+      preLoaderRoute: typeof AuthenticatedEventsRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/dashboard': {
@@ -195,12 +297,26 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedDashboardRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/audit': {
+      id: '/_authenticated/audit'
+      path: '/audit'
+      fullPath: '/audit'
+      preLoaderRoute: typeof AuthenticatedAuditRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/inventory/': {
       id: '/_authenticated/inventory/'
       path: '/'
       fullPath: '/inventory/'
       preLoaderRoute: typeof AuthenticatedInventoryIndexRouteImport
       parentRoute: typeof AuthenticatedInventoryRoute
+    }
+    '/_authenticated/settings/profile': {
+      id: '/_authenticated/settings/profile'
+      path: '/settings/profile'
+      fullPath: '/settings/profile'
+      preLoaderRoute: typeof AuthenticatedSettingsProfileRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
     }
   }
 }
@@ -220,17 +336,29 @@ const AuthenticatedInventoryRouteWithChildren =
   )
 
 interface AuthenticatedRouteRouteChildren {
+  AuthenticatedAuditRoute: typeof AuthenticatedAuditRoute
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
+  AuthenticatedEventsRoute: typeof AuthenticatedEventsRoute
   AuthenticatedInventoryRoute: typeof AuthenticatedInventoryRouteWithChildren
+  AuthenticatedNotificationsRoute: typeof AuthenticatedNotificationsRoute
   AuthenticatedProcurementRoute: typeof AuthenticatedProcurementRoute
   AuthenticatedProductionRoute: typeof AuthenticatedProductionRoute
+  AuthenticatedReportsRoute: typeof AuthenticatedReportsRoute
+  AuthenticatedUsersRoute: typeof AuthenticatedUsersRoute
+  AuthenticatedSettingsProfileRoute: typeof AuthenticatedSettingsProfileRoute
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
+  AuthenticatedAuditRoute: AuthenticatedAuditRoute,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
+  AuthenticatedEventsRoute: AuthenticatedEventsRoute,
   AuthenticatedInventoryRoute: AuthenticatedInventoryRouteWithChildren,
+  AuthenticatedNotificationsRoute: AuthenticatedNotificationsRoute,
   AuthenticatedProcurementRoute: AuthenticatedProcurementRoute,
   AuthenticatedProductionRoute: AuthenticatedProductionRoute,
+  AuthenticatedReportsRoute: AuthenticatedReportsRoute,
+  AuthenticatedUsersRoute: AuthenticatedUsersRoute,
+  AuthenticatedSettingsProfileRoute: AuthenticatedSettingsProfileRoute,
 }
 
 const AuthenticatedRouteRouteWithChildren =
