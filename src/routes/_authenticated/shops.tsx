@@ -3,10 +3,11 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Store, Pencil } from "lucide-react";
+import { Plus, Store, Pencil, ListChecks } from "lucide-react";
 import { useSession } from "@/hooks/useSession";
-import { CAN_MANAGE_SHOPS, hasAny } from "@/lib/permissions";
+import { CAN_MANAGE_ASSORTMENT, CAN_MANAGE_SHOPS, hasAny } from "@/lib/permissions";
 import { ShopDialog, type Shop } from "@/components/shops/ShopDialog";
+import { AssortmentDialog } from "@/components/shops/AssortmentDialog";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/shops")({
@@ -21,10 +22,12 @@ interface ShopRow extends Shop {
 function ShopsPage() {
   const session = useSession();
   const canManage = hasAny(session.roles, CAN_MANAGE_SHOPS);
+  const canAssort = hasAny(session.roles, CAN_MANAGE_ASSORTMENT);
   const [rows, setRows] = useState<ShopRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState<Shop | null>(null);
   const [open, setOpen] = useState(false);
+  const [assortFor, setAssortFor] = useState<{ id: string; name: string } | null>(null);
 
   async function load() {
     setLoading(true);
@@ -98,7 +101,16 @@ function ShopsPage() {
                       <Badge variant="outline" className="text-muted-foreground">Inactive</Badge>
                     )}
                   </td>
-                  <td className="px-4 py-3">
+                  <td className="px-4 py-3 text-right whitespace-nowrap">
+                    {canAssort && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setAssortFor({ id: s.id, name: s.name })}
+                      >
+                        <ListChecks className="size-4 mr-1" /> Assortment
+                      </Button>
+                    )}
                     {canManage && (
                       <Button
                         variant="ghost"
@@ -124,6 +136,13 @@ function ShopsPage() {
           shop={editing}
           onClose={() => setOpen(false)}
           onSaved={load}
+        />
+      )}
+      {assortFor && (
+        <AssortmentDialog
+          shopId={assortFor.id}
+          shopName={assortFor.name}
+          onClose={() => setAssortFor(null)}
         />
       )}
     </div>

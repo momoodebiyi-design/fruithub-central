@@ -9,6 +9,7 @@ export interface SessionState {
   roles: AppRole[];
   fullName: string | null;
   department: string | null;
+  shopId: string | null;
 }
 
 export function useSession(): SessionState {
@@ -18,6 +19,7 @@ export function useSession(): SessionState {
     roles: [],
     fullName: null,
     department: null,
+    shopId: null,
   });
 
   useEffect(() => {
@@ -25,12 +27,17 @@ export function useSession(): SessionState {
 
     async function hydrate(user: User | null) {
       if (!user) {
-        if (mounted) setState({ loading: false, user: null, roles: [], fullName: null, department: null });
+        if (mounted)
+          setState({ loading: false, user: null, roles: [], fullName: null, department: null, shopId: null });
         return;
       }
       const [{ data: roleRows }, { data: profile }] = await Promise.all([
         supabase.from("user_roles").select("role").eq("user_id", user.id),
-        supabase.from("profiles").select("full_name, department").eq("id", user.id).maybeSingle(),
+        supabase
+          .from("profiles")
+          .select("full_name, department, shop_id")
+          .eq("id", user.id)
+          .maybeSingle(),
       ]);
       if (!mounted) return;
       setState({
@@ -39,6 +46,7 @@ export function useSession(): SessionState {
         roles: (roleRows ?? []).map((r) => r.role as AppRole),
         fullName: profile?.full_name ?? null,
         department: profile?.department ?? null,
+        shopId: (profile as { shop_id?: string | null } | null)?.shop_id ?? null,
       });
     }
 

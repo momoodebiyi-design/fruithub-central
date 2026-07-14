@@ -22,7 +22,10 @@ interface DispatchRow {
   vehicle: string | null;
   notes: string | null;
   status: string;
+  invoice_number: string | null;
+  invoice_url: string | null;
   shops: { name: string } | null;
+  clients: { name: string } | null;
   dispatch_lines: { quantity_dispatched: number; quantity_returned: number }[];
 }
 
@@ -47,7 +50,7 @@ function DispatchesPage() {
     setLoading(true);
     const { data, error } = await supabase
       .from("dispatches")
-      .select("id, reference, dispatched_at, vehicle, notes, status, shops(name), dispatch_lines(quantity_dispatched, quantity_returned)")
+      .select("id, reference, dispatched_at, vehicle, notes, status, invoice_number, invoice_url, shops(name), clients(name), dispatch_lines(quantity_dispatched, quantity_returned)")
       .order("dispatched_at", { ascending: false })
       .limit(100);
     if (error) toast.error(error.message);
@@ -90,7 +93,7 @@ function DispatchesPage() {
             <tr>
               <th className="w-8" />
               <th className="text-left px-4 py-2 font-medium">Reference</th>
-              <th className="text-left px-4 py-2 font-medium">Shop</th>
+              <th className="text-left px-4 py-2 font-medium">Destination</th>
               <th className="text-left px-4 py-2 font-medium">Date</th>
               <th className="text-left px-4 py-2 font-medium">Lines</th>
               <th className="text-left px-4 py-2 font-medium">Status</th>
@@ -121,7 +124,12 @@ function DispatchesPage() {
                     >
                       <td className="px-2"><ChevronRight className={`size-4 transition-transform ${isExpanded ? "rotate-90" : ""}`} /></td>
                       <td className="px-4 py-3 font-mono text-xs">{d.reference}</td>
-                      <td className="px-4 py-3">{d.shops?.name ?? "—"}</td>
+                      <td className="px-4 py-3">
+                        {d.shops?.name ?? (d.clients?.name ? `${d.clients.name} (bulk)` : "—")}
+                        {d.invoice_number && (
+                          <span className="ml-2 text-xs text-muted-foreground font-mono">· {d.invoice_number}</span>
+                        )}
+                      </td>
                       <td className="px-4 py-3 text-muted-foreground">
                         {format(new Date(d.dispatched_at), "d MMM yyyy · HH:mm")}
                       </td>

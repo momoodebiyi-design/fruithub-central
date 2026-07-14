@@ -56,13 +56,17 @@ interface UserRow {
   email: string;
   department: string | null;
   is_active: boolean;
+  shop_id: string | null;
   roles: AppRole[];
 }
+
+interface ShopOpt { id: string; name: string }
 
 function UsersPage() {
   const session = useSession();
   const [invites, setInvites] = useState<Invite[]>([]);
   const [users, setUsers] = useState<UserRow[]>([]);
+  const [shops, setShops] = useState<ShopOpt[]>([]);
   const [open, setOpen] = useState(false);
 
   const canManage = hasAny(session.roles, CAN_MANAGE_USERS);
@@ -74,12 +78,14 @@ function UsersPage() {
   }, [session.loading, canManage]);
 
   async function loadAll() {
-    const [{ data: inv }, { data: profs }, { data: roleRows }] = await Promise.all([
+    const [{ data: inv }, { data: profs }, { data: roleRows }, { data: shopRows }] = await Promise.all([
       supabase.from("user_invites").select("*").is("accepted_at", null).order("created_at", { ascending: false }),
-      supabase.from("profiles").select("id, full_name, email, department, is_active").order("full_name"),
+      supabase.from("profiles").select("id, full_name, email, department, is_active, shop_id").order("full_name"),
       supabase.from("user_roles").select("user_id, role"),
+      supabase.from("shops").select("id, name").eq("is_active", true).order("name"),
     ]);
     setInvites((inv ?? []) as unknown as Invite[]);
+    setShops((shopRows as ShopOpt[]) ?? []);
     const roleMap = new Map<string, AppRole[]>();
     for (const r of (roleRows ?? []) as any[]) {
       const arr = roleMap.get(r.user_id) ?? [];
@@ -89,9 +95,17 @@ function UsersPage() {
     setUsers(
       ((profs ?? []) as any[]).map((p) => ({
         id: p.id, full_name: p.full_name, email: p.email, department: p.department, is_active: p.is_active,
+        shop_id: p.shop_id ?? null,
         roles: roleMap.get(p.id) ?? [],
       })),
     );
+  }
+
+  async function assignShop(userId: string, shopId: string | null) {
+    const { error } = await supabase.from("profiles").update({ shop_id: shopId }).eq("id", userId);
+    if (error) return toast.error(error.message);
+    toast.success("Shop assignment updated");
+    setUsers((us) => us.map((u) => (u.id === userId ? { ...u, shop_id: shopId } : u)));
   }
 
   if (!session.loading && !canManage) {
@@ -170,32 +184,52 @@ function UsersPage() {
                 <TableHead>Email</TableHead>
                 <TableHead>Department</TableHead>
                 <TableHead>Roles</TableHead>
+                <TableHead>Shop</TableHead>
                 <TableHead>Status</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {users.map((u) => (
-                <TableRow key={u.id}>
-                  <TableCell className="font-medium">{u.full_name ?? "—"}</TableCell>
-                  <TableCell className="text-xs text-muted-foreground">{u.email}</TableCell>
-                  <TableCell className="text-xs">{u.department ?? "—"}</TableCell>
-                  <TableCell>
-                    <div className="flex flex-wrap gap-1">
-                      {u.roles.length === 0 && <span className="text-xs text-muted-foreground">none</span>}
-                      {u.roles.map((r) => (
-                        <Badge key={r} variant="outline" className="text-[10px]">{ROLE_LABELS[r]}</Badge>
-                      ))}
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    {u.is_active ? (
-                      <Badge className="bg-brand-green/15 text-brand-green border-0">Active</Badge>
-                    ) : (
-                      <Badge variant="outline">Inactive</Badge>
-                    )}
-                  </TableCell>
-                </TableRow>
-              ))}
+              {users.map((u) => {
+                const isSupervisor = u.roles.includes("shop_supervisor");
+                return (
+                  <TableRow key={u.id}>
+                    <TableCell className="font-medium">{u.full_name ?? "—"}</TableCell>
+                    <TableCell className="text-xs text-muted-foreground">{u.email}</TableCell>
+                    <TableCell className="text-xs">{u.department ?? "—"}</TableCell>
+                    <TableCell>
+                      <div className="flex flex-wrap gap-1">
+                        {u.roles.length === 0 && <span className="text-xs text-muted-foreground">none</span>}
+                        {u.roles.map((r) => (
+                          <Badge key={r} variant="outline" className="text-[10px]">{ROLE_LABELS[r]}</Badge>
+                        ))}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      {isSupervisor ? (
+                        <Select
+                          value={u.shop_id ?? "__none"}
+                          onValueChange={(v) => assignShop(u.id, v === "__none" ? null : v)}
+                        >
+                          <SelectTrigger className="w-40 h-8 text-xs"><SelectValue placeholder="Assign shop" /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="__none">— none —</SelectItem>
+                            {shops.map((s) => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
+                          </SelectContent>
+                        </Select>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">—</span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {u.is_active ? (
+                        <Badge className="bg-brand-green/15 text-brand-green border-0">Active</Badge>
+                      ) : (
+                        <Badge variant="outline">Inactive</Badge>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
             </TableBody>
           </Table>
         </div>

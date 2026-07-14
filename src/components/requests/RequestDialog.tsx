@@ -8,24 +8,21 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { useSession } from "@/hooks/useSession";
+import { isShopSupervisorOnly } from "@/lib/permissions";
 
 interface ItemOpt { id: string; name: string; unit: string; quantity: number }
 interface ShopOpt { id: string; name: string }
 
-export function RequestDialog({
-  onClose,
-  onSaved,
-}: {
-  onClose: () => void;
-  onSaved: () => void;
-}) {
+export function RequestDialog({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }) {
   const session = useSession();
+  const supervisorOnly = isShopSupervisorOnly(session.roles);
   const [items, setItems] = useState<ItemOpt[]>([]);
   const [shops, setShops] = useState<ShopOpt[]>([]);
   const [itemId, setItemId] = useState<string>("");
   const [quantity, setQuantity] = useState("");
   const [purpose, setPurpose] = useState("");
-  const [shopId, setShopId] = useState<string>("");
+  const [shopId, setShopId] = useState<string>(supervisorOnly ? (session.shopId ?? "") : "");
+  const [supervisorShopName, setSupervisorShopName] = useState<string>("");
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -36,12 +33,20 @@ export function RequestDialog({
       ]);
       setItems((i as ItemOpt[]) ?? []);
       setShops((s as ShopOpt[]) ?? []);
+      if (supervisorOnly && session.shopId) {
+        const shop = ((s as ShopOpt[]) ?? []).find((x) => x.id === session.shopId);
+        setSupervisorShopName(shop?.name ?? "");
+        setShopId(session.shopId);
+      }
     })();
-  }, []);
+  }, [supervisorOnly, session.shopId]);
 
   async function save() {
     if (!itemId || !purpose.trim() || Number(quantity) <= 0) {
       return toast.error("Item, quantity and purpose are required");
+    }
+    if (supervisorOnly && !session.shopId) {
+      return toast.error("Your account isn't assigned to a shop. Ask an admin to set it.");
     }
     if (!session.user) return toast.error("Not signed in");
     setSaving(true);
@@ -89,13 +94,17 @@ export function RequestDialog({
             <div className="flex items-end text-xs text-muted-foreground">{item?.unit ?? ""}</div>
           </div>
           <div>
-            <Label>Destination shop (optional)</Label>
-            <Select value={shopId} onValueChange={setShopId}>
-              <SelectTrigger><SelectValue placeholder="None" /></SelectTrigger>
-              <SelectContent>
-                {shops.map((s) => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
-              </SelectContent>
-            </Select>
+            <Label>Destination shop{supervisorOnly ? "" : " (optional)"}</Label>
+            {supervisorOnly ? (
+              <Input value={supervisorShopName || "— unassigned —"} readOnly className="bg-muted/40" />
+            ) : (
+              <Select value={shopId} onValueChange={setShopId}>
+                <SelectTrigger><SelectValue placeholder="None" /></SelectTrigger>
+                <SelectContent>
+                  {shops.map((s) => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            )}
           </div>
           <div>
             <Label>Purpose</Label>

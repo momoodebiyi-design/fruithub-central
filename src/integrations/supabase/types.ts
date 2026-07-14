@@ -71,6 +71,45 @@ export type Database = {
         }
         Relationships: []
       }
+      clients: {
+        Row: {
+          address: string | null
+          contact_name: string | null
+          created_at: string
+          email: string | null
+          id: string
+          is_active: boolean
+          name: string
+          notes: string | null
+          phone: string | null
+          updated_at: string
+        }
+        Insert: {
+          address?: string | null
+          contact_name?: string | null
+          created_at?: string
+          email?: string | null
+          id?: string
+          is_active?: boolean
+          name: string
+          notes?: string | null
+          phone?: string | null
+          updated_at?: string
+        }
+        Update: {
+          address?: string | null
+          contact_name?: string | null
+          created_at?: string
+          email?: string | null
+          id?: string
+          is_active?: boolean
+          name?: string
+          notes?: string | null
+          phone?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       dispatch_lines: {
         Row: {
           created_at: string
@@ -118,48 +157,64 @@ export type Database = {
       }
       dispatches: {
         Row: {
+          client_id: string | null
           created_at: string
           dispatched_at: string
           dispatched_by: string | null
           id: string
+          invoice_number: string | null
+          invoice_url: string | null
           notes: string | null
           received_at: string | null
           received_by: string | null
           reference: string
-          shop_id: string
+          shop_id: string | null
           status: Database["public"]["Enums"]["dispatch_status"]
           updated_at: string
           vehicle: string | null
         }
         Insert: {
+          client_id?: string | null
           created_at?: string
           dispatched_at?: string
           dispatched_by?: string | null
           id?: string
+          invoice_number?: string | null
+          invoice_url?: string | null
           notes?: string | null
           received_at?: string | null
           received_by?: string | null
           reference: string
-          shop_id: string
+          shop_id?: string | null
           status?: Database["public"]["Enums"]["dispatch_status"]
           updated_at?: string
           vehicle?: string | null
         }
         Update: {
+          client_id?: string | null
           created_at?: string
           dispatched_at?: string
           dispatched_by?: string | null
           id?: string
+          invoice_number?: string | null
+          invoice_url?: string | null
           notes?: string | null
           received_at?: string | null
           received_by?: string | null
           reference?: string
-          shop_id?: string
+          shop_id?: string | null
           status?: Database["public"]["Enums"]["dispatch_status"]
           updated_at?: string
           vehicle?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "dispatches_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "dispatches_dispatched_by_fkey"
             columns: ["dispatched_by"]
@@ -285,6 +340,7 @@ export type Database = {
           batch_id: string | null
           created_at: string
           dispatch_id: string | null
+          from_client_id: string | null
           from_shop_id: string | null
           id: string
           item_id: string
@@ -292,6 +348,7 @@ export type Database = {
           quantity: number
           reason: string | null
           related_production_batch: string | null
+          to_client_id: string | null
           to_shop_id: string | null
           type: Database["public"]["Enums"]["movement_type"]
         }
@@ -299,6 +356,7 @@ export type Database = {
           batch_id?: string | null
           created_at?: string
           dispatch_id?: string | null
+          from_client_id?: string | null
           from_shop_id?: string | null
           id?: string
           item_id: string
@@ -306,6 +364,7 @@ export type Database = {
           quantity: number
           reason?: string | null
           related_production_batch?: string | null
+          to_client_id?: string | null
           to_shop_id?: string | null
           type: Database["public"]["Enums"]["movement_type"]
         }
@@ -313,6 +372,7 @@ export type Database = {
           batch_id?: string | null
           created_at?: string
           dispatch_id?: string | null
+          from_client_id?: string | null
           from_shop_id?: string | null
           id?: string
           item_id?: string
@@ -320,6 +380,7 @@ export type Database = {
           quantity?: number
           reason?: string | null
           related_production_batch?: string | null
+          to_client_id?: string | null
           to_shop_id?: string | null
           type?: Database["public"]["Enums"]["movement_type"]
         }
@@ -339,6 +400,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "inventory_movements_from_client_id_fkey"
+            columns: ["from_client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "inventory_movements_from_shop_id_fkey"
             columns: ["from_shop_id"]
             isOneToOne: false
@@ -350,6 +418,13 @@ export type Database = {
             columns: ["item_id"]
             isOneToOne: false
             referencedRelation: "inventory_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_movements_to_client_id_fkey"
+            columns: ["to_client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
             referencedColumns: ["id"]
           },
           {
@@ -484,6 +559,7 @@ export type Database = {
           id: string
           is_active: boolean
           phone: string | null
+          shop_id: string | null
           updated_at: string
         }
         Insert: {
@@ -495,6 +571,7 @@ export type Database = {
           id: string
           is_active?: boolean
           phone?: string | null
+          shop_id?: string | null
           updated_at?: string
         }
         Update: {
@@ -506,9 +583,140 @@ export type Database = {
           id?: string
           is_active?: boolean
           phone?: string | null
+          shop_id?: string | null
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "profiles_shop_id_fkey"
+            columns: ["shop_id"]
+            isOneToOne: false
+            referencedRelation: "shops"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      shop_assortments: {
+        Row: {
+          created_at: string
+          id: string
+          item_id: string
+          shop_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          item_id: string
+          shop_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          item_id?: string
+          shop_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shop_assortments_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shop_assortments_shop_id_fkey"
+            columns: ["shop_id"]
+            isOneToOne: false
+            referencedRelation: "shops"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      shop_stock_count_lines: {
+        Row: {
+          count_id: string
+          created_at: string
+          id: string
+          item_id: string
+          quantity_counted: number
+        }
+        Insert: {
+          count_id: string
+          created_at?: string
+          id?: string
+          item_id: string
+          quantity_counted?: number
+        }
+        Update: {
+          count_id?: string
+          created_at?: string
+          id?: string
+          item_id?: string
+          quantity_counted?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shop_stock_count_lines_count_id_fkey"
+            columns: ["count_id"]
+            isOneToOne: false
+            referencedRelation: "shop_stock_counts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shop_stock_count_lines_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      shop_stock_counts: {
+        Row: {
+          count_date: string
+          count_type: Database["public"]["Enums"]["stock_count_type"]
+          created_at: string
+          id: string
+          notes: string | null
+          shop_id: string
+          status: Database["public"]["Enums"]["stock_count_status"]
+          submitted_at: string | null
+          submitted_by: string | null
+          updated_at: string
+        }
+        Insert: {
+          count_date: string
+          count_type: Database["public"]["Enums"]["stock_count_type"]
+          created_at?: string
+          id?: string
+          notes?: string | null
+          shop_id: string
+          status?: Database["public"]["Enums"]["stock_count_status"]
+          submitted_at?: string | null
+          submitted_by?: string | null
+          updated_at?: string
+        }
+        Update: {
+          count_date?: string
+          count_type?: Database["public"]["Enums"]["stock_count_type"]
+          created_at?: string
+          id?: string
+          notes?: string | null
+          shop_id?: string
+          status?: Database["public"]["Enums"]["stock_count_status"]
+          submitted_at?: string | null
+          submitted_by?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shop_stock_counts_shop_id_fkey"
+            columns: ["shop_id"]
+            isOneToOne: false
+            referencedRelation: "shops"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       shops: {
         Row: {
@@ -742,6 +950,9 @@ export type Database = {
       }
       create_dispatch: {
         Args: {
+          _client_id: string
+          _invoice_number: string
+          _invoice_url: string
           _lines: Json
           _notes: string
           _reference: string
@@ -782,6 +993,10 @@ export type Database = {
         Args: { _notes: string; _request_id: string }
         Returns: undefined
       }
+      submit_shop_stock_count: {
+        Args: { _count_id: string }
+        Returns: undefined
+      }
     }
     Enums: {
       app_role:
@@ -795,6 +1010,7 @@ export type Database = {
         | "event_team"
         | "sales"
         | "readonly"
+        | "shop_supervisor"
       batch_status:
         | "planned"
         | "in_progress"
@@ -823,6 +1039,8 @@ export type Database = {
         | "production_consume"
         | "production_output"
       notification_level: "info" | "warn" | "critical"
+      stock_count_status: "draft" | "submitted"
+      stock_count_type: "opening" | "closing"
       stock_request_status:
         | "pending"
         | "approved"
@@ -967,6 +1185,7 @@ export const Constants = {
         "event_team",
         "sales",
         "readonly",
+        "shop_supervisor",
       ],
       batch_status: [
         "planned",
@@ -1000,6 +1219,8 @@ export const Constants = {
         "production_output",
       ],
       notification_level: ["info", "warn", "critical"],
+      stock_count_status: ["draft", "submitted"],
+      stock_count_type: ["opening", "closing"],
       stock_request_status: [
         "pending",
         "approved",

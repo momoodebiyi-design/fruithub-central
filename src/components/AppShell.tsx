@@ -8,8 +8,10 @@ import {
   Store,
   Send,
   ClipboardList,
+  ClipboardCheck,
   BarChart3,
   Users,
+  Building2,
   Search,
   LogOut,
   Menu,
@@ -18,7 +20,14 @@ import {
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useSession } from "@/hooks/useSession";
-import { CAN_MANAGE_USERS, CAN_VIEW_AUDIT, hasAny, ROLE_LABELS } from "@/lib/permissions";
+import {
+  CAN_MANAGE_USERS,
+  CAN_VIEW_AUDIT,
+  CAN_MANAGE_CLIENTS,
+  hasAny,
+  isShopSupervisorOnly,
+  ROLE_LABELS,
+} from "@/lib/permissions";
 import { NotificationsBell } from "@/components/NotificationsBell";
 import { CommandPalette } from "@/components/CommandPalette";
 import { Button } from "@/components/ui/button";
@@ -28,20 +37,25 @@ type NavItem = {
   to: string;
   label: string;
   icon: typeof LayoutDashboard;
-  gated?: (roles: string[]) => boolean;
 };
 
-const NAV: NavItem[] = [
+const FULL_NAV: NavItem[] = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { to: "/inventory", label: "Inventory", icon: Boxes },
   { to: "/production", label: "Production", icon: FlaskConical },
   { to: "/dispatches", label: "Dispatches", icon: Send },
   { to: "/shops", label: "Shops", icon: Store },
+  { to: "/shop-counts", label: "Daily counts", icon: ClipboardCheck },
   { to: "/requests", label: "Stock requests", icon: ClipboardList },
   { to: "/procurement", label: "Procurement", icon: Truck },
   { to: "/reports", label: "Reports", icon: BarChart3 },
 ];
 
+const SUPERVISOR_NAV: NavItem[] = [
+  { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { to: "/shop-counts", label: "Daily counts", icon: ClipboardCheck },
+  { to: "/requests", label: "Stock requests", icon: ClipboardList },
+];
 
 export function AppShell({ children }: { children: ReactNode }) {
   const session = useSession();
@@ -61,25 +75,29 @@ export function AppShell({ children }: { children: ReactNode }) {
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
+  const supervisorOnly = isShopSupervisorOnly(session.roles);
   const canManageUsers = hasAny(session.roles, CAN_MANAGE_USERS);
   const canViewAudit = hasAny(session.roles, CAN_VIEW_AUDIT);
+  const canManageClients = hasAny(session.roles, CAN_MANAGE_CLIENTS);
 
   async function signOut() {
     await supabase.auth.signOut();
     navigate({ to: "/auth", replace: true });
   }
 
-  const items = [
-    ...NAV,
-    ...(canManageUsers ? [{ to: "/users", label: "Users", icon: Users } as NavItem] : []),
-    ...(canViewAudit ? [{ to: "/audit", label: "Audit Log", icon: ShieldCheck } as NavItem] : []),
-  ];
+  const items: NavItem[] = supervisorOnly
+    ? SUPERVISOR_NAV
+    : [
+        ...FULL_NAV,
+        ...(canManageClients ? [{ to: "/clients", label: "Bulk clients", icon: Building2 } as NavItem] : []),
+        ...(canManageUsers ? [{ to: "/users", label: "Users", icon: Users } as NavItem] : []),
+        ...(canViewAudit ? [{ to: "/audit", label: "Audit Log", icon: ShieldCheck } as NavItem] : []),
+      ];
 
   const primaryRole = session.roles[0];
 
   return (
     <div className="flex min-h-screen bg-background text-foreground">
-      {/* Sidebar */}
       <aside
         className={cn(
           "fixed inset-y-0 left-0 z-40 w-64 shrink-0 border-r bg-sidebar flex flex-col transition-transform lg:sticky lg:top-0 lg:h-screen lg:translate-x-0",
@@ -153,7 +171,6 @@ export function AppShell({ children }: { children: ReactNode }) {
         />
       )}
 
-      {/* Main */}
       <div className="flex-1 flex flex-col min-w-0">
         <header className="h-16 border-b bg-background/80 backdrop-blur-sm sticky top-0 z-20 flex items-center justify-between px-4 lg:px-8 gap-4">
           <button
@@ -164,17 +181,20 @@ export function AppShell({ children }: { children: ReactNode }) {
             <Menu className="size-5" />
           </button>
 
-          <div className="flex-1 max-w-xl relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground pointer-events-none" />
-            <button
-              type="button"
-              onClick={() => setPaletteOpen(true)}
-              className="w-full pl-9 pr-16 py-1.5 bg-muted rounded-md text-sm text-left text-muted-foreground/80 hover:bg-muted/70 outline-none focus:ring-1 focus:ring-brand-orange/40"
-            >
-              Search inventory, batches, suppliers…
-              <kbd className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-mono bg-background/80 border rounded px-1.5 py-0.5">⌘K</kbd>
-            </button>
-          </div>
+          {!supervisorOnly && (
+            <div className="flex-1 max-w-xl relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground pointer-events-none" />
+              <button
+                type="button"
+                onClick={() => setPaletteOpen(true)}
+                className="w-full pl-9 pr-16 py-1.5 bg-muted rounded-md text-sm text-left text-muted-foreground/80 hover:bg-muted/70 outline-none focus:ring-1 focus:ring-brand-orange/40"
+              >
+                Search inventory, batches, suppliers…
+                <kbd className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-mono bg-background/80 border rounded px-1.5 py-0.5">⌘K</kbd>
+              </button>
+            </div>
+          )}
+          {supervisorOnly && <div className="flex-1" />}
 
           <div className="flex items-center gap-3">
             <NotificationsBell />
@@ -188,7 +208,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           <div className="max-w-7xl mx-auto w-full">{children}</div>
         </main>
       </div>
-      <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} />
+      {!supervisorOnly && <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} />}
     </div>
   );
 }
