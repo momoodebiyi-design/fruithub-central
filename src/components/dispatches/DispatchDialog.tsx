@@ -49,7 +49,7 @@ export function DispatchDialog({
     const valid = lines.filter((l) => l.item_id && Number(l.quantity) > 0);
     if (valid.length === 0) return toast.error("Add at least one line");
     setSaving(true);
-    const { error } = await supabase.rpc("create_dispatch", {
+    const { error } = await supabase.rpc("create_dispatch" as any, {
       _shop_id: shopId,
       _reference: reference.trim(),
       _vehicle: vehicle.trim() || null,

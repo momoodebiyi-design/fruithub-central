@@ -63,7 +63,7 @@ function RequestsPage() {
 
   async function approve(id: string) {
     const notes = window.prompt("Approval notes (optional)") ?? undefined;
-    const { error } = await supabase.rpc("approve_stock_request", { _request_id: id, _notes: notes ?? null });
+    const { error } = await supabase.rpc("approve_stock_request", { _request_id: id, _notes: (notes ?? null) as any });
     if (error) return toast.error(error.message);
     toast.success("Request approved & stock issued");
     load();

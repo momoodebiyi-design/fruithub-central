@@ -47,7 +47,7 @@ export function ReturnDialog({
       .filter((l) => l.quantity > 0);
     if (payload.length === 0) return toast.error("Enter at least one return quantity");
     setSaving(true);
-    const { error } = await supabase.rpc("record_shop_return", {
+    const { error } = await supabase.rpc("record_shop_return" as any, {
       _dispatch_id: dispatchId,
       _lines: payload,
       _reason: reason.trim() || null,
