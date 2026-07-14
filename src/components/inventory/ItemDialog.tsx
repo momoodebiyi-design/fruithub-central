@@ -76,8 +76,8 @@ export function ItemDialog({
       is_active: form.is_active ?? true,
     };
     const { error } = editing
-      ? await supabase.from("inventory_items").update(payload).eq("id", item!.id!)
-      : await supabase.from("inventory_items").insert(payload);
+      ? await supabase.from("inventory_items").update(payload as any).eq("id", item!.id!)
+      : await supabase.from("inventory_items").insert(payload as any);
     setSaving(false);
     if (error) return toast.error(error.message);
     toast.success(editing ? "Item updated" : "Item created");
