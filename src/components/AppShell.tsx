@@ -5,7 +5,9 @@ import {
   Boxes,
   FlaskConical,
   Truck,
-  CalendarDays,
+  Store,
+  Send,
+  ClipboardList,
   BarChart3,
   Users,
   Search,
@@ -33,10 +35,13 @@ const NAV: NavItem[] = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { to: "/inventory", label: "Inventory", icon: Boxes },
   { to: "/production", label: "Production", icon: FlaskConical },
+  { to: "/dispatches", label: "Dispatches", icon: Send },
+  { to: "/shops", label: "Shops", icon: Store },
+  { to: "/requests", label: "Stock requests", icon: ClipboardList },
   { to: "/procurement", label: "Procurement", icon: Truck },
-  { to: "/events", label: "Events", icon: CalendarDays },
   { to: "/reports", label: "Reports", icon: BarChart3 },
 ];
+
 
 export function AppShell({ children }: { children: ReactNode }) {
   const session = useSession();
