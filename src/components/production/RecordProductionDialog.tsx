@@ -83,7 +83,7 @@ export function RecordProductionDialog({
       _product_item_id: outputItemId,
       _quantity: outQ,
       _consumption: consumption as any,
-      _qc_notes: qcNotes || null,
+      _qc_notes: qcNotes || undefined,
     });
     setSaving(false);
     if (error) return toast.error(error.message);
