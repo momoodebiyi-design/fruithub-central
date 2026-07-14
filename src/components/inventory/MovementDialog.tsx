@@ -1,0 +1,104 @@
+import { useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { toast } from "sonner";
+
+type MovementType = "stock_in" | "stock_out" | "adjustment" | "damaged" | "expired" | "wastage" | "transfer";
+
+const TYPES: { v: MovementType; label: string }[] = [
+  { v: "stock_in", label: "Stock in (receipt)" },
+  { v: "stock_out", label: "Stock out" },
+  { v: "adjustment", label: "Adjustment" },
+  { v: "wastage", label: "Wastage" },
+  { v: "damaged", label: "Damaged" },
+  { v: "expired", label: "Expired" },
+  { v: "transfer", label: "Transfer" },
+];
+
+export function MovementDialog({
+  item,
+  onClose,
+  onSaved,
+}: {
+  item: { id: string; name: string; sku: string; unit: string; quantity: number };
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const [type, setType] = useState<MovementType>("stock_in");
+  const [qty, setQty] = useState("");
+  const [reason, setReason] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  async function save() {
+    const n = Number(qty);
+    if (!n || n <= 0) return toast.error("Enter a positive quantity");
+    setSaving(true);
+    const { data: userData } = await supabase.auth.getUser();
+    const { error } = await supabase.from("inventory_movements").insert({
+      item_id: item.id,
+      type,
+      quantity: n,
+      reason: reason || null,
+      performed_by: userData.user?.id,
+    });
+    setSaving(false);
+    if (error) return toast.error(error.message);
+    toast.success("Movement recorded");
+    onSaved();
+    onClose();
+  }
+
+  return (
+    <Dialog open onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-w-md">
+        <DialogHeader><DialogTitle>Record movement</DialogTitle></DialogHeader>
+        <div className="space-y-4">
+          <div className="bg-muted rounded-md p-3">
+            <p className="text-sm font-medium">{item.name}</p>
+            <p className="text-xs text-muted-foreground font-mono">
+              {item.sku} · {Number(item.quantity).toLocaleString()} {item.unit} on hand
+            </p>
+          </div>
+          <div>
+            <Label>Type</Label>
+            <Select value={type} onValueChange={(v) => setType(v as MovementType)}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>{TYPES.map((t) => <SelectItem key={t.v} value={t.v}>{t.label}</SelectItem>)}</SelectContent>
+            </Select>
+          </div>
+          <div>
+            <Label>Quantity ({item.unit})</Label>
+            <Input type="number" step="0.01" min="0" value={qty} onChange={(e) => setQty(e.target.value)} />
+          </div>
+          <div>
+            <Label>Reason / notes</Label>
+            <Textarea value={reason} onChange={(e) => setReason(e.target.value)} rows={2} />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="ghost" onClick={onClose}>Cancel</Button>
+          <Button onClick={save} disabled={saving} className="bg-brand-orange text-white hover:bg-brand-orange/90">
+            {saving ? "Recording…" : "Record"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
