@@ -20,13 +20,14 @@ export const Route = createFileRoute("/_authenticated/audit")({
 
 interface AuditRow {
   id: string;
-  actor_id: string | null;
+  user_id: string | null;
   action: string;
   entity: string;
   entity_id: string | null;
-  metadata: any;
+  new_value: any;
+  previous_value: any;
   created_at: string;
-  actor: { full_name: string | null; email: string } | null;
+  actor_name?: string | null;
 }
 
 function AuditPage() {
@@ -39,10 +40,18 @@ function AuditPage() {
     (async () => {
       const { data } = await supabase
         .from("audit_log")
-        .select("id, actor_id, action, entity, entity_id, metadata, created_at, actor:profiles!audit_log_actor_id_fkey(full_name, email)")
+        .select("id, user_id, action, entity, entity_id, new_value, previous_value, created_at")
         .order("created_at", { ascending: false })
         .limit(200);
-      setRows((data ?? []) as unknown as AuditRow[]);
+      const list = (data ?? []) as AuditRow[];
+      const ids = Array.from(new Set(list.map((r) => r.user_id).filter(Boolean))) as string[];
+      if (ids.length) {
+        const { data: profs } = await supabase.from("profiles").select("id, full_name, email").in("id", ids);
+        const map = new Map<string, string>();
+        for (const p of (profs ?? []) as any[]) map.set(p.id, p.full_name ?? p.email);
+        for (const r of list) r.actor_name = r.user_id ? (map.get(r.user_id) ?? null) : null;
+      }
+      setRows(list);
     })();
   }, [canView]);
 
@@ -65,7 +74,7 @@ function AuditPage() {
               <TableHead>Actor</TableHead>
               <TableHead>Action</TableHead>
               <TableHead>Entity</TableHead>
-              <TableHead>Details</TableHead>
+              <TableHead>Change</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -74,11 +83,11 @@ function AuditPage() {
                 <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
                   {formatDistanceToNow(new Date(r.created_at), { addSuffix: true })}
                 </TableCell>
-                <TableCell className="text-xs">{r.actor?.full_name ?? r.actor?.email ?? "system"}</TableCell>
+                <TableCell className="text-xs">{r.actor_name ?? "system"}</TableCell>
                 <TableCell><Badge variant="outline" className="text-[10px] uppercase tracking-wider">{r.action}</Badge></TableCell>
                 <TableCell className="text-xs font-mono">{r.entity}</TableCell>
-                <TableCell className="text-[11px] font-mono text-muted-foreground max-w-xs truncate">
-                  {r.metadata ? JSON.stringify(r.metadata) : "—"}
+                <TableCell className="text-[11px] font-mono text-muted-foreground max-w-md truncate">
+                  {r.new_value ? JSON.stringify(r.new_value) : r.previous_value ? JSON.stringify(r.previous_value) : "—"}
                 </TableCell>
               </TableRow>
             ))}
