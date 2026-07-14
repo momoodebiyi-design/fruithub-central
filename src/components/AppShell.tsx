@@ -1,4 +1,4 @@
-import { type ReactNode, useState } from "react";
+import { type ReactNode, useEffect, useState } from "react";
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import {
   LayoutDashboard,
@@ -18,6 +18,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useSession } from "@/hooks/useSession";
 import { CAN_MANAGE_USERS, CAN_VIEW_AUDIT, hasAny, ROLE_LABELS } from "@/lib/permissions";
 import { NotificationsBell } from "@/components/NotificationsBell";
+import { CommandPalette } from "@/components/CommandPalette";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -42,6 +43,18 @@ export function AppShell({ children }: { children: ReactNode }) {
   const navigate = useNavigate();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [paletteOpen, setPaletteOpen] = useState(false);
+
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        setPaletteOpen((v) => !v);
+      }
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
 
   const canManageUsers = hasAny(session.roles, CAN_MANAGE_USERS);
   const canViewAudit = hasAny(session.roles, CAN_VIEW_AUDIT);
@@ -148,11 +161,14 @@ export function AppShell({ children }: { children: ReactNode }) {
 
           <div className="flex-1 max-w-xl relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground pointer-events-none" />
-            <input
-              type="text"
-              placeholder="Search inventory, batches, SKUs…"
-              className="w-full pl-9 pr-4 py-1.5 bg-muted border-none rounded-md text-sm placeholder:text-muted-foreground/70 outline-none focus:ring-1 focus:ring-brand-orange/40"
-            />
+            <button
+              type="button"
+              onClick={() => setPaletteOpen(true)}
+              className="w-full pl-9 pr-16 py-1.5 bg-muted rounded-md text-sm text-left text-muted-foreground/80 hover:bg-muted/70 outline-none focus:ring-1 focus:ring-brand-orange/40"
+            >
+              Search inventory, batches, suppliers…
+              <kbd className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-mono bg-background/80 border rounded px-1.5 py-0.5">⌘K</kbd>
+            </button>
           </div>
 
           <div className="flex items-center gap-3">
@@ -167,6 +183,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           <div className="max-w-7xl mx-auto w-full">{children}</div>
         </main>
       </div>
+      <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} />
     </div>
   );
 }

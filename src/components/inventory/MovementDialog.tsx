@@ -48,7 +48,7 @@ export function MovementDialog({
 
   async function save() {
     const n = Number(qty);
-    if (!n || n <= 0) return toast.error("Enter a positive quantity");
+    if (!n || (type !== "adjustment" && n <= 0)) return toast.error("Enter a quantity");
     setSaving(true);
     const { data: userData } = await supabase.auth.getUser();
     const { error } = await supabase.from("inventory_movements").insert({
@@ -65,6 +65,8 @@ export function MovementDialog({
     onClose();
   }
 
+  const active = TYPES.find((t) => t.v === type);
+
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-w-md">
@@ -77,15 +79,16 @@ export function MovementDialog({
             </p>
           </div>
           <div>
-            <Label>Type</Label>
+            <Label>Movement type</Label>
             <Select value={type} onValueChange={(v) => setType(v as MovementType)}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>{TYPES.map((t) => <SelectItem key={t.v} value={t.v}>{t.label}</SelectItem>)}</SelectContent>
             </Select>
+            {active && <p className="text-[11px] text-muted-foreground mt-1">{active.hint}</p>}
           </div>
           <div>
-            <Label>Quantity ({item.unit})</Label>
-            <Input type="number" step="0.01" min="0" value={qty} onChange={(e) => setQty(e.target.value)} />
+            <Label>Quantity ({item.unit}){type === "adjustment" && " — use negative to reduce"}</Label>
+            <Input type="number" step="0.01" value={qty} onChange={(e) => setQty(e.target.value)} />
           </div>
           <div>
             <Label>Reason / notes</Label>

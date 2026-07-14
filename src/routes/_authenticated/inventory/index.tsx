@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -19,11 +19,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Plus, ArrowUpDown } from "lucide-react";
+import { Plus, ArrowUpDown, ClipboardList, Upload } from "lucide-react";
 import { useSession } from "@/hooks/useSession";
 import { CAN_WRITE_INVENTORY, hasAny } from "@/lib/permissions";
 import { ItemDialog } from "@/components/inventory/ItemDialog";
 import { MovementDialog } from "@/components/inventory/MovementDialog";
+import { StockCountDialog } from "@/components/inventory/StockCountDialog";
+import { BulkImportDialog } from "@/components/inventory/BulkImportDialog";
 
 export const Route = createFileRoute("/_authenticated/inventory/")({
   component: InventoryList,
@@ -45,6 +47,7 @@ export interface Item {
 const CATEGORIES = ["all", "raw_material", "packaging", "finished_good", "consumable"] as const;
 
 function InventoryList() {
+  const navigate = useNavigate();
   const session = useSession();
   const canEdit = hasAny(session.roles, CAN_WRITE_INVENTORY);
   const [items, setItems] = useState<Item[]>([]);
@@ -52,6 +55,8 @@ function InventoryList() {
   const [cat, setCat] = useState<string>("all");
   const [dialogItem, setDialogItem] = useState<Item | null | undefined>(undefined);
   const [moveItem, setMoveItem] = useState<Item | null>(null);
+  const [countItem, setCountItem] = useState<Item | null>(null);
+  const [showImport, setShowImport] = useState(false);
 
   async function load() {
     const { data } = await supabase
@@ -86,13 +91,18 @@ function InventoryList() {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Inventory</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            {items.length} SKUs · {filtered.length} shown
+            {items.length} SKUs · {filtered.length} shown · stock changes via movements only
           </p>
         </div>
         {canEdit && (
-          <Button onClick={() => setDialogItem(null)} className="bg-brand-orange text-white hover:bg-brand-orange/90">
-            <Plus className="size-4 mr-2" /> New item
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={() => setShowImport(true)}>
+              <Upload className="size-4 mr-2" /> Bulk import
+            </Button>
+            <Button onClick={() => setDialogItem(null)} className="bg-brand-orange text-white hover:bg-brand-orange/90">
+              <Plus className="size-4 mr-2" /> New item
+            </Button>
+          </div>
         )}
       </div>
 
@@ -125,7 +135,11 @@ function InventoryList() {
             {filtered.map((it) => {
               const low = it.reorder_level !== null && Number(it.quantity) <= Number(it.reorder_level);
               return (
-                <TableRow key={it.id}>
+                <TableRow
+                  key={it.id}
+                  className="cursor-pointer hover:bg-muted/40"
+                  onClick={() => navigate({ to: "/inventory/$itemId", params: { itemId: it.id } })}
+                >
                   <TableCell className="font-mono text-xs">{it.sku}</TableCell>
                   <TableCell className="font-medium">{it.name}</TableCell>
                   <TableCell className="text-xs text-muted-foreground">{it.category.replace("_", " ")}</TableCell>
@@ -140,11 +154,14 @@ function InventoryList() {
                       <Badge className="bg-brand-green/15 text-brand-green hover:bg-brand-green/15 border-0">OK</Badge>
                     )}
                   </TableCell>
-                  <TableCell className="text-right">
+                  <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
                     {canEdit && (
-                      <div className="flex justify-end gap-2">
-                        <Button size="sm" variant="ghost" onClick={() => setMoveItem(it)}>
+                      <div className="flex justify-end gap-1">
+                        <Button size="sm" variant="ghost" title="Record movement" onClick={() => setMoveItem(it)}>
                           <ArrowUpDown className="size-3.5" />
+                        </Button>
+                        <Button size="sm" variant="ghost" title="Stock count" onClick={() => setCountItem(it)}>
+                          <ClipboardList className="size-3.5" />
                         </Button>
                         <Button size="sm" variant="ghost" onClick={() => setDialogItem(it)}>Edit</Button>
                       </div>
@@ -165,6 +182,12 @@ function InventoryList() {
       )}
       {moveItem && (
         <MovementDialog item={moveItem} onClose={() => setMoveItem(null)} onSaved={load} />
+      )}
+      {countItem && (
+        <StockCountDialog item={countItem} onClose={() => setCountItem(null)} onSaved={load} />
+      )}
+      {showImport && (
+        <BulkImportDialog onClose={() => setShowImport(false)} onImported={load} />
       )}
     </div>
   );
