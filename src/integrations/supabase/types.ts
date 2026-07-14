@@ -71,6 +71,118 @@ export type Database = {
         }
         Relationships: []
       }
+      dispatch_lines: {
+        Row: {
+          created_at: string
+          dispatch_id: string
+          id: string
+          item_id: string
+          notes: string | null
+          quantity_dispatched: number
+          quantity_returned: number
+        }
+        Insert: {
+          created_at?: string
+          dispatch_id: string
+          id?: string
+          item_id: string
+          notes?: string | null
+          quantity_dispatched: number
+          quantity_returned?: number
+        }
+        Update: {
+          created_at?: string
+          dispatch_id?: string
+          id?: string
+          item_id?: string
+          notes?: string | null
+          quantity_dispatched?: number
+          quantity_returned?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dispatch_lines_dispatch_id_fkey"
+            columns: ["dispatch_id"]
+            isOneToOne: false
+            referencedRelation: "dispatches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dispatch_lines_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      dispatches: {
+        Row: {
+          created_at: string
+          dispatched_at: string
+          dispatched_by: string | null
+          id: string
+          notes: string | null
+          received_at: string | null
+          received_by: string | null
+          reference: string
+          shop_id: string
+          status: Database["public"]["Enums"]["dispatch_status"]
+          updated_at: string
+          vehicle: string | null
+        }
+        Insert: {
+          created_at?: string
+          dispatched_at?: string
+          dispatched_by?: string | null
+          id?: string
+          notes?: string | null
+          received_at?: string | null
+          received_by?: string | null
+          reference: string
+          shop_id: string
+          status?: Database["public"]["Enums"]["dispatch_status"]
+          updated_at?: string
+          vehicle?: string | null
+        }
+        Update: {
+          created_at?: string
+          dispatched_at?: string
+          dispatched_by?: string | null
+          id?: string
+          notes?: string | null
+          received_at?: string | null
+          received_by?: string | null
+          reference?: string
+          shop_id?: string
+          status?: Database["public"]["Enums"]["dispatch_status"]
+          updated_at?: string
+          vehicle?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dispatches_dispatched_by_fkey"
+            columns: ["dispatched_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dispatches_received_by_fkey"
+            columns: ["received_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dispatches_shop_id_fkey"
+            columns: ["shop_id"]
+            isOneToOne: false
+            referencedRelation: "shops"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       inventory_batches: {
         Row: {
           batch_number: string
@@ -172,34 +284,43 @@ export type Database = {
         Row: {
           batch_id: string | null
           created_at: string
+          dispatch_id: string | null
+          from_shop_id: string | null
           id: string
           item_id: string
           performed_by: string | null
           quantity: number
           reason: string | null
           related_production_batch: string | null
+          to_shop_id: string | null
           type: Database["public"]["Enums"]["movement_type"]
         }
         Insert: {
           batch_id?: string | null
           created_at?: string
+          dispatch_id?: string | null
+          from_shop_id?: string | null
           id?: string
           item_id: string
           performed_by?: string | null
           quantity: number
           reason?: string | null
           related_production_batch?: string | null
+          to_shop_id?: string | null
           type: Database["public"]["Enums"]["movement_type"]
         }
         Update: {
           batch_id?: string | null
           created_at?: string
+          dispatch_id?: string | null
+          from_shop_id?: string | null
           id?: string
           item_id?: string
           performed_by?: string | null
           quantity?: number
           reason?: string | null
           related_production_batch?: string | null
+          to_shop_id?: string | null
           type?: Database["public"]["Enums"]["movement_type"]
         }
         Relationships: [
@@ -211,10 +332,31 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "inventory_movements_dispatch_id_fkey"
+            columns: ["dispatch_id"]
+            isOneToOne: false
+            referencedRelation: "dispatches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_movements_from_shop_id_fkey"
+            columns: ["from_shop_id"]
+            isOneToOne: false
+            referencedRelation: "shops"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "inventory_movements_item_id_fkey"
             columns: ["item_id"]
             isOneToOne: false
             referencedRelation: "inventory_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_movements_to_shop_id_fkey"
+            columns: ["to_shop_id"]
+            isOneToOne: false
+            referencedRelation: "shops"
             referencedColumns: ["id"]
           },
         ]
@@ -368,6 +510,137 @@ export type Database = {
         }
         Relationships: []
       }
+      shops: {
+        Row: {
+          contact_email: string | null
+          contact_phone: string | null
+          created_at: string
+          id: string
+          is_active: boolean
+          location: string | null
+          manager_id: string | null
+          name: string
+          notes: string | null
+          updated_at: string
+        }
+        Insert: {
+          contact_email?: string | null
+          contact_phone?: string | null
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          location?: string | null
+          manager_id?: string | null
+          name: string
+          notes?: string | null
+          updated_at?: string
+        }
+        Update: {
+          contact_email?: string | null
+          contact_phone?: string | null
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          location?: string | null
+          manager_id?: string | null
+          name?: string
+          notes?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shops_manager_id_fkey"
+            columns: ["manager_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      stock_requests: {
+        Row: {
+          created_at: string
+          destination_shop_id: string | null
+          fulfilled_movement_id: string | null
+          id: string
+          item_id: string
+          purpose: string
+          quantity: number
+          requested_by: string
+          review_notes: string | null
+          reviewed_at: string | null
+          reviewer_id: string | null
+          status: Database["public"]["Enums"]["stock_request_status"]
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          destination_shop_id?: string | null
+          fulfilled_movement_id?: string | null
+          id?: string
+          item_id: string
+          purpose: string
+          quantity: number
+          requested_by: string
+          review_notes?: string | null
+          reviewed_at?: string | null
+          reviewer_id?: string | null
+          status?: Database["public"]["Enums"]["stock_request_status"]
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          destination_shop_id?: string | null
+          fulfilled_movement_id?: string | null
+          id?: string
+          item_id?: string
+          purpose?: string
+          quantity?: number
+          requested_by?: string
+          review_notes?: string | null
+          reviewed_at?: string | null
+          reviewer_id?: string | null
+          status?: Database["public"]["Enums"]["stock_request_status"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "stock_requests_destination_shop_id_fkey"
+            columns: ["destination_shop_id"]
+            isOneToOne: false
+            referencedRelation: "shops"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stock_requests_fulfilled_movement_id_fkey"
+            columns: ["fulfilled_movement_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_movements"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stock_requests_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stock_requests_requested_by_fkey"
+            columns: ["requested_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stock_requests_reviewer_id_fkey"
+            columns: ["reviewer_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       suppliers: {
         Row: {
           contact_name: string | null
@@ -463,6 +736,20 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      approve_stock_request: {
+        Args: { _notes?: string; _request_id: string }
+        Returns: string
+      }
+      create_dispatch: {
+        Args: {
+          _lines: Json
+          _notes: string
+          _reference: string
+          _shop_id: string
+          _vehicle: string
+        }
+        Returns: string
+      }
       has_any_role: {
         Args: {
           _roles: Database["public"]["Enums"]["app_role"][]
@@ -487,6 +774,14 @@ export type Database = {
         }
         Returns: string
       }
+      record_shop_return: {
+        Args: { _dispatch_id: string; _lines: Json; _reason: string }
+        Returns: undefined
+      }
+      reject_stock_request: {
+        Args: { _notes: string; _request_id: string }
+        Returns: undefined
+      }
     }
     Enums: {
       app_role:
@@ -506,6 +801,12 @@ export type Database = {
         | "completed"
         | "qc_passed"
         | "qc_failed"
+      dispatch_status:
+        | "draft"
+        | "dispatched"
+        | "received"
+        | "reconciled"
+        | "cancelled"
       inventory_category:
         | "packaging"
         | "raw_material"
@@ -522,6 +823,12 @@ export type Database = {
         | "production_consume"
         | "production_output"
       notification_level: "info" | "warn" | "critical"
+      stock_request_status:
+        | "pending"
+        | "approved"
+        | "rejected"
+        | "fulfilled"
+        | "cancelled"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -668,6 +975,13 @@ export const Constants = {
         "qc_passed",
         "qc_failed",
       ],
+      dispatch_status: [
+        "draft",
+        "dispatched",
+        "received",
+        "reconciled",
+        "cancelled",
+      ],
       inventory_category: [
         "packaging",
         "raw_material",
@@ -686,6 +1000,13 @@ export const Constants = {
         "production_output",
       ],
       notification_level: ["info", "warn", "critical"],
+      stock_request_status: [
+        "pending",
+        "approved",
+        "rejected",
+        "fulfilled",
+        "cancelled",
+      ],
     },
   },
 } as const

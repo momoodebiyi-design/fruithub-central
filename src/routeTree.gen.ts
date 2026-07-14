@@ -14,12 +14,14 @@ import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedUsersRouteImport } from './routes/_authenticated/users'
+import { Route as AuthenticatedShopsRouteImport } from './routes/_authenticated/shops'
+import { Route as AuthenticatedRequestsRouteImport } from './routes/_authenticated/requests'
 import { Route as AuthenticatedReportsRouteImport } from './routes/_authenticated/reports'
 import { Route as AuthenticatedProductionRouteImport } from './routes/_authenticated/production'
 import { Route as AuthenticatedProcurementRouteImport } from './routes/_authenticated/procurement'
 import { Route as AuthenticatedNotificationsRouteImport } from './routes/_authenticated/notifications'
 import { Route as AuthenticatedInventoryRouteImport } from './routes/_authenticated/inventory'
-import { Route as AuthenticatedEventsRouteImport } from './routes/_authenticated/events'
+import { Route as AuthenticatedDispatchesRouteImport } from './routes/_authenticated/dispatches'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedAuditRouteImport } from './routes/_authenticated/audit'
 import { Route as AuthenticatedInventoryIndexRouteImport } from './routes/_authenticated/inventory/index'
@@ -50,6 +52,16 @@ const AuthenticatedUsersRoute = AuthenticatedUsersRouteImport.update({
   path: '/users',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedShopsRoute = AuthenticatedShopsRouteImport.update({
+  id: '/shops',
+  path: '/shops',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedRequestsRoute = AuthenticatedRequestsRouteImport.update({
+  id: '/requests',
+  path: '/requests',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedReportsRoute = AuthenticatedReportsRouteImport.update({
   id: '/reports',
   path: '/reports',
@@ -77,9 +89,9 @@ const AuthenticatedInventoryRoute = AuthenticatedInventoryRouteImport.update({
   path: '/inventory',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
-const AuthenticatedEventsRoute = AuthenticatedEventsRouteImport.update({
-  id: '/events',
-  path: '/events',
+const AuthenticatedDispatchesRoute = AuthenticatedDispatchesRouteImport.update({
+  id: '/dispatches',
+  path: '/dispatches',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedDashboardRoute = AuthenticatedDashboardRouteImport.update({
@@ -117,12 +129,14 @@ export interface FileRoutesByFullPath {
   '/reset-password': typeof ResetPasswordRoute
   '/audit': typeof AuthenticatedAuditRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
-  '/events': typeof AuthenticatedEventsRoute
+  '/dispatches': typeof AuthenticatedDispatchesRoute
   '/inventory': typeof AuthenticatedInventoryRouteWithChildren
   '/notifications': typeof AuthenticatedNotificationsRoute
   '/procurement': typeof AuthenticatedProcurementRoute
   '/production': typeof AuthenticatedProductionRoute
   '/reports': typeof AuthenticatedReportsRoute
+  '/requests': typeof AuthenticatedRequestsRoute
+  '/shops': typeof AuthenticatedShopsRoute
   '/users': typeof AuthenticatedUsersRoute
   '/inventory/$itemId': typeof AuthenticatedInventoryItemIdRoute
   '/settings/profile': typeof AuthenticatedSettingsProfileRoute
@@ -134,11 +148,13 @@ export interface FileRoutesByTo {
   '/reset-password': typeof ResetPasswordRoute
   '/audit': typeof AuthenticatedAuditRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
-  '/events': typeof AuthenticatedEventsRoute
+  '/dispatches': typeof AuthenticatedDispatchesRoute
   '/notifications': typeof AuthenticatedNotificationsRoute
   '/procurement': typeof AuthenticatedProcurementRoute
   '/production': typeof AuthenticatedProductionRoute
   '/reports': typeof AuthenticatedReportsRoute
+  '/requests': typeof AuthenticatedRequestsRoute
+  '/shops': typeof AuthenticatedShopsRoute
   '/users': typeof AuthenticatedUsersRoute
   '/inventory/$itemId': typeof AuthenticatedInventoryItemIdRoute
   '/settings/profile': typeof AuthenticatedSettingsProfileRoute
@@ -152,12 +168,14 @@ export interface FileRoutesById {
   '/reset-password': typeof ResetPasswordRoute
   '/_authenticated/audit': typeof AuthenticatedAuditRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
-  '/_authenticated/events': typeof AuthenticatedEventsRoute
+  '/_authenticated/dispatches': typeof AuthenticatedDispatchesRoute
   '/_authenticated/inventory': typeof AuthenticatedInventoryRouteWithChildren
   '/_authenticated/notifications': typeof AuthenticatedNotificationsRoute
   '/_authenticated/procurement': typeof AuthenticatedProcurementRoute
   '/_authenticated/production': typeof AuthenticatedProductionRoute
   '/_authenticated/reports': typeof AuthenticatedReportsRoute
+  '/_authenticated/requests': typeof AuthenticatedRequestsRoute
+  '/_authenticated/shops': typeof AuthenticatedShopsRoute
   '/_authenticated/users': typeof AuthenticatedUsersRoute
   '/_authenticated/inventory/$itemId': typeof AuthenticatedInventoryItemIdRoute
   '/_authenticated/settings/profile': typeof AuthenticatedSettingsProfileRoute
@@ -171,12 +189,14 @@ export interface FileRouteTypes {
     | '/reset-password'
     | '/audit'
     | '/dashboard'
-    | '/events'
+    | '/dispatches'
     | '/inventory'
     | '/notifications'
     | '/procurement'
     | '/production'
     | '/reports'
+    | '/requests'
+    | '/shops'
     | '/users'
     | '/inventory/$itemId'
     | '/settings/profile'
@@ -188,11 +208,13 @@ export interface FileRouteTypes {
     | '/reset-password'
     | '/audit'
     | '/dashboard'
-    | '/events'
+    | '/dispatches'
     | '/notifications'
     | '/procurement'
     | '/production'
     | '/reports'
+    | '/requests'
+    | '/shops'
     | '/users'
     | '/inventory/$itemId'
     | '/settings/profile'
@@ -205,12 +227,14 @@ export interface FileRouteTypes {
     | '/reset-password'
     | '/_authenticated/audit'
     | '/_authenticated/dashboard'
-    | '/_authenticated/events'
+    | '/_authenticated/dispatches'
     | '/_authenticated/inventory'
     | '/_authenticated/notifications'
     | '/_authenticated/procurement'
     | '/_authenticated/production'
     | '/_authenticated/reports'
+    | '/_authenticated/requests'
+    | '/_authenticated/shops'
     | '/_authenticated/users'
     | '/_authenticated/inventory/$itemId'
     | '/_authenticated/settings/profile'
@@ -261,6 +285,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedUsersRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/shops': {
+      id: '/_authenticated/shops'
+      path: '/shops'
+      fullPath: '/shops'
+      preLoaderRoute: typeof AuthenticatedShopsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/requests': {
+      id: '/_authenticated/requests'
+      path: '/requests'
+      fullPath: '/requests'
+      preLoaderRoute: typeof AuthenticatedRequestsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/reports': {
       id: '/_authenticated/reports'
       path: '/reports'
@@ -296,11 +334,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedInventoryRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
-    '/_authenticated/events': {
-      id: '/_authenticated/events'
-      path: '/events'
-      fullPath: '/events'
-      preLoaderRoute: typeof AuthenticatedEventsRouteImport
+    '/_authenticated/dispatches': {
+      id: '/_authenticated/dispatches'
+      path: '/dispatches'
+      fullPath: '/dispatches'
+      preLoaderRoute: typeof AuthenticatedDispatchesRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/dashboard': {
@@ -360,12 +398,14 @@ const AuthenticatedInventoryRouteWithChildren =
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedAuditRoute: typeof AuthenticatedAuditRoute
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
-  AuthenticatedEventsRoute: typeof AuthenticatedEventsRoute
+  AuthenticatedDispatchesRoute: typeof AuthenticatedDispatchesRoute
   AuthenticatedInventoryRoute: typeof AuthenticatedInventoryRouteWithChildren
   AuthenticatedNotificationsRoute: typeof AuthenticatedNotificationsRoute
   AuthenticatedProcurementRoute: typeof AuthenticatedProcurementRoute
   AuthenticatedProductionRoute: typeof AuthenticatedProductionRoute
   AuthenticatedReportsRoute: typeof AuthenticatedReportsRoute
+  AuthenticatedRequestsRoute: typeof AuthenticatedRequestsRoute
+  AuthenticatedShopsRoute: typeof AuthenticatedShopsRoute
   AuthenticatedUsersRoute: typeof AuthenticatedUsersRoute
   AuthenticatedSettingsProfileRoute: typeof AuthenticatedSettingsProfileRoute
 }
@@ -373,12 +413,14 @@ interface AuthenticatedRouteRouteChildren {
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedAuditRoute: AuthenticatedAuditRoute,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
-  AuthenticatedEventsRoute: AuthenticatedEventsRoute,
+  AuthenticatedDispatchesRoute: AuthenticatedDispatchesRoute,
   AuthenticatedInventoryRoute: AuthenticatedInventoryRouteWithChildren,
   AuthenticatedNotificationsRoute: AuthenticatedNotificationsRoute,
   AuthenticatedProcurementRoute: AuthenticatedProcurementRoute,
   AuthenticatedProductionRoute: AuthenticatedProductionRoute,
   AuthenticatedReportsRoute: AuthenticatedReportsRoute,
+  AuthenticatedRequestsRoute: AuthenticatedRequestsRoute,
+  AuthenticatedShopsRoute: AuthenticatedShopsRoute,
   AuthenticatedUsersRoute: AuthenticatedUsersRoute,
   AuthenticatedSettingsProfileRoute: AuthenticatedSettingsProfileRoute,
 }
