@@ -60,6 +60,27 @@ export const CAN_VIEW_AUDIT: AppRole[] = [
   "operations_manager",
 ];
 
+export const CAN_MANAGE_SHOPS: AppRole[] = [
+  "super_admin",
+  "management",
+  "operations_manager",
+];
+
+export const CAN_DISPATCH: AppRole[] = [
+  "super_admin",
+  "management",
+  "operations_manager",
+  "inventory_officer",
+];
+
+export const CAN_APPROVE_REQUESTS: AppRole[] = [
+  "super_admin",
+  "management",
+  "operations_manager",
+  "inventory_officer",
+];
+
 export function hasAny(userRoles: AppRole[], allowed: AppRole[]): boolean {
   return userRoles.some((r) => allowed.includes(r));
 }
+

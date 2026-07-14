@@ -19,7 +19,6 @@ import { Route as AuthenticatedProductionRouteImport } from './routes/_authentic
 import { Route as AuthenticatedProcurementRouteImport } from './routes/_authenticated/procurement'
 import { Route as AuthenticatedNotificationsRouteImport } from './routes/_authenticated/notifications'
 import { Route as AuthenticatedInventoryRouteImport } from './routes/_authenticated/inventory'
-import { Route as AuthenticatedEventsRouteImport } from './routes/_authenticated/events'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedAuditRouteImport } from './routes/_authenticated/audit'
 import { Route as AuthenticatedInventoryIndexRouteImport } from './routes/_authenticated/inventory/index'
@@ -77,11 +76,6 @@ const AuthenticatedInventoryRoute = AuthenticatedInventoryRouteImport.update({
   path: '/inventory',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
-const AuthenticatedEventsRoute = AuthenticatedEventsRouteImport.update({
-  id: '/events',
-  path: '/events',
-  getParentRoute: () => AuthenticatedRouteRoute,
-} as any)
 const AuthenticatedDashboardRoute = AuthenticatedDashboardRouteImport.update({
   id: '/dashboard',
   path: '/dashboard',
@@ -117,7 +111,6 @@ export interface FileRoutesByFullPath {
   '/reset-password': typeof ResetPasswordRoute
   '/audit': typeof AuthenticatedAuditRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
-  '/events': typeof AuthenticatedEventsRoute
   '/inventory': typeof AuthenticatedInventoryRouteWithChildren
   '/notifications': typeof AuthenticatedNotificationsRoute
   '/procurement': typeof AuthenticatedProcurementRoute
@@ -134,7 +127,6 @@ export interface FileRoutesByTo {
   '/reset-password': typeof ResetPasswordRoute
   '/audit': typeof AuthenticatedAuditRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
-  '/events': typeof AuthenticatedEventsRoute
   '/notifications': typeof AuthenticatedNotificationsRoute
   '/procurement': typeof AuthenticatedProcurementRoute
   '/production': typeof AuthenticatedProductionRoute
@@ -152,7 +144,6 @@ export interface FileRoutesById {
   '/reset-password': typeof ResetPasswordRoute
   '/_authenticated/audit': typeof AuthenticatedAuditRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
-  '/_authenticated/events': typeof AuthenticatedEventsRoute
   '/_authenticated/inventory': typeof AuthenticatedInventoryRouteWithChildren
   '/_authenticated/notifications': typeof AuthenticatedNotificationsRoute
   '/_authenticated/procurement': typeof AuthenticatedProcurementRoute
@@ -171,7 +162,6 @@ export interface FileRouteTypes {
     | '/reset-password'
     | '/audit'
     | '/dashboard'
-    | '/events'
     | '/inventory'
     | '/notifications'
     | '/procurement'
@@ -188,7 +178,6 @@ export interface FileRouteTypes {
     | '/reset-password'
     | '/audit'
     | '/dashboard'
-    | '/events'
     | '/notifications'
     | '/procurement'
     | '/production'
@@ -205,7 +194,6 @@ export interface FileRouteTypes {
     | '/reset-password'
     | '/_authenticated/audit'
     | '/_authenticated/dashboard'
-    | '/_authenticated/events'
     | '/_authenticated/inventory'
     | '/_authenticated/notifications'
     | '/_authenticated/procurement'
@@ -296,13 +284,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedInventoryRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
-    '/_authenticated/events': {
-      id: '/_authenticated/events'
-      path: '/events'
-      fullPath: '/events'
-      preLoaderRoute: typeof AuthenticatedEventsRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
     '/_authenticated/dashboard': {
       id: '/_authenticated/dashboard'
       path: '/dashboard'
@@ -360,7 +341,6 @@ const AuthenticatedInventoryRouteWithChildren =
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedAuditRoute: typeof AuthenticatedAuditRoute
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
-  AuthenticatedEventsRoute: typeof AuthenticatedEventsRoute
   AuthenticatedInventoryRoute: typeof AuthenticatedInventoryRouteWithChildren
   AuthenticatedNotificationsRoute: typeof AuthenticatedNotificationsRoute
   AuthenticatedProcurementRoute: typeof AuthenticatedProcurementRoute
@@ -373,7 +353,6 @@ interface AuthenticatedRouteRouteChildren {
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedAuditRoute: AuthenticatedAuditRoute,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
-  AuthenticatedEventsRoute: AuthenticatedEventsRoute,
   AuthenticatedInventoryRoute: AuthenticatedInventoryRouteWithChildren,
   AuthenticatedNotificationsRoute: AuthenticatedNotificationsRoute,
   AuthenticatedProcurementRoute: AuthenticatedProcurementRoute,
