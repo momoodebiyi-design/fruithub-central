@@ -334,3 +334,41 @@ function CountDetailPage() {
     </div>
   );
 }
+
+function RequestRestockButton({
+  itemId, shopId, shopName, itemName, quantity,
+}: { itemId: string; shopId: string; shopName: string; itemName: string; quantity: number }) {
+  const [busy, setBusy] = useState(false);
+  const [done, setDone] = useState(false);
+
+  async function create() {
+    setBusy(true);
+    const { data: u } = await supabase.auth.getUser();
+    const uid = u.user?.id;
+    if (!uid) { setBusy(false); return toast.error("Not signed in"); }
+    const { error } = await supabase.from("stock_requests").insert({
+      requested_by: uid,
+      item_id: itemId,
+      quantity,
+      purpose: `Restock ${itemName} at ${shopName} (from closing count)`,
+      destination_shop_id: shopId,
+    });
+    setBusy(false);
+    if (error) return toast.error(error.message);
+    setDone(true);
+    toast.success("Stock request created");
+  }
+
+  if (done) {
+    return (
+      <Button asChild variant="ghost" size="sm" className="text-emerald-700">
+        <Link to="/requests"><Plus className="size-3 mr-1" /> Sent</Link>
+      </Button>
+    );
+  }
+  return (
+    <Button variant="outline" size="sm" onClick={create} disabled={busy}>
+      <Plus className="size-3 mr-1" /> {busy ? "Sending…" : "Request restock"}
+    </Button>
+  );
+}
