@@ -42,12 +42,14 @@ type NavItem = {
 const FULL_NAV: NavItem[] = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { to: "/inventory", label: "Inventory", icon: Boxes },
+  { to: "/recipes", label: "Recipes / BOM", icon: FlaskConical },
   { to: "/production", label: "Production", icon: FlaskConical },
+  { to: "/sales", label: "Sales orders", icon: Send },
+  { to: "/purchases", label: "Purchases", icon: Truck },
   { to: "/dispatches", label: "Dispatches", icon: Send },
   { to: "/shops", label: "Shops", icon: Store },
   { to: "/shop-counts", label: "Daily counts", icon: ClipboardCheck },
   { to: "/requests", label: "Stock requests", icon: ClipboardList },
-  { to: "/procurement", label: "Procurement", icon: Truck },
   { to: "/reports", label: "Reports", icon: BarChart3 },
 ];
 

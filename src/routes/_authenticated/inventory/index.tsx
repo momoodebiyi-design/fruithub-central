@@ -33,18 +33,19 @@ export const Route = createFileRoute("/_authenticated/inventory/")({
 
 export interface Item {
   id: string;
+  item_id: string | null;
   sku: string;
   name: string;
-  category: "raw_material" | "packaging" | "finished_good" | "consumable";
+  category: "raw_material" | "packaging" | "finished_good" | "consumable" | "semi_finished";
+  subcategory: string | null;
   unit: string;
   quantity: number;
   reorder_level: number | null;
   min_level: number | null;
-  location: string | null;
-  is_active: boolean;
+  status: string;
 }
 
-const CATEGORIES = ["all", "raw_material", "packaging", "finished_good", "consumable"] as const;
+const CATEGORIES = ["all", "raw_material", "packaging", "finished_good", "consumable", "semi_finished"] as const;
 
 function InventoryList() {
   const navigate = useNavigate();
@@ -59,22 +60,26 @@ function InventoryList() {
   const [showImport, setShowImport] = useState(false);
 
   async function load() {
-    const { data } = await supabase
-      .from("inventory_items")
-      .select("id, sku, name, category, unit, quantity, reorder_level, min_level, location, is_active")
-      .order("name");
-    setItems((data ?? []) as unknown as Item[]);
+    const { data } = await (supabase as any)
+      .from("v_item_stock")
+      .select("id, item_id, sku, name, category, subcategory, unit, min_level, reorder_level, status, on_hand")
+      .order("item_id", { nullsFirst: false });
+    setItems(((data ?? []) as any[]).map((r) => ({
+      id: r.id, item_id: r.item_id, sku: r.sku, name: r.name,
+      category: r.category, subcategory: r.subcategory, unit: r.unit,
+      quantity: Number(r.on_hand ?? 0), reorder_level: r.reorder_level,
+      min_level: r.min_level, status: r.status,
+    })));
   }
 
   useEffect(() => {
     load();
     const ch = supabase
       .channel("inventory-list")
+      .on("postgres_changes", { event: "*", schema: "public", table: "inventory_movements" }, load)
       .on("postgres_changes", { event: "*", schema: "public", table: "inventory_items" }, load)
       .subscribe();
-    return () => {
-      supabase.removeChannel(ch);
-    };
+    return () => { supabase.removeChannel(ch); };
   }, []);
 
   const filtered = useMemo(() => {
@@ -146,7 +151,7 @@ function InventoryList() {
                   <TableCell className="text-right font-mono tabular-nums">{Number(it.quantity).toLocaleString()}</TableCell>
                   <TableCell className="text-xs">{it.unit}</TableCell>
                   <TableCell>
-                    {!it.is_active ? (
+                    {it.status !== "active" ? (
                       <Badge variant="outline">Inactive</Badge>
                     ) : low ? (
                       <Badge className="bg-brand-orange/15 text-brand-orange hover:bg-brand-orange/15 border-0">Low</Badge>
@@ -178,7 +183,7 @@ function InventoryList() {
       </div>
 
       {dialogItem !== undefined && (
-        <ItemDialog item={dialogItem} onClose={() => setDialogItem(undefined)} onSaved={load} />
+        <ItemDialog item={dialogItem as any} onClose={() => setDialogItem(undefined)} onSaved={load} />
       )}
       {moveItem && (
         <MovementDialog item={moveItem} onClose={() => setMoveItem(null)} onSaved={load} />

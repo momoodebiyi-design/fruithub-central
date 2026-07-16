@@ -108,6 +108,22 @@ export const CAN_VIEW_ALL_SHOP_COUNTS: AppRole[] = [
   "procurement",
 ];
 
+export const CAN_MANAGE_SALES: AppRole[] = [
+  "super_admin", "admin", "management", "operations_manager", "sales",
+];
+export const CAN_MANAGE_PURCHASES: AppRole[] = [
+  "super_admin", "admin", "management", "operations_manager", "procurement",
+];
+export const CAN_MANAGE_RECIPES: AppRole[] = [
+  "super_admin", "admin", "management", "operations_manager", "production",
+];
+export const CAN_APPROVE_RECIPES: AppRole[] = [
+  "super_admin", "management", "operations_manager",
+];
+export const CAN_ADJUST_STOCK: AppRole[] = [
+  "super_admin", "management", "operations_manager", "inventory_officer",
+];
+
 export function hasAny(userRoles: AppRole[], allowed: AppRole[]): boolean {
   return userRoles.some((r) => allowed.includes(r));
 }
