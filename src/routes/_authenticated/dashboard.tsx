@@ -29,6 +29,19 @@ interface PendingClosing {
   closing_id: string | null;
 }
 
+interface TopRestock {
+  shop_id: string;
+  item_id: string;
+  shop_name: string;
+  item_name: string;
+  sku: string | null;
+  unit: string;
+  actual_closing: number | null;
+  target_level: number | null;
+  restock_recommendation: number;
+  count_date: string;
+}
+
 function DashboardPage() {
   const [pendingClosings, setPendingClosings] = useState<PendingClosing[]>([]);
   const [stats, setStats] = useState<Stats>({
