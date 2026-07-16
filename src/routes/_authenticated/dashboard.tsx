@@ -153,12 +153,41 @@ function DashboardPage() {
         />
         <KpiCard label="Batches today" value={stats.batchesToday} icon={FlaskConical} />
         <KpiCard
-          label="Output today"
-          value={stats.outputToday.toLocaleString()}
-          suffix="units"
-          icon={TrendingUp}
+          label="Closings pending"
+          value={pendingClosings.length}
+          icon={AlertTriangle}
+          accent={pendingClosings.length > 0 ? "warn" : undefined}
         />
       </div>
+
+      {pendingClosings.length > 0 && (
+        <Card className="border-brand-orange/40">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base flex items-center gap-2 text-brand-orange">
+              <AlertTriangle className="size-4" />
+              Shops pending closing count
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            {pendingClosings.map((p) => (
+              <Link
+                key={p.opening_id}
+                to={p.closing_id ? "/shop-counts/$countId" : "/shop-counts"}
+                params={p.closing_id ? { countId: p.closing_id } : undefined as any}
+                className="flex items-center justify-between border rounded-md px-3 py-2 hover:bg-muted/40 text-sm"
+              >
+                <div>
+                  <p className="font-medium">{p.shop_name}</p>
+                  <p className="text-[11px] text-muted-foreground font-mono">{p.count_date}</p>
+                </div>
+                <Badge variant="outline" className="text-brand-orange border-brand-orange/40 text-[10px]">
+                  {p.closing_id ? "Complete" : "Awaiting"}
+                </Badge>
+              </Link>
+            ))}
+          </CardContent>
+        </Card>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <Card>
