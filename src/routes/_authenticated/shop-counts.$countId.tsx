@@ -260,15 +260,17 @@ function CountDetailPage() {
                   <th className="text-right py-2 font-medium">Target</th>
                   <th className="text-right py-2 font-medium">On hand</th>
                   <th className="text-right py-2 font-medium">Restock</th>
+                  <th className="w-40" />
                 </tr>
               </thead>
               <tbody className="divide-y">
                 {balance.filter((b) => Number(b.restock_recommendation ?? 0) > 0).length === 0 ? (
-                  <tr><td colSpan={4} className="py-4 text-center text-muted-foreground">All items at target level.</td></tr>
+                  <tr><td colSpan={5} className="py-4 text-center text-muted-foreground">All items at target level.</td></tr>
                 ) : balance
                   .filter((b) => Number(b.restock_recommendation ?? 0) > 0)
                   .map((b) => {
-                    const item = items.find((i) => i.id === b.item_id) ?? lines.find((l) => l.item_id === b.item_id)?.inventory_items;
+                    const line = lines.find((l) => l.item_id === b.item_id);
+                    const item = items.find((i) => i.id === b.item_id) ?? line?.inventory_items;
                     return (
                       <tr key={b.item_id}>
                         <td className="py-2">{(item as any)?.name ?? b.item_id}</td>
@@ -276,6 +278,15 @@ function CountDetailPage() {
                         <td className="py-2 text-right font-mono text-xs">{b.actual_closing ?? 0}</td>
                         <td className="py-2 text-right font-mono text-sm text-brand-orange">
                           +{Number(b.restock_recommendation).toFixed(0)}
+                        </td>
+                        <td className="py-2 text-right">
+                          <RequestRestockButton
+                            itemId={b.item_id}
+                            shopId={header!.shop_id}
+                            shopName={header!.shops?.name ?? "shop"}
+                            itemName={(item as any)?.name ?? "item"}
+                            quantity={Number(b.restock_recommendation)}
+                          />
                         </td>
                       </tr>
                     );
