@@ -102,8 +102,18 @@ function NotificationRow({ n }: { n: Notification }) {
       : n.level === "warn"
         ? "bg-brand-orange"
         : "bg-brand-green";
-  return (
-    <div className={cn("px-4 py-3 flex gap-3", !n.read_at && "bg-muted/40")}>
+
+  async function handleClick() {
+    if (!n.read_at) {
+      await supabase
+        .from("notifications")
+        .update({ read_at: new Date().toISOString() })
+        .eq("id", n.id);
+    }
+  }
+
+  const body = (
+    <>
       <div className={cn("mt-1.5 size-2 rounded-full shrink-0", dot)} />
       <div className="flex-1 min-w-0">
         <p className="text-sm font-medium leading-tight">{n.title}</p>
@@ -112,6 +122,24 @@ function NotificationRow({ n }: { n: Notification }) {
           {formatDistanceToNow(new Date(n.created_at), { addSuffix: true })}
         </p>
       </div>
-    </div>
+    </>
+  );
+
+  const className = cn(
+    "px-4 py-3 flex gap-3 w-full text-left transition-colors hover:bg-muted/60",
+    !n.read_at && "bg-muted/40",
+  );
+
+  if (n.link) {
+    return (
+      <Link to={n.link} onClick={handleClick} className={className}>
+        {body}
+      </Link>
+    );
+  }
+  return (
+    <button onClick={handleClick} className={className} type="button">
+      {body}
+    </button>
   );
 }
