@@ -15,6 +15,7 @@ import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedUsersRouteImport } from './routes/_authenticated/users'
 import { Route as AuthenticatedShopsRouteImport } from './routes/_authenticated/shops'
+import { Route as AuthenticatedShopCountsRouteImport } from './routes/_authenticated/shop-counts'
 import { Route as AuthenticatedSalesRouteImport } from './routes/_authenticated/sales'
 import { Route as AuthenticatedRequestsRouteImport } from './routes/_authenticated/requests'
 import { Route as AuthenticatedReportsRouteImport } from './routes/_authenticated/reports'
@@ -61,6 +62,11 @@ const AuthenticatedUsersRoute = AuthenticatedUsersRouteImport.update({
 const AuthenticatedShopsRoute = AuthenticatedShopsRouteImport.update({
   id: '/shops',
   path: '/shops',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedShopCountsRoute = AuthenticatedShopCountsRouteImport.update({
+  id: '/shop-counts',
+  path: '/shop-counts',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedSalesRoute = AuthenticatedSalesRouteImport.update({
@@ -132,9 +138,9 @@ const AuthenticatedAuditRoute = AuthenticatedAuditRouteImport.update({
 } as any)
 const AuthenticatedShopCountsIndexRoute =
   AuthenticatedShopCountsIndexRouteImport.update({
-    id: '/shop-counts/',
-    path: '/shop-counts/',
-    getParentRoute: () => AuthenticatedRouteRoute,
+    id: '/',
+    path: '/',
+    getParentRoute: () => AuthenticatedShopCountsRoute,
   } as any)
 const AuthenticatedInventoryIndexRoute =
   AuthenticatedInventoryIndexRouteImport.update({
@@ -144,9 +150,9 @@ const AuthenticatedInventoryIndexRoute =
   } as any)
 const AuthenticatedShopCountsCountIdRoute =
   AuthenticatedShopCountsCountIdRouteImport.update({
-    id: '/shop-counts/$countId',
-    path: '/shop-counts/$countId',
-    getParentRoute: () => AuthenticatedRouteRoute,
+    id: '/$countId',
+    path: '/$countId',
+    getParentRoute: () => AuthenticatedShopCountsRoute,
   } as any)
 const AuthenticatedSettingsProfileRoute =
   AuthenticatedSettingsProfileRouteImport.update({
@@ -178,6 +184,7 @@ export interface FileRoutesByFullPath {
   '/reports': typeof AuthenticatedReportsRoute
   '/requests': typeof AuthenticatedRequestsRoute
   '/sales': typeof AuthenticatedSalesRoute
+  '/shop-counts': typeof AuthenticatedShopCountsRouteWithChildren
   '/shops': typeof AuthenticatedShopsRoute
   '/users': typeof AuthenticatedUsersRoute
   '/inventory/$itemId': typeof AuthenticatedInventoryItemIdRoute
@@ -229,6 +236,7 @@ export interface FileRoutesById {
   '/_authenticated/reports': typeof AuthenticatedReportsRoute
   '/_authenticated/requests': typeof AuthenticatedRequestsRoute
   '/_authenticated/sales': typeof AuthenticatedSalesRoute
+  '/_authenticated/shop-counts': typeof AuthenticatedShopCountsRouteWithChildren
   '/_authenticated/shops': typeof AuthenticatedShopsRoute
   '/_authenticated/users': typeof AuthenticatedUsersRoute
   '/_authenticated/inventory/$itemId': typeof AuthenticatedInventoryItemIdRoute
@@ -256,6 +264,7 @@ export interface FileRouteTypes {
     | '/reports'
     | '/requests'
     | '/sales'
+    | '/shop-counts'
     | '/shops'
     | '/users'
     | '/inventory/$itemId'
@@ -306,6 +315,7 @@ export interface FileRouteTypes {
     | '/_authenticated/reports'
     | '/_authenticated/requests'
     | '/_authenticated/sales'
+    | '/_authenticated/shop-counts'
     | '/_authenticated/shops'
     | '/_authenticated/users'
     | '/_authenticated/inventory/$itemId'
@@ -364,6 +374,13 @@ declare module '@tanstack/react-router' {
       path: '/shops'
       fullPath: '/shops'
       preLoaderRoute: typeof AuthenticatedShopsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/shop-counts': {
+      id: '/_authenticated/shop-counts'
+      path: '/shop-counts'
+      fullPath: '/shop-counts'
+      preLoaderRoute: typeof AuthenticatedShopCountsRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/sales': {
@@ -459,10 +476,10 @@ declare module '@tanstack/react-router' {
     }
     '/_authenticated/shop-counts/': {
       id: '/_authenticated/shop-counts/'
-      path: '/shop-counts'
+      path: '/'
       fullPath: '/shop-counts/'
       preLoaderRoute: typeof AuthenticatedShopCountsIndexRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
+      parentRoute: typeof AuthenticatedShopCountsRoute
     }
     '/_authenticated/inventory/': {
       id: '/_authenticated/inventory/'
@@ -473,10 +490,10 @@ declare module '@tanstack/react-router' {
     }
     '/_authenticated/shop-counts/$countId': {
       id: '/_authenticated/shop-counts/$countId'
-      path: '/shop-counts/$countId'
+      path: '/$countId'
       fullPath: '/shop-counts/$countId'
       preLoaderRoute: typeof AuthenticatedShopCountsCountIdRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
+      parentRoute: typeof AuthenticatedShopCountsRoute
     }
     '/_authenticated/settings/profile': {
       id: '/_authenticated/settings/profile'
@@ -511,6 +528,22 @@ const AuthenticatedInventoryRouteWithChildren =
     AuthenticatedInventoryRouteChildren,
   )
 
+interface AuthenticatedShopCountsRouteChildren {
+  AuthenticatedShopCountsCountIdRoute: typeof AuthenticatedShopCountsCountIdRoute
+  AuthenticatedShopCountsIndexRoute: typeof AuthenticatedShopCountsIndexRoute
+}
+
+const AuthenticatedShopCountsRouteChildren: AuthenticatedShopCountsRouteChildren =
+  {
+    AuthenticatedShopCountsCountIdRoute: AuthenticatedShopCountsCountIdRoute,
+    AuthenticatedShopCountsIndexRoute: AuthenticatedShopCountsIndexRoute,
+  }
+
+const AuthenticatedShopCountsRouteWithChildren =
+  AuthenticatedShopCountsRoute._addFileChildren(
+    AuthenticatedShopCountsRouteChildren,
+  )
+
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedAuditRoute: typeof AuthenticatedAuditRoute
   AuthenticatedClientsRoute: typeof AuthenticatedClientsRoute
@@ -525,11 +558,10 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedReportsRoute: typeof AuthenticatedReportsRoute
   AuthenticatedRequestsRoute: typeof AuthenticatedRequestsRoute
   AuthenticatedSalesRoute: typeof AuthenticatedSalesRoute
+  AuthenticatedShopCountsRoute: typeof AuthenticatedShopCountsRouteWithChildren
   AuthenticatedShopsRoute: typeof AuthenticatedShopsRoute
   AuthenticatedUsersRoute: typeof AuthenticatedUsersRoute
   AuthenticatedSettingsProfileRoute: typeof AuthenticatedSettingsProfileRoute
-  AuthenticatedShopCountsCountIdRoute: typeof AuthenticatedShopCountsCountIdRoute
-  AuthenticatedShopCountsIndexRoute: typeof AuthenticatedShopCountsIndexRoute
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
@@ -546,11 +578,10 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedReportsRoute: AuthenticatedReportsRoute,
   AuthenticatedRequestsRoute: AuthenticatedRequestsRoute,
   AuthenticatedSalesRoute: AuthenticatedSalesRoute,
+  AuthenticatedShopCountsRoute: AuthenticatedShopCountsRouteWithChildren,
   AuthenticatedShopsRoute: AuthenticatedShopsRoute,
   AuthenticatedUsersRoute: AuthenticatedUsersRoute,
   AuthenticatedSettingsProfileRoute: AuthenticatedSettingsProfileRoute,
-  AuthenticatedShopCountsCountIdRoute: AuthenticatedShopCountsCountIdRoute,
-  AuthenticatedShopCountsIndexRoute: AuthenticatedShopCountsIndexRoute,
 }
 
 const AuthenticatedRouteRouteWithChildren =
