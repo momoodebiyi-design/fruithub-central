@@ -1017,6 +1017,7 @@ export type Database = {
         | "completed"
         | "qc_passed"
         | "qc_failed"
+      customer_type: "retail" | "wholesale" | "outlet" | "online"
       dispatch_status:
         | "draft"
         | "dispatched"
@@ -1028,6 +1029,7 @@ export type Database = {
         | "raw_material"
         | "consumable"
         | "finished_good"
+        | "semi_finished"
       movement_type:
         | "stock_in"
         | "stock_out"
@@ -1038,7 +1040,20 @@ export type Database = {
         | "wastage"
         | "production_consume"
         | "production_output"
+        | "opening_balance"
+        | "receipt"
+        | "sale"
+        | "adjustment_in"
+        | "adjustment_out"
       notification_level: "info" | "warn" | "critical"
+      purchase_order_status:
+        | "draft"
+        | "ordered"
+        | "partial"
+        | "received"
+        | "cancelled"
+      recipe_status: "draft" | "pending_approval" | "approved" | "retired"
+      sales_order_status: "draft" | "confirmed" | "fulfilled" | "void"
       stock_count_status: "draft" | "submitted"
       stock_count_type: "opening" | "closing"
       stock_request_status:
@@ -1194,6 +1209,7 @@ export const Constants = {
         "qc_passed",
         "qc_failed",
       ],
+      customer_type: ["retail", "wholesale", "outlet", "online"],
       dispatch_status: [
         "draft",
         "dispatched",
@@ -1206,6 +1222,7 @@ export const Constants = {
         "raw_material",
         "consumable",
         "finished_good",
+        "semi_finished",
       ],
       movement_type: [
         "stock_in",
@@ -1217,8 +1234,22 @@ export const Constants = {
         "wastage",
         "production_consume",
         "production_output",
+        "opening_balance",
+        "receipt",
+        "sale",
+        "adjustment_in",
+        "adjustment_out",
       ],
       notification_level: ["info", "warn", "critical"],
+      purchase_order_status: [
+        "draft",
+        "ordered",
+        "partial",
+        "received",
+        "cancelled",
+      ],
+      recipe_status: ["draft", "pending_approval", "approved", "retired"],
+      sales_order_status: ["draft", "confirmed", "fulfilled", "void"],
       stock_count_status: ["draft", "submitted"],
       stock_count_type: ["opening", "closing"],
       stock_request_status: [
