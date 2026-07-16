@@ -13,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { toast } from "sonner";
 import { format } from "date-fns";
 
-export const Route = createFileRoute("/_authenticated/shop-counts")({
+export const Route = createFileRoute("/_authenticated/shop-counts/")({
   component: ShopCountsPage,
 });
 
