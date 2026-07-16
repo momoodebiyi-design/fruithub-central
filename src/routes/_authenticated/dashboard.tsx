@@ -143,7 +143,7 @@ function DashboardPage() {
         <p className="text-sm text-muted-foreground mt-1">Live operations across inventory and production.</p>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
         <KpiCard label="SKUs tracked" value={stats.totalItems} icon={Boxes} />
         <KpiCard
           label="Low stock alerts"
@@ -152,6 +152,12 @@ function DashboardPage() {
           accent={stats.lowStock > 0 ? "warn" : undefined}
         />
         <KpiCard label="Batches today" value={stats.batchesToday} icon={FlaskConical} />
+        <KpiCard
+          label="Output today"
+          value={stats.outputToday.toLocaleString()}
+          suffix="units"
+          icon={TrendingUp}
+        />
         <KpiCard
           label="Closings pending"
           value={pendingClosings.length}
