@@ -41,10 +41,22 @@ function ShopCountsPage() {
   const session = useSession();
   const supervisorOnly = isShopSupervisorOnly(session.roles);
   const canViewAll = hasAny(session.roles, CAN_VIEW_ALL_SHOP_COUNTS);
+  const canDelete = session.roles.includes("super_admin") || session.roles.includes("management");
   const [rows, setRows] = useState<CountRow[]>([]);
   const [pending, setPending] = useState<PendingRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [openNew, setOpenNew] = useState(false);
+  const [deleting, setDeleting] = useState<string | null>(null);
+
+  async function handleDelete(id: string) {
+    if (!confirm("Delete this count? This cannot be undone. If it's an opening count, the matching draft closing will also be removed.")) return;
+    setDeleting(id);
+    const { error } = await supabase.rpc("delete_shop_stock_count" as any, { _count_id: id });
+    setDeleting(null);
+    if (error) return toast.error(error.message);
+    toast.success("Count deleted");
+    load();
+  }
 
   async function load() {
     setLoading(true);
