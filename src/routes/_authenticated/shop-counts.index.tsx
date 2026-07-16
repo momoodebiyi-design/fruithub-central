@@ -160,9 +160,22 @@ function ShopCountsPage() {
                   )}
                 </td>
                 <td className="px-4 py-3 text-right">
-                  <Button asChild variant="ghost" size="sm">
-                    <Link to="/shop-counts/$countId" params={{ countId: r.id }}>Open</Link>
-                  </Button>
+                  <div className="flex items-center justify-end gap-1">
+                    <Button asChild variant="ghost" size="sm">
+                      <Link to="/shop-counts/$countId" params={{ countId: r.id }}>Open</Link>
+                    </Button>
+                    {canDelete && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-destructive hover:text-destructive"
+                        disabled={deleting === r.id}
+                        onClick={() => handleDelete(r.id)}
+                      >
+                        <Trash2 className="size-4" />
+                      </Button>
+                    )}
+                  </div>
                 </td>
               </tr>
             ))}
