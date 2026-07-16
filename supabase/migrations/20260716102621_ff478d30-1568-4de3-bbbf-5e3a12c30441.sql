@@ -1,0 +1,1 @@
+ALTER VIEW public.v_item_stock SET (security_invoker = true);
