@@ -96,6 +96,7 @@ export function NotificationsBell() {
 }
 
 function NotificationRow({ n }: { n: Notification }) {
+  const navigate = useNavigate();
   const dot =
     n.level === "critical"
       ? "bg-brand-red"
@@ -110,36 +111,34 @@ function NotificationRow({ n }: { n: Notification }) {
         .update({ read_at: new Date().toISOString() })
         .eq("id", n.id);
     }
+    if (n.link) {
+      navigate({ to: n.link });
+    }
   }
 
-  const body = (
-    <>
+  return (
+    <button
+      type="button"
+      onClick={handleClick}
+      className={cn(
+        "px-4 py-3 flex gap-3 w-full text-left transition-colors hover:bg-muted/60",
+        !n.read_at && "bg-muted/40",
+        n.link && "cursor-pointer",
+      )}
+    >
       <div className={cn("mt-1.5 size-2 rounded-full shrink-0", dot)} />
       <div className="flex-1 min-w-0">
         <p className="text-sm font-medium leading-tight">{n.title}</p>
         {n.body && <p className="text-xs text-muted-foreground mt-0.5">{n.body}</p>}
-        <p className="text-[10px] text-muted-foreground mt-1 uppercase tracking-wider">
-          {formatDistanceToNow(new Date(n.created_at), { addSuffix: true })}
-        </p>
+        <div className="flex items-center gap-2 mt-1">
+          <p className="text-[10px] text-muted-foreground uppercase tracking-wider">
+            {formatDistanceToNow(new Date(n.created_at), { addSuffix: true })}
+          </p>
+          {n.link && (
+            <span className="text-[10px] text-brand-orange font-medium">Open →</span>
+          )}
+        </div>
       </div>
-    </>
-  );
-
-  const className = cn(
-    "px-4 py-3 flex gap-3 w-full text-left transition-colors hover:bg-muted/60",
-    !n.read_at && "bg-muted/40",
-  );
-
-  if (n.link) {
-    return (
-      <Link to={n.link} onClick={handleClick} className={className}>
-        {body}
-      </Link>
-    );
-  }
-  return (
-    <button onClick={handleClick} className={className} type="button">
-      {body}
     </button>
   );
 }
