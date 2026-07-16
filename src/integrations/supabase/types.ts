@@ -1559,6 +1559,10 @@ export type Database = {
         }
         Returns: string
       }
+      delete_shop_stock_count: {
+        Args: { _count_id: string }
+        Returns: undefined
+      }
       fulfill_sales_order: { Args: { _order_id: string }; Returns: undefined }
       has_any_role: {
         Args: {

@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Plus, ClipboardCheck, AlertTriangle } from "lucide-react";
+import { Plus, ClipboardCheck, AlertTriangle, Trash2 } from "lucide-react";
 import { useSession } from "@/hooks/useSession";
 import { CAN_VIEW_ALL_SHOP_COUNTS, hasAny, isShopSupervisorOnly } from "@/lib/permissions";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -41,10 +41,22 @@ function ShopCountsPage() {
   const session = useSession();
   const supervisorOnly = isShopSupervisorOnly(session.roles);
   const canViewAll = hasAny(session.roles, CAN_VIEW_ALL_SHOP_COUNTS);
+  const canDelete = session.roles.includes("super_admin") || session.roles.includes("management");
   const [rows, setRows] = useState<CountRow[]>([]);
   const [pending, setPending] = useState<PendingRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [openNew, setOpenNew] = useState(false);
+  const [deleting, setDeleting] = useState<string | null>(null);
+
+  async function handleDelete(id: string) {
+    if (!confirm("Delete this count? This cannot be undone. If it's an opening count, the matching draft closing will also be removed.")) return;
+    setDeleting(id);
+    const { error } = await supabase.rpc("delete_shop_stock_count" as any, { _count_id: id });
+    setDeleting(null);
+    if (error) return toast.error(error.message);
+    toast.success("Count deleted");
+    load();
+  }
 
   async function load() {
     setLoading(true);
@@ -148,9 +160,22 @@ function ShopCountsPage() {
                   )}
                 </td>
                 <td className="px-4 py-3 text-right">
-                  <Button asChild variant="ghost" size="sm">
-                    <Link to="/shop-counts/$countId" params={{ countId: r.id }}>Open</Link>
-                  </Button>
+                  <div className="flex items-center justify-end gap-1">
+                    <Button asChild variant="ghost" size="sm">
+                      <Link to="/shop-counts/$countId" params={{ countId: r.id }}>Open</Link>
+                    </Button>
+                    {canDelete && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-destructive hover:text-destructive"
+                        disabled={deleting === r.id}
+                        onClick={() => handleDelete(r.id)}
+                      >
+                        <Trash2 className="size-4" />
+                      </Button>
+                    )}
+                  </div>
                 </td>
               </tr>
             ))}
