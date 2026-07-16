@@ -151,7 +151,7 @@ function InventoryList() {
                   <TableCell className="text-right font-mono tabular-nums">{Number(it.quantity).toLocaleString()}</TableCell>
                   <TableCell className="text-xs">{it.unit}</TableCell>
                   <TableCell>
-                    {!it.is_active ? (
+                    {it.status !== "active" ? (
                       <Badge variant="outline">Inactive</Badge>
                     ) : low ? (
                       <Badge className="bg-brand-orange/15 text-brand-orange hover:bg-brand-orange/15 border-0">Low</Badge>
