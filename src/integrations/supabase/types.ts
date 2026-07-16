@@ -1087,18 +1087,21 @@ export type Database = {
           id: string
           item_id: string
           shop_id: string
+          target_level: number
         }
         Insert: {
           created_at?: string
           id?: string
           item_id: string
           shop_id: string
+          target_level?: number
         }
         Update: {
           created_at?: string
           id?: string
           item_id?: string
           shop_id?: string
+          target_level?: number
         }
         Relationships: [
           {
@@ -1153,6 +1156,34 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "shop_stock_counts"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shop_stock_count_lines_count_id_fkey"
+            columns: ["count_id"]
+            isOneToOne: false
+            referencedRelation: "v_shop_daily_balance"
+            referencedColumns: ["closing_id"]
+          },
+          {
+            foreignKeyName: "shop_stock_count_lines_count_id_fkey"
+            columns: ["count_id"]
+            isOneToOne: false
+            referencedRelation: "v_shop_daily_balance"
+            referencedColumns: ["opening_id"]
+          },
+          {
+            foreignKeyName: "shop_stock_count_lines_count_id_fkey"
+            columns: ["count_id"]
+            isOneToOne: false
+            referencedRelation: "v_shop_pending_closings"
+            referencedColumns: ["closing_id"]
+          },
+          {
+            foreignKeyName: "shop_stock_count_lines_count_id_fkey"
+            columns: ["count_id"]
+            isOneToOne: false
+            referencedRelation: "v_shop_pending_closings"
+            referencedColumns: ["opening_id"]
           },
           {
             foreignKeyName: "shop_stock_count_lines_item_id_fkey"
@@ -1462,6 +1493,51 @@ export type Database = {
           unit: string | null
         }
         Relationships: []
+      }
+      v_shop_daily_balance: {
+        Row: {
+          actual_closing: number | null
+          closing_id: string | null
+          closing_status:
+            | Database["public"]["Enums"]["stock_count_status"]
+            | null
+          count_date: string | null
+          expected_closing: number | null
+          item_id: string | null
+          opening_id: string | null
+          opening_qty: number | null
+          opening_status:
+            | Database["public"]["Enums"]["stock_count_status"]
+            | null
+          received: number | null
+          restock_recommendation: number | null
+          returned: number | null
+          shop_id: string | null
+          target_level: number | null
+          variance: number | null
+        }
+        Relationships: []
+      }
+      v_shop_pending_closings: {
+        Row: {
+          closing_id: string | null
+          closing_status:
+            | Database["public"]["Enums"]["stock_count_status"]
+            | null
+          count_date: string | null
+          opening_id: string | null
+          shop_id: string | null
+          shop_name: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shop_stock_counts_shop_id_fkey"
+            columns: ["shop_id"]
+            isOneToOne: false
+            referencedRelation: "shops"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Functions: {
