@@ -50,7 +50,7 @@ function CountDetailPage() {
       supabase.from("shop_stock_count_lines")
         .select("id, item_id, quantity_counted, inventory_items(name, unit, sku)")
         .eq("count_id", countId),
-      supabase.from("inventory_items").select("id, name, unit").eq("is_active", true).order("name"),
+      supabase.from("inventory_items").select("id, name, unit").eq("is_active", true).eq("category", "finished_good").order("name"),
     ]);
     setHeader((h as unknown as CountHeader) ?? null);
     setLines((l as unknown as CountLine[]) ?? []);

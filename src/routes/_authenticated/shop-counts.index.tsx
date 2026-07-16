@@ -164,8 +164,9 @@ function NewCountDialog({ onClose, onCreated }: { onClose: () => void; onCreated
       // Seed lines from shop assortment
       const { data: assort } = await supabase
         .from("shop_assortments")
-        .select("item_id")
-        .eq("shop_id", shopId);
+        .select("item_id, inventory_items!inner(category)")
+        .eq("shop_id", shopId)
+        .eq("inventory_items.category", "finished_good");
       if (assort && assort.length > 0) {
         await supabase.from("shop_stock_count_lines").insert(
           assort.map((a) => ({ count_id: id!, item_id: a.item_id, quantity_counted: 0 })),
