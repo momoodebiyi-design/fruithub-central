@@ -85,7 +85,7 @@ function NotificationsPage() {
               type="button"
               onClick={async () => {
                 if (!n.read_at) await markRead(n.id);
-                if (n.link) navigate({ to: n.link });
+                if (n.link) navigate({ to: n.link as any });
               }}
               className={cn(
                 "p-4 flex gap-3 w-full text-left transition-colors hover:bg-muted/60",

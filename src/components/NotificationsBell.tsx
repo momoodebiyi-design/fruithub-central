@@ -112,7 +112,7 @@ function NotificationRow({ n }: { n: Notification }) {
         .eq("id", n.id);
     }
     if (n.link) {
-      navigate({ to: n.link });
+      navigate({ to: n.link as any });
     }
   }
 
