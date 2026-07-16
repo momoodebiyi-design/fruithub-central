@@ -21,7 +21,16 @@ interface Stats {
   outputToday: number;
 }
 
+interface PendingClosing {
+  shop_id: string;
+  shop_name: string;
+  count_date: string;
+  opening_id: string;
+  closing_id: string | null;
+}
+
 function DashboardPage() {
+  const [pendingClosings, setPendingClosings] = useState<PendingClosing[]>([]);
   const [stats, setStats] = useState<Stats>({
     totalItems: 0,
     lowStock: 0,
