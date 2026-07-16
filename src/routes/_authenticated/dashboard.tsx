@@ -62,7 +62,7 @@ function DashboardPage() {
       const iso = today.toISOString();
       const since = new Date(Date.now() - 30 * 86400_000).toISOString();
 
-      const [{ count: itemsCount }, { data: lowRows }, { data: batches }] = await Promise.all([
+      const [{ count: itemsCount }, { data: lowRows }, { data: batches }, { data: pend }] = await Promise.all([
         supabase.from("inventory_items").select("*", { count: "exact", head: true }),
         supabase
           .from("inventory_items")
@@ -75,7 +75,9 @@ function DashboardPage() {
           .select("id, batch_number, produced_at, quantity_produced, inventory_items!production_batches_product_item_id_fkey(name)")
           .gte("produced_at", iso)
           .order("produced_at", { ascending: false }),
+        supabase.from("v_shop_pending_closings" as any).select("*").order("count_date", { ascending: false }).limit(20),
       ]);
+      setPendingClosings((pend as unknown as PendingClosing[]) ?? []);
 
       const low = ((lowRows ?? []) as any[]).filter(
         (r) => r.reorder_level !== null && Number(r.quantity) <= Number(r.reorder_level),
