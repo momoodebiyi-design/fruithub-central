@@ -3,10 +3,11 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Building2, Pencil } from "lucide-react";
+import { Plus, Building2, Pencil, Upload } from "lucide-react";
 import { useSession } from "@/hooks/useSession";
 import { CAN_MANAGE_CLIENTS, hasAny } from "@/lib/permissions";
 import { ClientDialog, type Client } from "@/components/clients/ClientDialog";
+import { ContactsImportDialog } from "@/components/shared/ContactsImportDialog";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/clients")({
@@ -25,6 +26,7 @@ function ClientsPage() {
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState<Client | null>(null);
   const [open, setOpen] = useState(false);
+  const [importing, setImporting] = useState(false);
 
   async function load() {
     setLoading(true);
@@ -46,9 +48,14 @@ function ClientsPage() {
           <p className="text-sm text-muted-foreground">Businesses you supply in bulk. Dispatches to a client attach an invoice from your invoicing app.</p>
         </div>
         {canManage && (
-          <Button onClick={() => { setEditing(null); setOpen(true); }} className="bg-brand-orange text-white hover:bg-brand-orange/90">
-            <Plus className="size-4 mr-2" /> New client
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={() => setImporting(true)}>
+              <Upload className="size-4 mr-2" /> Import
+            </Button>
+            <Button onClick={() => { setEditing(null); setOpen(true); }} className="bg-brand-orange text-white hover:bg-brand-orange/90">
+              <Plus className="size-4 mr-2" /> New client
+            </Button>
+          </div>
         )}
       </div>
 
@@ -101,6 +108,7 @@ function ClientsPage() {
       </div>
 
       {open && <ClientDialog client={editing} onClose={() => setOpen(false)} onSaved={load} />}
+      {importing && <ContactsImportDialog kind="client" onClose={() => setImporting(false)} onImported={load} />}
     </div>
   );
 }
