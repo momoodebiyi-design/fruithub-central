@@ -211,7 +211,48 @@ function DashboardPage() {
         </Card>
       )}
 
+      {topRestock.length > 0 && (
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base flex items-center gap-2">
+              <TrendingUp className="size-4 text-brand-orange" />
+              Top restock recommendations
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <table className="w-full text-sm">
+              <thead className="text-xs uppercase text-muted-foreground tracking-wider">
+                <tr>
+                  <th className="text-left py-2 font-medium">Shop</th>
+                  <th className="text-left py-2 font-medium">Item</th>
+                  <th className="text-right py-2 font-medium">On hand</th>
+                  <th className="text-right py-2 font-medium">Target</th>
+                  <th className="text-right py-2 font-medium">Restock</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y">
+                {topRestock.map((r) => (
+                  <tr key={`${r.shop_id}-${r.item_id}`} className="hover:bg-muted/30">
+                    <td className="py-2">{r.shop_name}</td>
+                    <td className="py-2">
+                      <p>{r.item_name}</p>
+                      <p className="font-mono text-[11px] text-muted-foreground">{r.sku ?? "—"}</p>
+                    </td>
+                    <td className="py-2 text-right font-mono text-xs">{Number(r.actual_closing ?? 0)}</td>
+                    <td className="py-2 text-right font-mono text-xs">{Number(r.target_level ?? 0)}</td>
+                    <td className="py-2 text-right font-mono text-sm text-brand-orange">
+                      +{Number(r.restock_recommendation).toFixed(0)} {r.unit}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </CardContent>
+        </Card>
+      )}
+
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+
         <Card>
           <CardHeader><CardTitle className="text-base">Low stock intelligence</CardTitle></CardHeader>
           <CardContent className="space-y-3">
