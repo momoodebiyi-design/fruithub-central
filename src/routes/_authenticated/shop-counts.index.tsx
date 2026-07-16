@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Plus, ClipboardCheck, AlertTriangle, Trash2 } from "lucide-react";
 import { useSession } from "@/hooks/useSession";
-import { CAN_VIEW_ALL_SHOP_COUNTS, hasAny, hasAnyRole, isShopSupervisorOnly } from "@/lib/permissions";
+import { CAN_VIEW_ALL_SHOP_COUNTS, hasAny, isShopSupervisorOnly } from "@/lib/permissions";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
