@@ -12,6 +12,7 @@ import {
   BarChart3,
   Users,
   Building2,
+  PackageSearch,
   Search,
   LogOut,
   Menu,
@@ -92,6 +93,7 @@ export function AppShell({ children }: { children: ReactNode }) {
     : [
         ...FULL_NAV,
         ...(canManageClients ? [{ to: "/clients", label: "Bulk clients", icon: Building2 } as NavItem] : []),
+        { to: "/suppliers", label: "Suppliers", icon: PackageSearch } as NavItem,
         ...(canManageUsers ? [{ to: "/users", label: "Users", icon: Users } as NavItem] : []),
         ...(canViewAudit ? [{ to: "/audit", label: "Audit Log", icon: ShieldCheck } as NavItem] : []),
       ];
