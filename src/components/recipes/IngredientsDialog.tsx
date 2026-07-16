@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import {
   Dialog,
@@ -10,6 +10,19 @@ import {
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -17,7 +30,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Trash2, Plus } from "lucide-react";
+import { Trash2, Plus, ChevronsUpDown, Check } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 interface Item {
   id: string;
@@ -44,6 +58,13 @@ interface RecipeRef {
   status: string;
 }
 
+const COMMON_UNITS = [
+  "g", "kg", "mg", "oz", "lb",
+  "ml", "l", "cl",
+  "pcs", "unit", "pack", "box", "bottle", "carton",
+  "tsp", "tbsp", "cup",
+];
+
 export function IngredientsDialog({
   recipe,
   canEdit,
@@ -59,6 +80,7 @@ export function IngredientsDialog({
   const [rows, setRows] = useState<Ingredient[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [openIdx, setOpenIdx] = useState<number | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -67,7 +89,7 @@ export function IngredientsDialog({
           .from("inventory_items")
           .select("id, sku, name, unit, category")
           .eq("is_active", true)
-          .in("category", ["raw_material", "packaging", "consumables", "semi_finished"] as any)
+          .in("category", ["raw_material", "packaging", "consumable", "semi_finished"] as any)
           .order("name"),
         supabase
           .from("recipe_ingredients")
@@ -90,6 +112,13 @@ export function IngredientsDialog({
       setLoading(false);
     })();
   }, [recipe.id]);
+
+  const unitOptions = useMemo(() => {
+    const set = new Set<string>(COMMON_UNITS);
+    items.forEach((i) => i.unit && set.add(i.unit));
+    rows.forEach((r) => r.unit && set.add(r.unit));
+    return Array.from(set).sort();
+  }, [items, rows]);
 
   function addRow() {
     setRows([
@@ -117,7 +146,6 @@ export function IngredientsDialog({
     const valid = rows.filter((r) => r.ingredient_item_id);
     if (valid.length === 0) return toast.error("Add at least one ingredient");
     setSaving(true);
-    // Simple replace strategy
     const { error: delErr } = await supabase
       .from("recipe_ingredients")
       .delete()
@@ -167,7 +195,7 @@ export function IngredientsDialog({
           <div className="p-8 text-center text-muted-foreground text-sm">Loading…</div>
         ) : (
           <div className="space-y-2">
-            <div className="grid grid-cols-[1fr_120px_100px_100px_1fr_auto] gap-2 text-xs uppercase tracking-wider text-muted-foreground font-medium px-1">
+            <div className="grid grid-cols-[1fr_110px_120px_90px_1fr_auto] gap-2 text-xs uppercase tracking-wider text-muted-foreground font-medium px-1">
               <div>Ingredient</div>
               <div>Quantity</div>
               <div>Unit</div>
@@ -185,33 +213,74 @@ export function IngredientsDialog({
               return (
                 <div
                   key={i}
-                  className="grid grid-cols-[1fr_120px_100px_100px_1fr_auto] gap-2 items-center"
+                  className="grid grid-cols-[1fr_110px_120px_90px_1fr_auto] gap-2 items-center"
                 >
-                  <Select
-                    value={r.ingredient_item_id}
-                    onValueChange={(v) => {
-                      const chosen = items.find((x) => x.id === v);
-                      updateRow(i, {
-                        ingredient_item_id: v,
-                        unit: r.unit || (chosen?.unit ?? ""),
-                      });
-                    }}
-                    disabled={!canEdit}
+                  <Popover
+                    open={openIdx === i}
+                    onOpenChange={(o) => setOpenIdx(o ? i : null)}
                   >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Pick ingredient" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {items.map((x) => (
-                        <SelectItem key={x.id} value={x.id}>
-                          {x.name}
-                          <span className="text-muted-foreground text-xs ml-2 font-mono">
-                            {x.sku}
-                          </span>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        role="combobox"
+                        disabled={!canEdit}
+                        className="w-full justify-between font-normal"
+                      >
+                        <span className="truncate">
+                          {it ? (
+                            <>
+                              {it.name}
+                              <span className="text-muted-foreground text-xs ml-2 font-mono">
+                                {it.sku}
+                              </span>
+                            </>
+                          ) : (
+                            <span className="text-muted-foreground">Pick ingredient…</span>
+                          )}
+                        </span>
+                        <ChevronsUpDown className="size-3.5 opacity-50 shrink-0 ml-2" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="p-0 w-[380px]" align="start">
+                      <Command
+                        filter={(value, search) =>
+                          value.toLowerCase().includes(search.toLowerCase()) ? 1 : 0
+                        }
+                      >
+                        <CommandInput placeholder="Search ingredient…" />
+                        <CommandList>
+                          <CommandEmpty>No ingredient found.</CommandEmpty>
+                          <CommandGroup>
+                            {items.map((x) => (
+                              <CommandItem
+                                key={x.id}
+                                value={`${x.name} ${x.sku}`}
+                                onSelect={() => {
+                                  updateRow(i, {
+                                    ingredient_item_id: x.id,
+                                    unit: r.unit || x.unit || "",
+                                  });
+                                  setOpenIdx(null);
+                                }}
+                              >
+                                <Check
+                                  className={cn(
+                                    "size-3.5 mr-2",
+                                    r.ingredient_item_id === x.id ? "opacity-100" : "opacity-0",
+                                  )}
+                                />
+                                <span className="flex-1 truncate">{x.name}</span>
+                                <span className="text-muted-foreground text-xs ml-2 font-mono">
+                                  {x.sku}
+                                </span>
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
+
                   <Input
                     type="number"
                     step="0.0001"
@@ -222,12 +291,27 @@ export function IngredientsDialog({
                     placeholder="blank ok"
                     disabled={!canEdit}
                   />
-                  <Input
-                    value={r.unit}
-                    onChange={(e) => updateRow(i, { unit: e.target.value })}
-                    placeholder={it?.unit ?? "unit"}
+
+                  <Select
+                    value={r.unit || undefined}
+                    onValueChange={(v) => {
+                      if (v === "__custom__") return;
+                      updateRow(i, { unit: v });
+                    }}
                     disabled={!canEdit}
-                  />
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder={it?.unit ?? "unit"} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {unitOptions.map((u) => (
+                        <SelectItem key={u} value={u}>
+                          {u}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+
                   <Input
                     type="number"
                     step="0.01"
