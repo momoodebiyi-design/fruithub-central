@@ -14,6 +14,7 @@ import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedUsersRouteImport } from './routes/_authenticated/users'
+import { Route as AuthenticatedSuppliersRouteImport } from './routes/_authenticated/suppliers'
 import { Route as AuthenticatedShopsRouteImport } from './routes/_authenticated/shops'
 import { Route as AuthenticatedShopCountsRouteImport } from './routes/_authenticated/shop-counts'
 import { Route as AuthenticatedSalesRouteImport } from './routes/_authenticated/sales'
@@ -57,6 +58,11 @@ const IndexRoute = IndexRouteImport.update({
 const AuthenticatedUsersRoute = AuthenticatedUsersRouteImport.update({
   id: '/users',
   path: '/users',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedSuppliersRoute = AuthenticatedSuppliersRouteImport.update({
+  id: '/suppliers',
+  path: '/suppliers',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedShopsRoute = AuthenticatedShopsRouteImport.update({
@@ -186,6 +192,7 @@ export interface FileRoutesByFullPath {
   '/sales': typeof AuthenticatedSalesRoute
   '/shop-counts': typeof AuthenticatedShopCountsRouteWithChildren
   '/shops': typeof AuthenticatedShopsRoute
+  '/suppliers': typeof AuthenticatedSuppliersRoute
   '/users': typeof AuthenticatedUsersRoute
   '/inventory/$itemId': typeof AuthenticatedInventoryItemIdRoute
   '/settings/profile': typeof AuthenticatedSettingsProfileRoute
@@ -210,6 +217,7 @@ export interface FileRoutesByTo {
   '/requests': typeof AuthenticatedRequestsRoute
   '/sales': typeof AuthenticatedSalesRoute
   '/shops': typeof AuthenticatedShopsRoute
+  '/suppliers': typeof AuthenticatedSuppliersRoute
   '/users': typeof AuthenticatedUsersRoute
   '/inventory/$itemId': typeof AuthenticatedInventoryItemIdRoute
   '/settings/profile': typeof AuthenticatedSettingsProfileRoute
@@ -238,6 +246,7 @@ export interface FileRoutesById {
   '/_authenticated/sales': typeof AuthenticatedSalesRoute
   '/_authenticated/shop-counts': typeof AuthenticatedShopCountsRouteWithChildren
   '/_authenticated/shops': typeof AuthenticatedShopsRoute
+  '/_authenticated/suppliers': typeof AuthenticatedSuppliersRoute
   '/_authenticated/users': typeof AuthenticatedUsersRoute
   '/_authenticated/inventory/$itemId': typeof AuthenticatedInventoryItemIdRoute
   '/_authenticated/settings/profile': typeof AuthenticatedSettingsProfileRoute
@@ -266,6 +275,7 @@ export interface FileRouteTypes {
     | '/sales'
     | '/shop-counts'
     | '/shops'
+    | '/suppliers'
     | '/users'
     | '/inventory/$itemId'
     | '/settings/profile'
@@ -290,6 +300,7 @@ export interface FileRouteTypes {
     | '/requests'
     | '/sales'
     | '/shops'
+    | '/suppliers'
     | '/users'
     | '/inventory/$itemId'
     | '/settings/profile'
@@ -317,6 +328,7 @@ export interface FileRouteTypes {
     | '/_authenticated/sales'
     | '/_authenticated/shop-counts'
     | '/_authenticated/shops'
+    | '/_authenticated/suppliers'
     | '/_authenticated/users'
     | '/_authenticated/inventory/$itemId'
     | '/_authenticated/settings/profile'
@@ -367,6 +379,13 @@ declare module '@tanstack/react-router' {
       path: '/users'
       fullPath: '/users'
       preLoaderRoute: typeof AuthenticatedUsersRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/suppliers': {
+      id: '/_authenticated/suppliers'
+      path: '/suppliers'
+      fullPath: '/suppliers'
+      preLoaderRoute: typeof AuthenticatedSuppliersRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/shops': {
@@ -560,6 +579,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedSalesRoute: typeof AuthenticatedSalesRoute
   AuthenticatedShopCountsRoute: typeof AuthenticatedShopCountsRouteWithChildren
   AuthenticatedShopsRoute: typeof AuthenticatedShopsRoute
+  AuthenticatedSuppliersRoute: typeof AuthenticatedSuppliersRoute
   AuthenticatedUsersRoute: typeof AuthenticatedUsersRoute
   AuthenticatedSettingsProfileRoute: typeof AuthenticatedSettingsProfileRoute
 }
@@ -580,6 +600,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedSalesRoute: AuthenticatedSalesRoute,
   AuthenticatedShopCountsRoute: AuthenticatedShopCountsRouteWithChildren,
   AuthenticatedShopsRoute: AuthenticatedShopsRoute,
+  AuthenticatedSuppliersRoute: AuthenticatedSuppliersRoute,
   AuthenticatedUsersRoute: AuthenticatedUsersRoute,
   AuthenticatedSettingsProfileRoute: AuthenticatedSettingsProfileRoute,
 }

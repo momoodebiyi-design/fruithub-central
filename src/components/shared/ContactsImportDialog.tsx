@@ -116,11 +116,11 @@ export function ContactsImportDialog({
       // Upsert by name (case-insensitive)
       const { data: existing } = await supabase.from(table).select("id").ilike("name", name).maybeSingle();
       if (existing) {
-        const { error } = await supabase.from(table).update(payload).eq("id", existing.id);
+        const { error } = await supabase.from(table).update(payload as never).eq("id", existing.id);
         if (error) { failed++; errors.push(`${name}: ${error.message}`); continue; }
         updated++;
       } else {
-        const { error } = await supabase.from(table).insert(payload);
+        const { error } = await supabase.from(table).insert(payload as never);
         if (error) { failed++; errors.push(`${name}: ${error.message}`); continue; }
         created++;
       }
