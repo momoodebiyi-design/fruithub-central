@@ -21,7 +21,16 @@ interface Stats {
   outputToday: number;
 }
 
+interface PendingClosing {
+  shop_id: string;
+  shop_name: string;
+  count_date: string;
+  opening_id: string;
+  closing_id: string | null;
+}
+
 function DashboardPage() {
+  const [pendingClosings, setPendingClosings] = useState<PendingClosing[]>([]);
   const [stats, setStats] = useState<Stats>({
     totalItems: 0,
     lowStock: 0,
@@ -53,7 +62,7 @@ function DashboardPage() {
       const iso = today.toISOString();
       const since = new Date(Date.now() - 30 * 86400_000).toISOString();
 
-      const [{ count: itemsCount }, { data: lowRows }, { data: batches }] = await Promise.all([
+      const [{ count: itemsCount }, { data: lowRows }, { data: batches }, { data: pend }] = await Promise.all([
         supabase.from("inventory_items").select("*", { count: "exact", head: true }),
         supabase
           .from("inventory_items")
@@ -66,7 +75,9 @@ function DashboardPage() {
           .select("id, batch_number, produced_at, quantity_produced, inventory_items!production_batches_product_item_id_fkey(name)")
           .gte("produced_at", iso)
           .order("produced_at", { ascending: false }),
+        supabase.from("v_shop_pending_closings" as any).select("*").order("count_date", { ascending: false }).limit(20),
       ]);
+      setPendingClosings((pend as unknown as PendingClosing[]) ?? []);
 
       const low = ((lowRows ?? []) as any[]).filter(
         (r) => r.reorder_level !== null && Number(r.quantity) <= Number(r.reorder_level),
@@ -132,7 +143,7 @@ function DashboardPage() {
         <p className="text-sm text-muted-foreground mt-1">Live operations across inventory and production.</p>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
         <KpiCard label="SKUs tracked" value={stats.totalItems} icon={Boxes} />
         <KpiCard
           label="Low stock alerts"
@@ -147,7 +158,42 @@ function DashboardPage() {
           suffix="units"
           icon={TrendingUp}
         />
+        <KpiCard
+          label="Closings pending"
+          value={pendingClosings.length}
+          icon={AlertTriangle}
+          accent={pendingClosings.length > 0 ? "warn" : undefined}
+        />
       </div>
+
+      {pendingClosings.length > 0 && (
+        <Card className="border-brand-orange/40">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base flex items-center gap-2 text-brand-orange">
+              <AlertTriangle className="size-4" />
+              Shops pending closing count
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            {pendingClosings.map((p) => (
+              <Link
+                key={p.opening_id}
+                to={p.closing_id ? "/shop-counts/$countId" : "/shop-counts"}
+                params={p.closing_id ? { countId: p.closing_id } : undefined as any}
+                className="flex items-center justify-between border rounded-md px-3 py-2 hover:bg-muted/40 text-sm"
+              >
+                <div>
+                  <p className="font-medium">{p.shop_name}</p>
+                  <p className="text-[11px] text-muted-foreground font-mono">{p.count_date}</p>
+                </div>
+                <Badge variant="outline" className="text-brand-orange border-brand-orange/40 text-[10px]">
+                  {p.closing_id ? "Complete" : "Awaiting"}
+                </Badge>
+              </Link>
+            ))}
+          </CardContent>
+        </Card>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <Card>
