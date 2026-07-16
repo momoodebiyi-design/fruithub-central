@@ -29,6 +29,19 @@ interface PendingClosing {
   closing_id: string | null;
 }
 
+interface TopRestock {
+  shop_id: string;
+  item_id: string;
+  shop_name: string;
+  item_name: string;
+  sku: string | null;
+  unit: string;
+  actual_closing: number | null;
+  target_level: number | null;
+  restock_recommendation: number;
+  count_date: string;
+}
+
 function DashboardPage() {
   const [pendingClosings, setPendingClosings] = useState<PendingClosing[]>([]);
   const [stats, setStats] = useState<Stats>({
@@ -54,6 +67,7 @@ function DashboardPage() {
       reorderQty: number;
     }>
   >([]);
+  const [topRestock, setTopRestock] = useState<TopRestock[]>([]);
 
   useEffect(() => {
     async function load() {
@@ -62,7 +76,7 @@ function DashboardPage() {
       const iso = today.toISOString();
       const since = new Date(Date.now() - 30 * 86400_000).toISOString();
 
-      const [{ count: itemsCount }, { data: lowRows }, { data: batches }, { data: pend }] = await Promise.all([
+      const [{ count: itemsCount }, { data: lowRows }, { data: batches }, { data: pend }, { data: rest }] = await Promise.all([
         supabase.from("inventory_items").select("*", { count: "exact", head: true }),
         supabase
           .from("inventory_items")
@@ -76,8 +90,10 @@ function DashboardPage() {
           .gte("produced_at", iso)
           .order("produced_at", { ascending: false }),
         supabase.from("v_shop_pending_closings" as any).select("*").order("count_date", { ascending: false }).limit(20),
+        supabase.from("v_shop_top_restock" as any).select("*").order("restock_recommendation", { ascending: false }).limit(6),
       ]);
       setPendingClosings((pend as unknown as PendingClosing[]) ?? []);
+      setTopRestock((rest as unknown as TopRestock[]) ?? []);
 
       const low = ((lowRows ?? []) as any[]).filter(
         (r) => r.reorder_level !== null && Number(r.quantity) <= Number(r.reorder_level),
@@ -195,7 +211,48 @@ function DashboardPage() {
         </Card>
       )}
 
+      {topRestock.length > 0 && (
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base flex items-center gap-2">
+              <TrendingUp className="size-4 text-brand-orange" />
+              Top restock recommendations
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <table className="w-full text-sm">
+              <thead className="text-xs uppercase text-muted-foreground tracking-wider">
+                <tr>
+                  <th className="text-left py-2 font-medium">Shop</th>
+                  <th className="text-left py-2 font-medium">Item</th>
+                  <th className="text-right py-2 font-medium">On hand</th>
+                  <th className="text-right py-2 font-medium">Target</th>
+                  <th className="text-right py-2 font-medium">Restock</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y">
+                {topRestock.map((r) => (
+                  <tr key={`${r.shop_id}-${r.item_id}`} className="hover:bg-muted/30">
+                    <td className="py-2">{r.shop_name}</td>
+                    <td className="py-2">
+                      <p>{r.item_name}</p>
+                      <p className="font-mono text-[11px] text-muted-foreground">{r.sku ?? "—"}</p>
+                    </td>
+                    <td className="py-2 text-right font-mono text-xs">{Number(r.actual_closing ?? 0)}</td>
+                    <td className="py-2 text-right font-mono text-xs">{Number(r.target_level ?? 0)}</td>
+                    <td className="py-2 text-right font-mono text-sm text-brand-orange">
+                      +{Number(r.restock_recommendation).toFixed(0)} {r.unit}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </CardContent>
+        </Card>
+      )}
+
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+
         <Card>
           <CardHeader><CardTitle className="text-base">Low stock intelligence</CardTitle></CardHeader>
           <CardContent className="space-y-3">

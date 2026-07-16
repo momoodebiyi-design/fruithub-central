@@ -260,15 +260,17 @@ function CountDetailPage() {
                   <th className="text-right py-2 font-medium">Target</th>
                   <th className="text-right py-2 font-medium">On hand</th>
                   <th className="text-right py-2 font-medium">Restock</th>
+                  <th className="w-40" />
                 </tr>
               </thead>
               <tbody className="divide-y">
                 {balance.filter((b) => Number(b.restock_recommendation ?? 0) > 0).length === 0 ? (
-                  <tr><td colSpan={4} className="py-4 text-center text-muted-foreground">All items at target level.</td></tr>
+                  <tr><td colSpan={5} className="py-4 text-center text-muted-foreground">All items at target level.</td></tr>
                 ) : balance
                   .filter((b) => Number(b.restock_recommendation ?? 0) > 0)
                   .map((b) => {
-                    const item = items.find((i) => i.id === b.item_id) ?? lines.find((l) => l.item_id === b.item_id)?.inventory_items;
+                    const line = lines.find((l) => l.item_id === b.item_id);
+                    const item = items.find((i) => i.id === b.item_id) ?? line?.inventory_items;
                     return (
                       <tr key={b.item_id}>
                         <td className="py-2">{(item as any)?.name ?? b.item_id}</td>
@@ -276,6 +278,15 @@ function CountDetailPage() {
                         <td className="py-2 text-right font-mono text-xs">{b.actual_closing ?? 0}</td>
                         <td className="py-2 text-right font-mono text-sm text-brand-orange">
                           +{Number(b.restock_recommendation).toFixed(0)}
+                        </td>
+                        <td className="py-2 text-right">
+                          <RequestRestockButton
+                            itemId={b.item_id}
+                            shopId={header!.shop_id}
+                            shopName={header!.shops?.name ?? "shop"}
+                            itemName={(item as any)?.name ?? "item"}
+                            quantity={Number(b.restock_recommendation)}
+                          />
                         </td>
                       </tr>
                     );
@@ -321,5 +332,43 @@ function CountDetailPage() {
         />
       </div>
     </div>
+  );
+}
+
+function RequestRestockButton({
+  itemId, shopId, shopName, itemName, quantity,
+}: { itemId: string; shopId: string; shopName: string; itemName: string; quantity: number }) {
+  const [busy, setBusy] = useState(false);
+  const [done, setDone] = useState(false);
+
+  async function create() {
+    setBusy(true);
+    const { data: u } = await supabase.auth.getUser();
+    const uid = u.user?.id;
+    if (!uid) { setBusy(false); return toast.error("Not signed in"); }
+    const { error } = await supabase.from("stock_requests").insert({
+      requested_by: uid,
+      item_id: itemId,
+      quantity,
+      purpose: `Restock ${itemName} at ${shopName} (from closing count)`,
+      destination_shop_id: shopId,
+    });
+    setBusy(false);
+    if (error) return toast.error(error.message);
+    setDone(true);
+    toast.success("Stock request created");
+  }
+
+  if (done) {
+    return (
+      <Button asChild variant="ghost" size="sm" className="text-emerald-700">
+        <Link to="/requests"><Plus className="size-3 mr-1" /> Sent</Link>
+      </Button>
+    );
+  }
+  return (
+    <Button variant="outline" size="sm" onClick={create} disabled={busy}>
+      <Plus className="size-3 mr-1" /> {busy ? "Sending…" : "Request restock"}
+    </Button>
   );
 }
