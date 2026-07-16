@@ -1513,8 +1513,10 @@ export type Database = {
           restock_recommendation: number | null
           returned: number | null
           shop_id: string | null
+          sold: number | null
           target_level: number | null
           variance: number | null
+          wasted: number | null
         }
         Relationships: []
       }
@@ -1538,6 +1540,21 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      v_shop_top_restock: {
+        Row: {
+          actual_closing: number | null
+          count_date: string | null
+          item_id: string | null
+          item_name: string | null
+          restock_recommendation: number | null
+          shop_id: string | null
+          shop_name: string | null
+          sku: string | null
+          target_level: number | null
+          unit: string | null
+        }
+        Relationships: []
       }
     }
     Functions: {
