@@ -3,7 +3,8 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Plus, ClipboardCheck } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Plus, ClipboardCheck, AlertTriangle } from "lucide-react";
 import { useSession } from "@/hooks/useSession";
 import { CAN_VIEW_ALL_SHOP_COUNTS, hasAny, isShopSupervisorOnly } from "@/lib/permissions";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -27,30 +28,43 @@ interface CountRow {
   shops: { name: string } | null;
 }
 
+interface PendingRow {
+  shop_id: string;
+  shop_name: string;
+  count_date: string;
+  opening_id: string;
+  closing_id: string | null;
+  closing_status: string | null;
+}
+
 function ShopCountsPage() {
   const session = useSession();
   const supervisorOnly = isShopSupervisorOnly(session.roles);
   const canViewAll = hasAny(session.roles, CAN_VIEW_ALL_SHOP_COUNTS);
   const [rows, setRows] = useState<CountRow[]>([]);
+  const [pending, setPending] = useState<PendingRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [openNew, setOpenNew] = useState(false);
 
   async function load() {
     setLoading(true);
-    const { data, error } = await supabase
-      .from("shop_stock_counts")
-      .select("id, shop_id, count_date, count_type, status, submitted_at, shops(name)")
-      .order("count_date", { ascending: false })
-      .order("count_type")
-      .limit(200);
+    const [{ data, error }, { data: pend }] = await Promise.all([
+      supabase
+        .from("shop_stock_counts")
+        .select("id, shop_id, count_date, count_type, status, submitted_at, shops(name)")
+        .order("count_date", { ascending: false })
+        .order("count_type")
+        .limit(200),
+      supabase.from("v_shop_pending_closings" as any)
+        .select("*").order("count_date", { ascending: false }),
+    ]);
     if (error) toast.error(error.message);
     setRows((data as unknown as CountRow[]) ?? []);
+    setPending((pend as unknown as PendingRow[]) ?? []);
     setLoading(false);
   }
 
-  useEffect(() => {
-    load();
-  }, []);
+  useEffect(() => { load(); }, []);
 
   return (
     <div className="space-y-6">
@@ -69,6 +83,36 @@ function ShopCountsPage() {
           </Button>
         )}
       </div>
+
+      {pending.length > 0 && (
+        <Card className="border-brand-orange/40">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base flex items-center gap-2 text-brand-orange">
+              <AlertTriangle className="size-4" />
+              {pending.length} closing count{pending.length === 1 ? "" : "s"} pending
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {pending.slice(0, 8).map((p) => (
+              <div key={p.opening_id} className="flex items-center justify-between text-sm border-b last:border-0 pb-2 last:pb-0">
+                <div>
+                  <p className="font-medium">{p.shop_name}</p>
+                  <p className="text-[11px] text-muted-foreground font-mono">
+                    {format(new Date(p.count_date), "EEE d MMM yyyy")}
+                  </p>
+                </div>
+                {p.closing_id ? (
+                  <Button asChild size="sm" variant="outline">
+                    <Link to="/shop-counts/$countId" params={{ countId: p.closing_id }}>Complete closing</Link>
+                  </Button>
+                ) : (
+                  <Badge variant="outline" className="text-brand-orange border-brand-orange/40">Awaiting</Badge>
+                )}
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
 
       <div className="rounded-lg border overflow-hidden bg-card">
         <table className="w-full text-sm">
@@ -127,6 +171,7 @@ function NewCountDialog({ onClose, onCreated }: { onClose: () => void; onCreated
   const [date, setDate] = useState<string>(new Date().toISOString().slice(0, 10));
   const [type, setType] = useState<"opening" | "closing">("opening");
   const [saving, setSaving] = useState(false);
+  const [warning, setWarning] = useState<string | null>(null);
   const navigate = Route.useNavigate();
 
   useEffect(() => {
@@ -137,10 +182,31 @@ function NewCountDialog({ onClose, onCreated }: { onClose: () => void; onCreated
     }
   }, [supervisorOnly]);
 
+  // Warn when opening a new day while previous day's closing missing
+  useEffect(() => {
+    setWarning(null);
+    if (!shopId || type !== "opening") return;
+    const prev = new Date(date);
+    prev.setDate(prev.getDate() - 1);
+    const prevStr = prev.toISOString().slice(0, 10);
+    (async () => {
+      const { data } = await supabase
+        .from("shop_stock_counts")
+        .select("id, status, count_type")
+        .eq("shop_id", shopId)
+        .eq("count_date", prevStr);
+      const rows = (data ?? []) as Array<{ status: string; count_type: string }>;
+      const hasOpening = rows.some((r) => r.count_type === "opening" && r.status === "submitted");
+      const closed = rows.some((r) => r.count_type === "closing" && r.status === "submitted");
+      if (hasOpening && !closed) {
+        setWarning(`Previous day (${format(prev, "d MMM")}) closing count is not submitted yet. Complete it before opening a new day.`);
+      }
+    })();
+  }, [shopId, date, type]);
+
   async function create() {
     if (!shopId) return toast.error("Pick a shop");
     setSaving(true);
-    // Try to find existing draft first
     const { data: existing } = await supabase
       .from("shop_stock_counts")
       .select("id")
@@ -155,13 +221,9 @@ function NewCountDialog({ onClose, onCreated }: { onClose: () => void; onCreated
         .insert({ shop_id: shopId, count_date: date, count_type: type })
         .select("id")
         .single();
-      if (error) {
-        setSaving(false);
-        return toast.error(error.message);
-      }
+      if (error) { setSaving(false); return toast.error(error.message); }
       id = data.id;
 
-      // Seed lines from shop assortment
       const { data: assort } = await supabase
         .from("shop_assortments")
         .select("item_id, inventory_items!inner(category)")
@@ -210,6 +272,12 @@ function NewCountDialog({ onClose, onCreated }: { onClose: () => void; onCreated
               </Select>
             </div>
           </div>
+          {warning && (
+            <div className="rounded-md border border-brand-orange/40 bg-brand-orange/5 p-3 text-xs text-brand-orange flex gap-2">
+              <AlertTriangle className="size-4 shrink-0 mt-0.5" />
+              <span>{warning}</span>
+            </div>
+          )}
         </div>
         <DialogFooter>
           <Button variant="ghost" onClick={onClose}>Cancel</Button>
