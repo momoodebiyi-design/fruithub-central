@@ -183,7 +183,7 @@ function InventoryList() {
       </div>
 
       {dialogItem !== undefined && (
-        <ItemDialog item={dialogItem} onClose={() => setDialogItem(undefined)} onSaved={load} />
+        <ItemDialog item={dialogItem as any} onClose={() => setDialogItem(undefined)} onSaved={load} />
       )}
       {moveItem && (
         <MovementDialog item={moveItem} onClose={() => setMoveItem(null)} onSaved={load} />
