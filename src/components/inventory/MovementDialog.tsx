@@ -104,7 +104,12 @@ export function MovementDialog({
           <div className="bg-muted rounded-md p-3">
             <p className="text-sm font-medium">{item.name}</p>
             <p className="text-xs text-muted-foreground font-mono">
-              {item.sku} · {onHand.toLocaleString()} {item.unit} on hand
+              {item.sku} ·{" "}
+              {loadingOnHand
+                ? "…"
+                : onHandError !== null || onHand === null
+                  ? "On-hand unavailable"
+                  : `${onHand.toLocaleString()} ${item.unit} on hand`}
             </p>
 
           </div>
