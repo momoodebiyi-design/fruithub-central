@@ -1,0 +1,38 @@
+{
+  "version": 1,
+  "sdk_version": "0.23.0",
+  "path": "/mcp",
+  "auth": {
+    "type": "none"
+  },
+  "mcp": {
+    "server": {
+      "name": "juicery-ops-mcp",
+      "version": "0.1.0",
+      "title": "Juicery Ops MCP"
+    },
+    "tools": [
+      {
+        "name": "ping",
+        "title": "Ping",
+        "description": "Health check for the Juicery Ops MCP server. Returns 'pong' plus the current server time.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "properties": {
+            "message": {
+              "description": "Optional message echoed back with the pong response.",
+              "type": "string"
+            }
+          }
+        },
+        "outputSchema": null
+      }
+    ]
+  }
+}
