@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { fetchOnHand } from "@/lib/stock";
 import {
   Dialog,
   DialogContent,
@@ -25,11 +26,27 @@ export function StockCountDialog({
   const [count, setCount] = useState("");
   const [reason, setReason] = useState("");
   const [saving, setSaving] = useState(false);
+  // Always re-read on_hand from the ledger at open time — never trust the
+  // cached `item.quantity` value coming from the caller.
+  const [system, setSystem] = useState<number>(Number(item.quantity ?? 0));
+  const [loadingSystem, setLoadingSystem] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchOnHand(item.id).then((v) => {
+      if (!cancelled) {
+        setSystem(v);
+        setLoadingSystem(false);
+      }
+    });
+    return () => { cancelled = true; };
+  }, [item.id]);
 
   const physical = Number(count);
-  const delta = count === "" ? 0 : physical - Number(item.quantity);
+  const delta = count === "" ? 0 : physical - system;
 
   async function save() {
+    if (loadingSystem) return toast.error("Still reading current stock — try again in a moment");
     if (count === "" || Number.isNaN(physical) || physical < 0) {
       return toast.error("Enter a physical count (0 or more)");
     }
@@ -38,12 +55,12 @@ export function StockCountDialog({
 
     setSaving(true);
     const { data: userData } = await supabase.auth.getUser();
-    // The trigger treats `adjustment` as an additive delta, so we insert the signed delta.
+    // Trigger treats `adjustment` as an additive delta — insert the signed delta.
     const { error } = await supabase.from("inventory_movements").insert({
       item_id: item.id,
       type: "adjustment",
       quantity: delta,
-      reason: `Stock count: physical ${physical} vs system ${item.quantity} — ${reason.trim()}`,
+      reason: `Stock count: physical ${physical} vs system ${system} — ${reason.trim()}`,
       performed_by: userData.user?.id,
     });
     setSaving(false);
@@ -52,6 +69,7 @@ export function StockCountDialog({
     onSaved();
     onClose();
   }
+
 
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()}>
@@ -65,7 +83,7 @@ export function StockCountDialog({
           <div className="grid grid-cols-2 gap-3">
             <div>
               <Label>System count</Label>
-              <Input value={`${Number(item.quantity).toLocaleString()} ${item.unit}`} readOnly className="font-mono" />
+              <Input value={loadingSystem ? "…" : `${system.toLocaleString()} ${item.unit}`} readOnly className="font-mono" />
             </div>
             <div>
               <Label>Physical count</Label>

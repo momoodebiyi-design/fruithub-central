@@ -21,10 +21,11 @@ export default defineTool({
     const auth = requireAuth(ctx);
     if (!auth.ok) return auth.response;
     const sb = supabaseForCaller(ctx);
-    const { data, error } = await sb
-      .from("inventory_items")
-      .select("id, sku, name, unit, quantity, reorder_level, category")
-      .order("quantity", { ascending: true })
+    const { data, error } = await (sb as any)
+      .from("v_item_stock")
+      .select("item_id, sku, name, unit, on_hand, reorder_level, category")
+      .not("reorder_level", "is", null)
+      .order("on_hand", { ascending: true })
       .limit(limit ?? 25);
     if (error) {
       return {
@@ -32,10 +33,12 @@ export default defineTool({
         isError: true,
       };
     }
-    const low = (data ?? []).filter(
-      (r) =>
-        r.reorder_level != null &&
-        Number(r.quantity) <= Number(r.reorder_level),
+    const rows = (data ?? []) as Array<{
+      item_id: string; sku: string; name: string; unit: string;
+      on_hand: number | null; reorder_level: number | null; category: string | null;
+    }>;
+    const low = rows.filter(
+      (r) => r.reorder_level != null && Number(r.on_hand ?? 0) <= Number(r.reorder_level),
     );
     return {
       content: [
@@ -46,7 +49,7 @@ export default defineTool({
               low
                 .map(
                   (r) =>
-                    `- ${r.name} (${r.sku}) — ${r.quantity} ${r.unit} (reorder at ${r.reorder_level})`,
+                    `- ${r.name} (${r.sku}) — ${Number(r.on_hand ?? 0)} ${r.unit} (reorder at ${r.reorder_level})`,
                 )
                 .join("\n")
             : "No items are at or below reorder level.",
@@ -54,5 +57,6 @@ export default defineTool({
       ],
       structuredContent: { items: low },
     };
+
   },
 });

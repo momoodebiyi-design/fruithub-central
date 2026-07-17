@@ -74,6 +74,7 @@ function ItemDetail() {
   const canEdit = hasAny(session.roles, CAN_WRITE_INVENTORY);
 
   const [item, setItem] = useState<Item | null>(null);
+  const [onHand, setOnHand] = useState<number>(0);
   const [movements, setMovements] = useState<Movement[]>([]);
   const [supplier, setSupplier] = useState<{ name: string } | null>(null);
   const [showMove, setShowMove] = useState(false);
@@ -81,13 +82,16 @@ function ItemDetail() {
   const [showEdit, setShowEdit] = useState(false);
 
   async function load() {
-    const { data: it } = await supabase
-      .from("inventory_items")
-      .select("*")
-      .eq("id", itemId)
-      .maybeSingle();
+    const [{ data: it }, { data: stockRow }] = await Promise.all([
+      supabase.from("inventory_items").select("*").eq("id", itemId).maybeSingle(),
+      (supabase as any).from("v_item_stock").select("on_hand").eq("item_id", itemId).maybeSingle(),
+    ]);
     if (!it) return;
-    setItem(it as Item);
+    // `quantity` on the returned row is the legacy trigger-maintained value.
+    // Overwrite it with the ledger-derived on_hand so nothing downstream sees stale data.
+    const fresh = Number((stockRow as any)?.on_hand ?? 0);
+    setOnHand(fresh);
+    setItem({ ...(it as Item), quantity: fresh });
 
     if (it.supplier_id) {
       const { data: s } = await supabase.from("suppliers").select("name").eq("id", it.supplier_id).maybeSingle();
@@ -113,6 +117,7 @@ function ItemDetail() {
     setMovements(list);
   }
 
+
   useEffect(() => {
     load();
     const ch = supabase
@@ -133,10 +138,11 @@ function ItemDetail() {
   }
 
   const stats = computeUsageStats(movements);
-  const days = daysUntilDepletion(Number(item.quantity), stats.avgDaily);
-  const reorderQty = recommendReorder(stats.avgDaily, Number(item.quantity), item.reorder_level);
+  const days = daysUntilDepletion(onHand, stats.avgDaily);
+  const reorderQty = recommendReorder(stats.avgDaily, onHand, item.reorder_level);
   const buckets = monthlyBuckets(movements);
-  const low = item.reorder_level !== null && Number(item.quantity) <= Number(item.reorder_level);
+  const low = item.reorder_level !== null && onHand <= Number(item.reorder_level);
+
 
   return (
     <div className="space-y-6">
@@ -175,7 +181,7 @@ function ItemDetail() {
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <StatCard label="On hand" value={`${Number(item.quantity).toLocaleString()} ${item.unit}`} accent={low ? "warn" : undefined} />
+        <StatCard label="On hand" value={`${onHand.toLocaleString()} ${item.unit}`} accent={low ? "warn" : undefined} />
         <StatCard label="Min / reorder" value={`${item.min_level ?? "—"} / ${item.reorder_level ?? "—"}`} />
         <StatCard
           label="Avg daily usage"
