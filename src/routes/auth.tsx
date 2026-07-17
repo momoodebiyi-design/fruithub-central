@@ -11,12 +11,20 @@ export const Route = createFileRoute("/auth")({
   validateSearch: (s: Record<string, unknown>) => ({
     invite: typeof s.invite === "string" ? s.invite : undefined,
     mode: s.mode === "signup" ? "signup" : "signin",
+    next: typeof s.next === "string" ? s.next : undefined,
   }),
   component: AuthPage,
 });
 
+/** Only accept a same-origin relative path so we can't be used as an open redirect. */
+function safeNext(next: string | undefined): string | null {
+  if (!next) return null;
+  if (!next.startsWith("/") || next.startsWith("//")) return null;
+  return next;
+}
+
 function AuthPage() {
-  const { invite, mode } = Route.useSearch();
+  const { invite, mode, next } = Route.useSearch();
   const navigate = useNavigate();
   const [tab, setTab] = useState<"signin" | "signup">(invite ? "signup" : mode);
   const [email, setEmail] = useState("");
@@ -47,30 +55,40 @@ function AuthPage() {
     })();
   }, [invite]);
 
+  function goPostAuth() {
+    const dest = safeNext(next);
+    if (dest) {
+      window.location.href = dest;
+      return;
+    }
+    navigate({ to: "/dashboard" });
+  }
+
   async function handleSignIn(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     setLoading(false);
     if (error) return toast.error(error.message);
-    navigate({ to: "/dashboard" });
+    goPostAuth();
   }
 
   async function handleSignUp(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
+    const dest = safeNext(next);
     const { error } = await supabase.auth.signUp({
       email,
       password,
       options: {
-        emailRedirectTo: `${window.location.origin}/dashboard`,
+        emailRedirectTo: `${window.location.origin}${dest ?? "/dashboard"}`,
         data: { full_name: fullName },
       },
     });
     setLoading(false);
     if (error) return toast.error(error.message);
     toast.success("Account created — you're signed in.");
-    navigate({ to: "/dashboard" });
+    goPostAuth();
   }
 
   async function handleReset() {
