@@ -106,7 +106,7 @@ function Consent() {
         <div className="rounded-md bg-muted/40 p-3 space-y-2">
           <p className="text-xs font-medium text-foreground">Requested access</p>
           <ul className="text-xs text-muted-foreground space-y-1">
-            {scopeList.map((s) => (
+            {scopeList.map((s: string) => (
               <li key={s}>
                 {s === "openid" && "Verify your identity"}
                 {s === "email" && "Share your email address"}
