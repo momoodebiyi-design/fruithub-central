@@ -101,7 +101,22 @@ export function StockCountDialog({
           <div className="grid grid-cols-2 gap-3">
             <div>
               <Label>System count</Label>
-              <Input value={loadingSystem ? "…" : `${system.toLocaleString()} ${item.unit}`} readOnly className="font-mono" />
+              <Input
+                value={
+                  loadingSystem
+                    ? "…"
+                    : systemError !== null || system === null
+                      ? "Unavailable"
+                      : `${system.toLocaleString()} ${item.unit}`
+                }
+                readOnly
+                className="font-mono"
+              />
+              {systemError !== null && !loadingSystem && (
+                <p className="text-[11px] text-brand-orange mt-1">
+                  Unable to load ledger balance
+                </p>
+              )}
             </div>
             <div>
               <Label>Physical count</Label>
