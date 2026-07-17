@@ -28,10 +28,15 @@ export function RequestDialog({ onClose, onSaved }: { onClose: () => void; onSav
   useEffect(() => {
     (async () => {
       const [{ data: i }, { data: s }] = await Promise.all([
-        supabase.from("inventory_items").select("id, name, unit, quantity").eq("is_active", true).order("name"),
+        (supabase as any).from("v_item_stock")
+          .select("item_id, name, unit, on_hand")
+          .eq("status", "active")
+          .order("name"),
         supabase.from("shops").select("id, name").eq("is_active", true).order("name"),
       ]);
-      setItems((i as ItemOpt[]) ?? []);
+      setItems(((i as any[]) ?? []).map((r) => ({
+        id: r.item_id, name: r.name, unit: r.unit, quantity: Number(r.on_hand ?? 0),
+      })));
       setShops((s as ShopOpt[]) ?? []);
       if (supervisorOnly && session.shopId) {
         const shop = ((s as ShopOpt[]) ?? []).find((x) => x.id === session.shopId);
@@ -40,6 +45,7 @@ export function RequestDialog({ onClose, onSaved }: { onClose: () => void; onSav
       }
     })();
   }, [supervisorOnly, session.shopId]);
+
 
   async function save() {
     if (!itemId || !purpose.trim() || Number(quantity) <= 0) {

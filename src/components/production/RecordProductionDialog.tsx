@@ -52,13 +52,17 @@ export function RecordProductionDialog({
 
   useEffect(() => {
     (async () => {
-      const { data } = await supabase
-        .from("inventory_items")
-        .select("id, sku, name, unit, category, quantity")
-        .eq("is_active", true)
+      const { data } = await (supabase as any)
+        .from("v_item_stock")
+        .select("item_id, sku, name, unit, category, on_hand")
+        .eq("status", "active")
         .order("name");
-      setItems((data ?? []) as unknown as Item[]);
+      setItems(((data ?? []) as any[]).map((r) => ({
+        id: r.item_id, sku: r.sku, name: r.name, unit: r.unit,
+        category: r.category, quantity: Number(r.on_hand ?? 0),
+      })));
     })();
+
     const d = new Date();
     setBatchNumber(
       `B-${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, "0")}${String(d.getDate()).padStart(2, "0")}-${String(d.getHours()).padStart(2, "0")}${String(d.getMinutes()).padStart(2, "0")}`,

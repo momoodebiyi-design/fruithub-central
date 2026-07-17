@@ -10,7 +10,7 @@ import {
   CommandList,
   CommandSeparator,
 } from "@/components/ui/command";
-import { Boxes, FlaskConical, LayoutDashboard, Truck, Users, BarChart3 } from "lucide-react";
+import { Boxes, FlaskConical, LayoutDashboard, Send, Users, PackageSearch } from "lucide-react";
 
 interface ItemHit {
   id: string;
@@ -41,16 +41,22 @@ export function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenCh
   useEffect(() => {
     if (!open) return;
     let cancelled = false;
+    const mapItems = (rows: any[] | null): ItemHit[] =>
+      (rows ?? []).map((r) => ({
+        id: r.item_id, sku: r.sku, name: r.name, unit: r.unit,
+        quantity: Number(r.on_hand ?? 0),
+      }));
     const run = async () => {
       const term = q.trim();
       if (!term) {
-        const { data } = await supabase
-          .from("inventory_items")
-          .select("id, sku, name, unit, quantity")
-          .order("updated_at", { ascending: false })
+        const { data } = await (supabase as any)
+          .from("v_item_stock")
+          .select("item_id, sku, name, unit, on_hand")
+          .eq("status", "active")
+          .order("name")
           .limit(8);
         if (!cancelled) {
-          setItems((data ?? []) as ItemHit[]);
+          setItems(mapItems(data));
           setBatches([]);
           setSuppliers([]);
         }
@@ -58,9 +64,9 @@ export function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenCh
       }
       const like = `%${term}%`;
       const [it, bt, sp] = await Promise.all([
-        supabase
-          .from("inventory_items")
-          .select("id, sku, name, unit, quantity")
+        (supabase as any)
+          .from("v_item_stock")
+          .select("item_id, sku, name, unit, on_hand")
           .or(`name.ilike.${like},sku.ilike.${like}`)
           .limit(8),
         supabase
@@ -71,7 +77,7 @@ export function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenCh
         supabase.from("suppliers").select("id, name").ilike("name", like).limit(5),
       ]);
       if (!cancelled) {
-        setItems((it.data ?? []) as ItemHit[]);
+        setItems(mapItems(it.data));
         setBatches((bt.data ?? []) as BatchHit[]);
         setSuppliers((sp.data ?? []) as SupplierHit[]);
       }
@@ -91,10 +97,10 @@ export function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenCh
 
   const NAV = [
     { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-    { to: "/inventory", label: "Inventory", icon: Boxes },
+    { to: "/inventory", label: "Central Stock", icon: Boxes },
     { to: "/production", label: "Production", icon: FlaskConical },
-    { to: "/procurement", label: "Procurement", icon: Truck },
-    { to: "/reports", label: "Reports", icon: BarChart3 },
+    { to: "/dispatches", label: "Transfers / Dispatches", icon: Send },
+    { to: "/suppliers", label: "Suppliers", icon: PackageSearch },
     { to: "/users", label: "Users", icon: Users },
   ];
 
@@ -158,9 +164,9 @@ export function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenCh
                 <CommandItem
                   key={s.id}
                   value={`supplier ${s.name}`}
-                  onSelect={() => go("/procurement")}
+                  onSelect={() => go("/suppliers")}
                 >
-                  <Truck className="size-4 mr-2 text-muted-foreground" />
+                  <PackageSearch className="size-4 mr-2 text-muted-foreground" />
                   {s.name}
                 </CommandItem>
               ))}

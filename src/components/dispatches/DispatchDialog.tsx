@@ -37,13 +37,19 @@ export function DispatchDialog({ onClose, onSaved }: { onClose: () => void; onSa
       const [{ data: s }, { data: c }, { data: i }] = await Promise.all([
         supabase.from("shops").select("id, name").eq("is_active", true).order("name"),
         supabase.from("clients").select("id, name").eq("is_active", true).order("name"),
-        supabase.from("inventory_items").select("id, name, sku, unit, quantity").eq("is_active", true).order("name"),
+        (supabase as any).from("v_item_stock")
+          .select("item_id, name, sku, unit, on_hand")
+          .eq("status", "active")
+          .order("name"),
       ]);
       setShops((s as ShopOpt[]) ?? []);
       setClients((c as ClientOpt[]) ?? []);
-      setItems((i as ItemOpt[]) ?? []);
+      setItems(((i as any[]) ?? []).map((r) => ({
+        id: r.item_id, name: r.name, sku: r.sku, unit: r.unit, quantity: Number(r.on_hand ?? 0),
+      })));
     })();
   }, []);
+
 
   function updateLine(idx: number, patch: Partial<Line>) {
     setLines((ls) => ls.map((l, i) => (i === idx ? { ...l, ...patch } : l)));
