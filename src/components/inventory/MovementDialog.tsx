@@ -47,11 +47,30 @@ export function MovementDialog({
   const [qty, setQty] = useState("");
   const [reason, setReason] = useState("");
   const [saving, setSaving] = useState(false);
-  const [onHand, setOnHand] = useState<number>(Number(item.quantity ?? 0));
+  const [onHand, setOnHand] = useState<number | null>(null);
+  const [onHandError, setOnHandError] = useState<string | null>(null);
+  const [loadingOnHand, setLoadingOnHand] = useState(true);
 
   useEffect(() => {
     let cancelled = false;
-    fetchOnHand(item.id).then((v) => { if (!cancelled) setOnHand(v); });
+    setLoadingOnHand(true);
+    setOnHandError(null);
+    fetchOnHand(item.id)
+      .then((v) => {
+        if (!cancelled) {
+          setOnHand(v);
+          setLoadingOnHand(false);
+        }
+      })
+      .catch((e) => {
+        if (!cancelled) {
+          setOnHand(null);
+          setLoadingOnHand(false);
+          setOnHandError(
+            e instanceof StockReadError ? e.message : "On-hand unavailable",
+          );
+        }
+      });
     return () => { cancelled = true; };
   }, [item.id]);
 
