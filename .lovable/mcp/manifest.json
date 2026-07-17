@@ -3,12 +3,16 @@
   "sdk_version": "0.23.0",
   "path": "/mcp",
   "auth": {
-    "type": "none"
+    "type": "oauth",
+    "issuer": "https://qvsumugnsrmpnklpgpqy.supabase.co/auth/v1",
+    "accepted_audiences": [
+      "authenticated"
+    ]
   },
   "mcp": {
     "server": {
       "name": "juicery-ops-mcp",
-      "version": "0.1.0",
+      "version": "0.2.0",
       "title": "Juicery Ops MCP"
     },
     "tools": [
@@ -28,6 +32,78 @@
             "message": {
               "description": "Optional message echoed back with the pong response.",
               "type": "string"
+            }
+          }
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "search_inventory_items",
+        "title": "Search inventory items",
+        "description": "Search inventory items by name or SKU. Returns current on-hand quantity and unit. Respects row-level security.",
+        "annotations": {
+          "readOnlyHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "properties": {
+            "query": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Search text matched against name and SKU."
+            },
+            "limit": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 50
+            }
+          },
+          "required": [
+            "query"
+          ]
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "list_low_stock_items",
+        "title": "List low-stock inventory items",
+        "description": "Returns inventory items whose current quantity is at or below their reorder threshold. Results respect the caller's row-level security.",
+        "annotations": {
+          "readOnlyHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "properties": {
+            "limit": {
+              "description": "Maximum number of items to return (default 25).",
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            }
+          }
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "list_pending_stock_requests",
+        "title": "List pending stock requests",
+        "description": "Returns stock requests the caller can see that are still awaiting approval or fulfillment. Respects row-level security.",
+        "annotations": {
+          "readOnlyHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "properties": {
+            "limit": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
             }
           }
         },
