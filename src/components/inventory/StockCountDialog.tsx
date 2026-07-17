@@ -26,27 +26,45 @@ export function StockCountDialog({
   const [count, setCount] = useState("");
   const [reason, setReason] = useState("");
   const [saving, setSaving] = useState(false);
-  // Always re-read on_hand from the ledger at open time — never trust the
-  // cached `item.quantity` value coming from the caller.
-  const [system, setSystem] = useState<number>(Number(item.quantity ?? 0));
+  // Never trust legacy `item.quantity` — the authoritative on-hand comes
+  // from the ledger. Start as null (loading) and fail closed on error.
+  const [system, setSystem] = useState<number | null>(null);
   const [loadingSystem, setLoadingSystem] = useState(true);
+  const [systemError, setSystemError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
-    fetchOnHand(item.id).then((v) => {
-      if (!cancelled) {
-        setSystem(v);
-        setLoadingSystem(false);
-      }
-    });
+    setLoadingSystem(true);
+    setSystemError(null);
+    fetchOnHand(item.id)
+      .then((v) => {
+        if (!cancelled) {
+          setSystem(v);
+          setLoadingSystem(false);
+        }
+      })
+      .catch((e) => {
+        if (!cancelled) {
+          setSystem(null);
+          setLoadingSystem(false);
+          setSystemError(
+            e instanceof StockReadError
+              ? e.message
+              : "Unable to load ledger balance",
+          );
+        }
+      });
     return () => { cancelled = true; };
   }, [item.id]);
 
   const physical = Number(count);
-  const delta = count === "" ? 0 : physical - system;
+  const delta = count === "" || system === null ? 0 : physical - system;
 
   async function save() {
     if (loadingSystem) return toast.error("Still reading current stock — try again in a moment");
+    if (systemError !== null || system === null) {
+      return toast.error("Cannot record adjustment without a ledger balance");
+    }
     if (count === "" || Number.isNaN(physical) || physical < 0) {
       return toast.error("Enter a physical count (0 or more)");
     }
