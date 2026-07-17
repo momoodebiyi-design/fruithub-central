@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { fetchOnHand } from "@/lib/stock";
+import { fetchOnHand, StockReadError } from "@/lib/stock";
 
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -47,11 +47,30 @@ export function MovementDialog({
   const [qty, setQty] = useState("");
   const [reason, setReason] = useState("");
   const [saving, setSaving] = useState(false);
-  const [onHand, setOnHand] = useState<number>(Number(item.quantity ?? 0));
+  const [onHand, setOnHand] = useState<number | null>(null);
+  const [onHandError, setOnHandError] = useState<string | null>(null);
+  const [loadingOnHand, setLoadingOnHand] = useState(true);
 
   useEffect(() => {
     let cancelled = false;
-    fetchOnHand(item.id).then((v) => { if (!cancelled) setOnHand(v); });
+    setLoadingOnHand(true);
+    setOnHandError(null);
+    fetchOnHand(item.id)
+      .then((v) => {
+        if (!cancelled) {
+          setOnHand(v);
+          setLoadingOnHand(false);
+        }
+      })
+      .catch((e) => {
+        if (!cancelled) {
+          setOnHand(null);
+          setLoadingOnHand(false);
+          setOnHandError(
+            e instanceof StockReadError ? e.message : "On-hand unavailable",
+          );
+        }
+      });
     return () => { cancelled = true; };
   }, [item.id]);
 
@@ -85,7 +104,12 @@ export function MovementDialog({
           <div className="bg-muted rounded-md p-3">
             <p className="text-sm font-medium">{item.name}</p>
             <p className="text-xs text-muted-foreground font-mono">
-              {item.sku} · {onHand.toLocaleString()} {item.unit} on hand
+              {item.sku} ·{" "}
+              {loadingOnHand
+                ? "…"
+                : onHandError !== null || onHand === null
+                  ? "On-hand unavailable"
+                  : `${onHand.toLocaleString()} ${item.unit} on hand`}
             </p>
 
           </div>

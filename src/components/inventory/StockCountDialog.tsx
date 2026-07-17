@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { fetchOnHand } from "@/lib/stock";
+import { fetchOnHand, StockReadError } from "@/lib/stock";
 import {
   Dialog,
   DialogContent,
@@ -26,27 +26,45 @@ export function StockCountDialog({
   const [count, setCount] = useState("");
   const [reason, setReason] = useState("");
   const [saving, setSaving] = useState(false);
-  // Always re-read on_hand from the ledger at open time — never trust the
-  // cached `item.quantity` value coming from the caller.
-  const [system, setSystem] = useState<number>(Number(item.quantity ?? 0));
+  // Never trust legacy `item.quantity` — the authoritative on-hand comes
+  // from the ledger. Start as null (loading) and fail closed on error.
+  const [system, setSystem] = useState<number | null>(null);
   const [loadingSystem, setLoadingSystem] = useState(true);
+  const [systemError, setSystemError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
-    fetchOnHand(item.id).then((v) => {
-      if (!cancelled) {
-        setSystem(v);
-        setLoadingSystem(false);
-      }
-    });
+    setLoadingSystem(true);
+    setSystemError(null);
+    fetchOnHand(item.id)
+      .then((v) => {
+        if (!cancelled) {
+          setSystem(v);
+          setLoadingSystem(false);
+        }
+      })
+      .catch((e) => {
+        if (!cancelled) {
+          setSystem(null);
+          setLoadingSystem(false);
+          setSystemError(
+            e instanceof StockReadError
+              ? e.message
+              : "Unable to load ledger balance",
+          );
+        }
+      });
     return () => { cancelled = true; };
   }, [item.id]);
 
   const physical = Number(count);
-  const delta = count === "" ? 0 : physical - system;
+  const delta = count === "" || system === null ? 0 : physical - system;
 
   async function save() {
     if (loadingSystem) return toast.error("Still reading current stock — try again in a moment");
+    if (systemError !== null || system === null) {
+      return toast.error("Cannot record adjustment without a ledger balance");
+    }
     if (count === "" || Number.isNaN(physical) || physical < 0) {
       return toast.error("Enter a physical count (0 or more)");
     }
@@ -83,7 +101,22 @@ export function StockCountDialog({
           <div className="grid grid-cols-2 gap-3">
             <div>
               <Label>System count</Label>
-              <Input value={loadingSystem ? "…" : `${system.toLocaleString()} ${item.unit}`} readOnly className="font-mono" />
+              <Input
+                value={
+                  loadingSystem
+                    ? "…"
+                    : systemError !== null || system === null
+                      ? "Unavailable"
+                      : `${system.toLocaleString()} ${item.unit}`
+                }
+                readOnly
+                className="font-mono"
+              />
+              {systemError !== null && !loadingSystem && (
+                <p className="text-[11px] text-brand-orange mt-1">
+                  Unable to load ledger balance
+                </p>
+              )}
             </div>
             <div>
               <Label>Physical count</Label>
@@ -120,7 +153,11 @@ export function StockCountDialog({
         </div>
         <DialogFooter>
           <Button variant="ghost" onClick={onClose}>Cancel</Button>
-          <Button onClick={save} disabled={saving} className="bg-brand-orange text-white hover:bg-brand-orange/90">
+          <Button
+            onClick={save}
+            disabled={saving || loadingSystem || systemError !== null || system === null}
+            className="bg-brand-orange text-white hover:bg-brand-orange/90"
+          >
             {saving ? "Recording…" : "Record adjustment"}
           </Button>
         </DialogFooter>

@@ -16,7 +16,10 @@ Existing tables already hold the pieces:
 
 - `inventory_movements` — immutable ledger. Signed inserts only; corrections
   are reversing movements, never `UPDATE`/`DELETE`.
-- `v_item_stock(item_id, on_hand, ...)` — SUM of signed movements per item.
+- `v_item_stock` — SUM of signed movements per item. Live columns:
+  `item_id, item_code, sku, name, category, subcategory, unit, min_level,
+  reorder_level, status, on_hand`. The view is **flat and not
+  location-aware** — `on_hand` is a global rollup across all locations.
 
 Target additions:
 
@@ -24,16 +27,21 @@ Target additions:
   `location_kind ∈ {factory, central_store, shop, quarantine, in_transit}`
   and nullable `shop_id UUID REFERENCES shops(id)`. Seed: Factory, Central
   Store, Shop 1, Shop 1 Quarantine, In-Transit(Shop 1).
-- `inventory_movements.location_id` is already present but not enforced —
-  make it `NOT NULL` in a future migration once every writer supplies it.
+- `inventory_movements.location_id` is already present but not enforced.
+  **Current data state:** 105 of 133 existing movements have a null
+  `location_id`, and the non-null rows point to only one distinct location.
+  Location-aware balances (`v_item_stock_by_location`, per-location UI,
+  `NOT NULL` enforcement) MUST NOT be enabled until a migration backfills
+  historical rows and that backfill is validated against physical counts.
 - New view `v_item_stock_by_location(item_id, location_id, on_hand)` —
-  same SUM logic grouped by `(item_id, location_id)`. The flat
-  `v_item_stock` becomes a rollup over this view for back-compat.
+  same SUM logic grouped by `(item_id, location_id)`, gated on the backfill
+  above. The flat `v_item_stock` becomes a rollup over this view for
+  back-compat.
 
 **Guarantee.** No app code reads `inventory_items.quantity`. The
 `apply_movement` trigger continues to maintain that column for RPC
-validation until commit 2 migrates every RPC to `v_item_stock`; the
-trigger's `.quantity` write is removed in the same migration to eliminate
+validation until a later commit migrates every RPC to `v_item_stock`; the
+trigger's `.quantity` write is removed in that same migration to eliminate
 the two-writer risk.
 
 Negative on-hand is accepted (offline-synced sales can arrive late) and
@@ -130,9 +138,11 @@ to make item/dispatch history retrieval cheap.
 1. **This commit** — navigation strip + app reads switch to `v_item_stock`.
    No schema change.
 2. **Schema foundation** — `locations.kind` + `shop_id`,
-   `v_item_stock_by_location`, extend `v_item_stock` columns, drop the
-   `.quantity` write from `apply_movement`, delete dead route files, prune
-   `CommandPalette` nav entries.
+   `v_item_stock_by_location` (gated on the location backfill described in
+   §1), and drop the `.quantity` write from `apply_movement` once every RPC
+   reads from `v_item_stock`. (The four placeholder routes — Sales,
+   Purchases, Reports, Procurement — were already removed in commit
+   5d6b8c79 and are not part of this step.)
 3. **Transfers + quarantine** — dispatch state machine, `stock_discrepancies`
    table, quarantine RPC.
 4. **Shop 1 sessions + sales slice** — sessions, attendants, sales, payments,
