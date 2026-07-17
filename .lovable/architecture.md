@@ -138,9 +138,11 @@ to make item/dispatch history retrieval cheap.
 1. **This commit** — navigation strip + app reads switch to `v_item_stock`.
    No schema change.
 2. **Schema foundation** — `locations.kind` + `shop_id`,
-   `v_item_stock_by_location`, extend `v_item_stock` columns, drop the
-   `.quantity` write from `apply_movement`, delete dead route files, prune
-   `CommandPalette` nav entries.
+   `v_item_stock_by_location` (gated on the location backfill described in
+   §1), and drop the `.quantity` write from `apply_movement` once every RPC
+   reads from `v_item_stock`. (The four placeholder routes — Sales,
+   Purchases, Reports, Procurement — were already removed in commit
+   5d6b8c79 and are not part of this step.)
 3. **Transfers + quarantine** — dispatch state machine, `stock_discrepancies`
    table, quarantine RPC.
 4. **Shop 1 sessions + sales slice** — sessions, attendants, sales, payments,
