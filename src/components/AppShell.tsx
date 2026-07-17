@@ -141,6 +141,11 @@ export function AppShell({ children }: { children: ReactNode }) {
         </div>
 
         <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
+          {supervisorOnly && (
+            <p className="px-3 pt-1 pb-2 text-[10px] uppercase tracking-wider text-muted-foreground/70">
+              Shop 1 pilot
+            </p>
+          )}
           {items.map((item) => {
             const active = pathname === item.to || pathname.startsWith(item.to + "/");
             const Icon = item.icon;
@@ -163,7 +168,24 @@ export function AppShell({ children }: { children: ReactNode }) {
               </Link>
             );
           })}
+          {supervisorOnly && SUPERVISOR_UPCOMING.map((u) => {
+            const Icon = u.icon;
+            return (
+              <span
+                key={u.label}
+                title={u.hint}
+                className="flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md text-muted-foreground/50 cursor-not-allowed select-none"
+              >
+                <Icon className="size-4 flex-shrink-0 opacity-60" />
+                <span className="flex-1">{u.label}</span>
+                <span className="text-[9px] uppercase tracking-wider border border-current/30 rounded px-1 py-0.5">
+                  soon
+                </span>
+              </span>
+            );
+          })}
         </nav>
+
 
         <div className="p-4 border-t border-sidebar-border">
           <Link
