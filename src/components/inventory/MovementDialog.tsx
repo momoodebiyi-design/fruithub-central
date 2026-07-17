@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { fetchOnHand } from "@/lib/stock";
+import { fetchOnHand, StockReadError } from "@/lib/stock";
 
 import { supabase } from "@/integrations/supabase/client";
 import {
