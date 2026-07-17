@@ -4,12 +4,10 @@ import {
   LayoutDashboard,
   Boxes,
   FlaskConical,
-  Truck,
   Store,
   Send,
   ClipboardList,
   ClipboardCheck,
-  BarChart3,
   Users,
   Building2,
   PackageSearch,
@@ -18,6 +16,7 @@ import {
   Menu,
   X,
   ShieldCheck,
+  Lock,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useSession } from "@/hooks/useSession";
@@ -25,9 +24,15 @@ import {
   CAN_MANAGE_USERS,
   CAN_VIEW_AUDIT,
   CAN_MANAGE_CLIENTS,
+  CAN_MANAGE_RECIPES,
+  CAN_RECORD_PRODUCTION,
+  CAN_DISPATCH,
+  CAN_MANAGE_SHOPS,
+  CAN_MANAGE_PURCHASES,
   hasAny,
   isShopSupervisorOnly,
   ROLE_LABELS,
+  type AppRole,
 } from "@/lib/permissions";
 import { NotificationsBell } from "@/components/NotificationsBell";
 import { CommandPalette } from "@/components/CommandPalette";
@@ -38,26 +43,38 @@ type NavItem = {
   to: string;
   label: string;
   icon: typeof LayoutDashboard;
+  roles?: AppRole[];
 };
 
+type DisabledItem = {
+  label: string;
+  icon: typeof LayoutDashboard;
+  hint: string;
+};
+
+// Scope-controlled nav: placeholder / not-yet-built modules
+// (Sales orders, Purchases, Reports, Procurement) are intentionally omitted.
+// See .lovable/architecture.md for the roadmap.
 const FULL_NAV: NavItem[] = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { to: "/inventory", label: "Inventory", icon: Boxes },
-  { to: "/recipes", label: "Recipes / BOM", icon: FlaskConical },
-  { to: "/production", label: "Production", icon: FlaskConical },
-  { to: "/sales", label: "Sales orders", icon: Send },
-  { to: "/purchases", label: "Purchases", icon: Truck },
-  { to: "/dispatches", label: "Dispatches", icon: Send },
-  { to: "/shops", label: "Shops", icon: Store },
-  { to: "/shop-counts", label: "Daily counts", icon: ClipboardCheck },
+  { to: "/inventory", label: "Central Stock", icon: Boxes },
+  { to: "/recipes", label: "Recipes / BOM", icon: FlaskConical, roles: CAN_MANAGE_RECIPES },
+  { to: "/production", label: "Production", icon: FlaskConical, roles: CAN_RECORD_PRODUCTION },
+  { to: "/dispatches", label: "Transfers / Dispatches", icon: Send, roles: CAN_DISPATCH },
+  { to: "/shops", label: "Shops", icon: Store, roles: CAN_MANAGE_SHOPS },
+  { to: "/shop-counts", label: "Daily counts", icon: ClipboardCheck, roles: [...CAN_MANAGE_SHOPS, "shop_supervisor"] },
   { to: "/requests", label: "Stock requests", icon: ClipboardList },
-  { to: "/reports", label: "Reports", icon: BarChart3 },
 ];
 
 const SUPERVISOR_NAV: NavItem[] = [
-  { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { to: "/dashboard", label: "Today", icon: LayoutDashboard },
   { to: "/shop-counts", label: "Daily counts", icon: ClipboardCheck },
   { to: "/requests", label: "Stock requests", icon: ClipboardList },
+];
+
+const SUPERVISOR_UPCOMING: DisabledItem[] = [
+  { label: "Sales", icon: Send, hint: "Coming in Shop 1 sales slice" },
+  { label: "Closing", icon: Lock, hint: "Coming in Shop 1 closing slice" },
 ];
 
 export function AppShell({ children }: { children: ReactNode }) {
@@ -82,6 +99,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const canManageUsers = hasAny(session.roles, CAN_MANAGE_USERS);
   const canViewAudit = hasAny(session.roles, CAN_VIEW_AUDIT);
   const canManageClients = hasAny(session.roles, CAN_MANAGE_CLIENTS);
+  const canViewSuppliers = hasAny(session.roles, CAN_MANAGE_PURCHASES);
 
   async function signOut() {
     await supabase.auth.signOut();
@@ -91,9 +109,9 @@ export function AppShell({ children }: { children: ReactNode }) {
   const items: NavItem[] = supervisorOnly
     ? SUPERVISOR_NAV
     : [
-        ...FULL_NAV,
+        ...FULL_NAV.filter((n) => !n.roles || hasAny(session.roles, n.roles)),
         ...(canManageClients ? [{ to: "/clients", label: "Bulk clients", icon: Building2 } as NavItem] : []),
-        { to: "/suppliers", label: "Suppliers", icon: PackageSearch } as NavItem,
+        ...(canViewSuppliers ? [{ to: "/suppliers", label: "Suppliers", icon: PackageSearch } as NavItem] : []),
         ...(canManageUsers ? [{ to: "/users", label: "Users", icon: Users } as NavItem] : []),
         ...(canViewAudit ? [{ to: "/audit", label: "Audit Log", icon: ShieldCheck } as NavItem] : []),
       ];
@@ -123,6 +141,11 @@ export function AppShell({ children }: { children: ReactNode }) {
         </div>
 
         <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
+          {supervisorOnly && (
+            <p className="px-3 pt-1 pb-2 text-[10px] uppercase tracking-wider text-muted-foreground/70">
+              Shop 1 pilot
+            </p>
+          )}
           {items.map((item) => {
             const active = pathname === item.to || pathname.startsWith(item.to + "/");
             const Icon = item.icon;
@@ -145,7 +168,24 @@ export function AppShell({ children }: { children: ReactNode }) {
               </Link>
             );
           })}
+          {supervisorOnly && SUPERVISOR_UPCOMING.map((u) => {
+            const Icon = u.icon;
+            return (
+              <span
+                key={u.label}
+                title={u.hint}
+                className="flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md text-muted-foreground/50 cursor-not-allowed select-none"
+              >
+                <Icon className="size-4 flex-shrink-0 opacity-60" />
+                <span className="flex-1">{u.label}</span>
+                <span className="text-[9px] uppercase tracking-wider border border-current/30 rounded px-1 py-0.5">
+                  soon
+                </span>
+              </span>
+            );
+          })}
         </nav>
+
 
         <div className="p-4 border-t border-sidebar-border">
           <Link

@@ -1,4 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { fetchOnHand } from "@/lib/stock";
+
 import { supabase } from "@/integrations/supabase/client";
 import {
   Dialog,
@@ -45,8 +47,16 @@ export function MovementDialog({
   const [qty, setQty] = useState("");
   const [reason, setReason] = useState("");
   const [saving, setSaving] = useState(false);
+  const [onHand, setOnHand] = useState<number>(Number(item.quantity ?? 0));
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchOnHand(item.id).then((v) => { if (!cancelled) setOnHand(v); });
+    return () => { cancelled = true; };
+  }, [item.id]);
 
   async function save() {
+
     const n = Number(qty);
     if (!n || (type !== "adjustment" && n <= 0)) return toast.error("Enter a quantity");
     setSaving(true);
@@ -75,8 +85,9 @@ export function MovementDialog({
           <div className="bg-muted rounded-md p-3">
             <p className="text-sm font-medium">{item.name}</p>
             <p className="text-xs text-muted-foreground font-mono">
-              {item.sku} · {Number(item.quantity).toLocaleString()} {item.unit} on hand
+              {item.sku} · {onHand.toLocaleString()} {item.unit} on hand
             </p>
+
           </div>
           <div>
             <Label>Movement type</Label>

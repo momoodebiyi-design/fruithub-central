@@ -78,11 +78,11 @@ function DashboardPage() {
 
       const [{ count: itemsCount }, { data: lowRows }, { data: batches }, { data: pend }, { data: rest }] = await Promise.all([
         supabase.from("inventory_items").select("*", { count: "exact", head: true }),
-        supabase
-          .from("inventory_items")
-          .select("id, sku, name, quantity, reorder_level, min_level, unit")
+        (supabase as any)
+          .from("v_item_stock")
+          .select("item_id, sku, name, on_hand, reorder_level, min_level, unit")
           .not("reorder_level", "is", null)
-          .order("quantity", { ascending: true })
+          .order("on_hand", { ascending: true })
           .limit(100),
         supabase
           .from("production_batches")
@@ -95,7 +95,13 @@ function DashboardPage() {
       setPendingClosings((pend as unknown as PendingClosing[]) ?? []);
       setTopRestock((rest as unknown as TopRestock[]) ?? []);
 
-      const low = ((lowRows ?? []) as any[]).filter(
+      // Normalize v_item_stock rows to {id, quantity, ...} shape
+      const lowNormalized = ((lowRows ?? []) as any[]).map((r) => ({
+        id: r.item_id, sku: r.sku, name: r.name,
+        quantity: Number(r.on_hand ?? 0),
+        reorder_level: r.reorder_level, min_level: r.min_level, unit: r.unit,
+      }));
+      const low = lowNormalized.filter(
         (r) => r.reorder_level !== null && Number(r.quantity) <= Number(r.reorder_level),
       );
       const topLow = low.slice(0, 6);
@@ -124,6 +130,7 @@ function DashboardPage() {
         const reorderQty = recommendReorder(s.avgDaily, Number(r.quantity), r.reorder_level);
         return { ...r, avgDaily: s.avgDaily, daysLeft: d, reorderQty };
       });
+
 
       setLowStockItems(enriched);
 

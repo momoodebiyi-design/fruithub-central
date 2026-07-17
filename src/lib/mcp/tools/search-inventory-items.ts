@@ -17,9 +17,9 @@ export default defineTool({
     if (!auth.ok) return auth.response;
     const sb = supabaseForCaller(ctx);
     const like = `%${query.replace(/[%_]/g, "")}%`;
-    const { data, error } = await sb
-      .from("inventory_items")
-      .select("id, sku, name, unit, quantity, category")
+    const { data, error } = await (sb as any)
+      .from("v_item_stock")
+      .select("item_id, sku, name, unit, on_hand, category")
       .or(`name.ilike.${like},sku.ilike.${like}`)
       .limit(limit ?? 20);
     if (error) {
@@ -28,7 +28,9 @@ export default defineTool({
         isError: true,
       };
     }
-    const rows = data ?? [];
+    const rows = (data ?? []) as Array<{
+      item_id: string; sku: string; name: string; unit: string; on_hand: number | null; category: string | null;
+    }>;
     return {
       content: [
         {
@@ -37,7 +39,7 @@ export default defineTool({
             ? rows
                 .map(
                   (r) =>
-                    `- ${r.name} (${r.sku}) — ${r.quantity} ${r.unit}${r.category ? ` · ${r.category}` : ""}`,
+                    `- ${r.name} (${r.sku}) — ${Number(r.on_hand ?? 0)} ${r.unit}${r.category ? ` · ${r.category}` : ""}`,
                 )
                 .join("\n")
             : `No inventory items match "${query}".`,
@@ -45,5 +47,6 @@ export default defineTool({
       ],
       structuredContent: { items: rows },
     };
+
   },
 });
