@@ -153,7 +153,11 @@ export function StockCountDialog({
         </div>
         <DialogFooter>
           <Button variant="ghost" onClick={onClose}>Cancel</Button>
-          <Button onClick={save} disabled={saving} className="bg-brand-orange text-white hover:bg-brand-orange/90">
+          <Button
+            onClick={save}
+            disabled={saving || loadingSystem || systemError !== null || system === null}
+            className="bg-brand-orange text-white hover:bg-brand-orange/90"
+          >
             {saving ? "Recording…" : "Record adjustment"}
           </Button>
         </DialogFooter>
