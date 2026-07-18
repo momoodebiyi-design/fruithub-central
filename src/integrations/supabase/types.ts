@@ -1478,6 +1478,36 @@ export type Database = {
       }
     }
     Views: {
+      v_item_location_stock: {
+        Row: {
+          item_id: string | null
+          location_id: string | null
+          on_hand: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inventory_movements_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_movements_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "v_item_stock"
+            referencedColumns: ["item_id"]
+          },
+          {
+            foreignKeyName: "inventory_movements_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "locations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       v_item_stock: {
         Row: {
           category: Database["public"]["Enums"]["inventory_category"] | null
@@ -1563,6 +1593,7 @@ export type Database = {
         Args: { _notes?: string; _request_id: string }
         Returns: string
       }
+      bootstrap_allowed: { Args: never; Returns: boolean }
       create_dispatch: {
         Args: {
           _client_id: string
@@ -1598,6 +1629,25 @@ export type Database = {
       receive_purchase_order: {
         Args: { _lines: Json; _po_id: string }
         Returns: undefined
+      }
+      record_location_stock_count: {
+        Args: {
+          _item_id: string
+          _location_id: string
+          _physical_qty: number
+          _reason: string
+        }
+        Returns: string
+      }
+      record_manual_movement: {
+        Args: {
+          _item_id: string
+          _location_id: string
+          _quantity: number
+          _reason: string
+          _type: Database["public"]["Enums"]["movement_type"]
+        }
+        Returns: string
       }
       record_production: {
         Args: {
