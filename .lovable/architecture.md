@@ -197,3 +197,42 @@ Everything before commit 2 is fully revertible with no data change.
   Policies that grant access to every authenticated identity without a role
   check remain outside this lifecycle guard and should be tightened in a later
   security-policy audit.
+
+---
+
+## 10. Replenishment and Purchasing MVP realignment
+
+The operational build now has two deliberately separate workflows:
+
+- **Replenishment** (`/replenishment`) is the internal Shop 1 movement from
+  Main Store. A request is reviewed, issued as a dispatch, and independently
+  confirmed at the shop. Approval never changes stock. A mismatch creates a
+  `replenishment_discrepancies` row and only the confirmed quantity is posted into
+  the Shop 1 location ledger.
+- **Purchasing** (`/purchasing`) is external supplier acquisition. It has one
+  workspace with only Needs and Orders tabs. Procurement records quotes,
+  payment evidence and delivery; Inventory independently inspects the delivery.
+  Only accepted quantity posts a location-specific `receipt` movement.
+
+`stock_level_policies` is the sole source of automatic low-stock decisions.
+Each item/location policy must satisfy `target > reorder >= critical >= 0` and
+routes to `purchasing`, `production`, or `replenishment`. Legacy zero values on
+`inventory_items` are not policies and must never generate automatic needs.
+
+`purchase_needs` is the deduplicated routed work queue. One open automatic need
+may exist for an item/location/route. A policy is evaluated immediately when it
+is configured and after each location movement. Shop 1 replenishment uses the
+latest submitted closing count plus dispatches already in transit; the ledger is
+the fallback before a closing exists.
+
+Purchasing transitions are audited SECURITY DEFINER operations. While
+`purchasing_settings.routine_approval_threshold_naira` is null, every quoted
+order requires `super_admin`/`management` (the current MD role mapping).
+Procurement cannot approve a purchase and the user who sourced or recorded a
+delivery cannot independently receive it. Submitted purchasing and
+replenishment records cannot be deleted; cancellation changes status and writes
+an audit event.
+
+Offline provider work remains out of this build, but request, order, dispatch
+and receipt mutations accept unique client references and are idempotent so a
+later offline queue can retry safely.

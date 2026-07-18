@@ -1,15 +1,17 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { createFileRoute, Link, useParams } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, ArrowUpDown, ClipboardList, Pencil } from "lucide-react";
+import { ArrowLeft, ArrowUpDown, ClipboardList, Pencil, SlidersHorizontal } from "lucide-react";
 import { useSession } from "@/hooks/useSession";
 import { CAN_WRITE_INVENTORY, hasAny } from "@/lib/permissions";
 import { MovementDialog } from "@/components/inventory/MovementDialog";
 import { StockCountDialog } from "@/components/inventory/StockCountDialog";
 import { ItemDialog } from "@/components/inventory/ItemDialog";
+import { StockPolicyDialog } from "@/components/inventory/StockPolicyDialog";
 import {
   computeUsageStats,
   daysUntilDepletion,
@@ -17,15 +19,7 @@ import {
   monthlyBuckets,
   type MovementLite,
 } from "@/lib/inventory-analytics";
-import {
-  ResponsiveContainer,
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  Tooltip,
-  CartesianGrid,
-} from "recharts";
+import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid } from "recharts";
 
 export const Route = createFileRoute("/_authenticated/inventory/$itemId")({
   component: ItemDetail,
@@ -80,11 +74,18 @@ function ItemDetail() {
   const [showMove, setShowMove] = useState(false);
   const [showCount, setShowCount] = useState(false);
   const [showEdit, setShowEdit] = useState(false);
+  const [showPolicy, setShowPolicy] = useState(false);
+  const [policyCount, setPolicyCount] = useState(0);
 
   async function load() {
-    const [{ data: it }, { data: stockRow }] = await Promise.all([
+    const [{ data: it }, { data: stockRow }, { count: policies }] = await Promise.all([
       supabase.from("inventory_items").select("*").eq("id", itemId).maybeSingle(),
       (supabase as any).from("v_item_stock").select("on_hand").eq("item_id", itemId).maybeSingle(),
+      (supabase as any)
+        .from("stock_level_policies")
+        .select("id", { count: "exact", head: true })
+        .eq("item_id", itemId)
+        .eq("is_active", true),
     ]);
     if (!it) return;
     // `quantity` on the returned row is the legacy trigger-maintained value.
@@ -92,9 +93,14 @@ function ItemDetail() {
     const fresh = Number((stockRow as any)?.on_hand ?? 0);
     setOnHand(fresh);
     setItem({ ...(it as Item), quantity: fresh });
+    setPolicyCount(policies ?? 0);
 
     if (it.supplier_id) {
-      const { data: s } = await supabase.from("suppliers").select("name").eq("id", it.supplier_id).maybeSingle();
+      const { data: s } = await supabase
+        .from("suppliers")
+        .select("name")
+        .eq("id", it.supplier_id)
+        .maybeSingle();
       setSupplier(s as { name: string } | null);
     } else {
       setSupplier(null);
@@ -108,22 +114,41 @@ function ItemDetail() {
       .limit(200);
 
     const list = (ms ?? []) as Movement[];
-    const userIds = Array.from(new Set(list.map((m) => m.performed_by).filter(Boolean))) as string[];
+    const userIds = Array.from(
+      new Set(list.map((m) => m.performed_by).filter(Boolean)),
+    ) as string[];
     if (userIds.length) {
-      const { data: profs } = await supabase.from("profiles").select("id, full_name").in("id", userIds);
+      const { data: profs } = await supabase
+        .from("profiles")
+        .select("id, full_name")
+        .in("id", userIds);
       const map = new Map((profs ?? []).map((p: any) => [p.id, p.full_name]));
-      list.forEach((m) => (m.performer_name = m.performed_by ? map.get(m.performed_by) ?? null : null));
+      list.forEach(
+        (m) => (m.performer_name = m.performed_by ? (map.get(m.performed_by) ?? null) : null),
+      );
     }
     setMovements(list);
   }
-
 
   useEffect(() => {
     load();
     const ch = supabase
       .channel(`item-${itemId}`)
-      .on("postgres_changes", { event: "*", schema: "public", table: "inventory_movements", filter: `item_id=eq.${itemId}` }, load)
-      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "inventory_items", filter: `id=eq.${itemId}` }, load)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "inventory_movements",
+          filter: `item_id=eq.${itemId}`,
+        },
+        load,
+      )
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "inventory_items", filter: `id=eq.${itemId}` },
+        load,
+      )
       .subscribe();
     return () => {
       supabase.removeChannel(ch);
@@ -132,9 +157,7 @@ function ItemDetail() {
   }, [itemId]);
 
   if (!item) {
-    return (
-      <div className="text-sm text-muted-foreground">Loading item…</div>
-    );
+    return <div className="text-sm text-muted-foreground">Loading item…</div>;
   }
 
   const stats = computeUsageStats(movements);
@@ -143,12 +166,13 @@ function ItemDetail() {
   const buckets = monthlyBuckets(movements);
   const low = item.reorder_level !== null && onHand <= Number(item.reorder_level);
 
-
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-3">
         <Button variant="ghost" size="sm" asChild>
-          <Link to="/inventory"><ArrowLeft className="size-4 mr-1" /> Inventory</Link>
+          <Link to="/inventory">
+            <ArrowLeft className="size-4 mr-1" /> Inventory
+          </Link>
         </Button>
       </div>
 
@@ -163,6 +187,9 @@ function ItemDetail() {
         </div>
         {canEdit && (
           <div className="flex gap-2">
+            <Button variant="outline" size="sm" onClick={() => setShowPolicy(true)}>
+              <SlidersHorizontal className="size-3.5 mr-1" /> Stock policy
+            </Button>
             <Button variant="outline" size="sm" onClick={() => setShowEdit(true)}>
               <Pencil className="size-3.5 mr-1" /> Edit
             </Button>
@@ -180,9 +207,26 @@ function ItemDetail() {
         )}
       </div>
 
+      {policyCount === 0 && (
+        <div className="rounded-md border border-dashed p-4 text-sm">
+          <p className="font-medium">Threshold setup required</p>
+          <p className="mt-1 text-muted-foreground">
+            No automatic need will be created from the old zero thresholds. Inventory must configure
+            location-specific critical, reorder and target levels.
+          </p>
+        </div>
+      )}
+
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <StatCard label="On hand" value={`${onHand.toLocaleString()} ${item.unit}`} accent={low ? "warn" : undefined} />
-        <StatCard label="Min / reorder" value={`${item.min_level ?? "—"} / ${item.reorder_level ?? "—"}`} />
+        <StatCard
+          label="On hand"
+          value={`${onHand.toLocaleString()} ${item.unit}`}
+          accent={low ? "warn" : undefined}
+        />
+        <StatCard
+          label="Min / reorder"
+          value={`${item.min_level ?? "—"} / ${item.reorder_level ?? "—"}`}
+        />
         <StatCard
           label="Avg daily usage"
           value={stats.avgDaily > 0 ? `${stats.avgDaily.toFixed(1)} ${item.unit}` : "—"}
@@ -202,7 +246,14 @@ function ItemDetail() {
             At the current usage rate, this item will run out in{" "}
             <span className="font-mono">{days ?? "—"}</span> days.
             {reorderQty > 0 && (
-              <> Order approximately <span className="font-mono font-semibold">{reorderQty.toLocaleString()} {item.unit}</span> to cover the next 30 days.</>
+              <>
+                {" "}
+                Order approximately{" "}
+                <span className="font-mono font-semibold">
+                  {reorderQty.toLocaleString()} {item.unit}
+                </span>{" "}
+                to cover the next 30 days.
+              </>
             )}
           </p>
         </div>
@@ -228,7 +279,9 @@ function ItemDetail() {
         </Card>
 
         <Card>
-          <CardHeader><CardTitle className="text-base">Details</CardTitle></CardHeader>
+          <CardHeader>
+            <CardTitle className="text-base">Details</CardTitle>
+          </CardHeader>
           <CardContent className="text-sm space-y-2">
             <Row k="Status" v={item.is_active ? "Active" : "Inactive"} />
             <Row k="Unit" v={item.unit} />
@@ -251,7 +304,8 @@ function ItemDetail() {
             <ol className="relative border-l pl-6 space-y-4">
               {movements.map((m) => {
                 const q = Math.abs(Number(m.quantity));
-                const pos = POSITIVE_TYPES.has(m.type) || (m.type === "adjustment" && Number(m.quantity) > 0);
+                const pos =
+                  POSITIVE_TYPES.has(m.type) || (m.type === "adjustment" && Number(m.quantity) > 0);
                 return (
                   <li key={m.id} className="relative">
                     <span
@@ -259,7 +313,9 @@ function ItemDetail() {
                     />
                     <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
                       <p className="text-sm font-medium">{TYPE_LABELS[m.type] ?? m.type}</p>
-                      <p className={`font-mono text-sm ${pos ? "text-brand-green" : "text-brand-orange"}`}>
+                      <p
+                        className={`font-mono text-sm ${pos ? "text-brand-green" : "text-brand-orange"}`}
+                      >
                         {pos ? "+" : "−"}
                         {q.toLocaleString()} {item.unit}
                       </p>
@@ -278,23 +334,19 @@ function ItemDetail() {
       </Card>
 
       {showMove && (
-        <MovementDialog
-          item={item as any}
-          onClose={() => setShowMove(false)}
-          onSaved={load}
-        />
+        <MovementDialog item={item as any} onClose={() => setShowMove(false)} onSaved={load} />
       )}
       {showCount && (
-        <StockCountDialog
-          item={item as any}
-          onClose={() => setShowCount(false)}
-          onSaved={load}
-        />
+        <StockCountDialog item={item as any} onClose={() => setShowCount(false)} onSaved={load} />
       )}
       {showEdit && (
-        <ItemDialog
-          item={item as any}
-          onClose={() => setShowEdit(false)}
+        <ItemDialog item={item as any} onClose={() => setShowEdit(false)} onSaved={load} />
+      )}
+      {showPolicy && (
+        <StockPolicyDialog
+          itemId={item.id}
+          itemCategory={item.category}
+          onClose={() => setShowPolicy(false)}
           onSaved={load}
         />
       )}
@@ -302,12 +354,26 @@ function ItemDetail() {
   );
 }
 
-function StatCard({ label, value, hint, accent }: { label: string; value: string; hint?: string; accent?: "warn" }) {
+function StatCard({
+  label,
+  value,
+  hint,
+  accent,
+}: {
+  label: string;
+  value: string;
+  hint?: string;
+  accent?: "warn";
+}) {
   return (
     <Card>
       <CardContent className="pt-6">
         <p className="text-xs uppercase tracking-wider text-muted-foreground">{label}</p>
-        <p className={`mt-1 text-2xl font-semibold font-mono tabular-nums ${accent === "warn" ? "text-brand-orange" : ""}`}>{value}</p>
+        <p
+          className={`mt-1 text-2xl font-semibold font-mono tabular-nums ${accent === "warn" ? "text-brand-orange" : ""}`}
+        >
+          {value}
+        </p>
         {hint && <p className="text-[11px] text-muted-foreground mt-0.5">{hint}</p>}
       </CardContent>
     </Card>

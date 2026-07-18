@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -10,6 +11,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { Check, X } from "lucide-react";
 
@@ -37,19 +39,32 @@ export function ReviewRequestDialog({
   const [notes, setNotes] = useState("");
   const [saving, setSaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
+  const [approvedQuantity, setApprovedQuantity] = useState(String(quantity));
 
   async function submit() {
     if (mode === "reject" && !notes.trim()) {
       setErrorMessage("A rejection reason is required");
       return;
     }
+    if (
+      mode === "approve" &&
+      (Number(approvedQuantity) <= 0 || (Number(approvedQuantity) !== quantity && !notes.trim()))
+    ) {
+      setErrorMessage(
+        Number(approvedQuantity) <= 0
+          ? "Approved quantity must be greater than zero"
+          : "Explain why the approved quantity was changed",
+      );
+      return;
+    }
     setErrorMessage("");
     setSaving(true);
     const { error } =
       mode === "approve"
-        ? await supabase.rpc("approve_stock_request", {
+        ? await (supabase as any).rpc("approve_replenishment_request", {
             _request_id: requestId,
-            _notes: notes.trim() || undefined,
+            _approved_quantity: Number(approvedQuantity),
+            _notes: notes.trim() || null,
           })
         : await supabase.rpc("reject_stock_request", {
             _request_id: requestId,
@@ -62,7 +77,9 @@ export function ReviewRequestDialog({
       return;
     }
     toast.success(
-      mode === "approve" ? "Approved — stock issued and requester notified" : "Request rejected",
+      mode === "approve"
+        ? "Approved — ready for Inventory to issue as a dispatch"
+        : "Request rejected",
     );
     await onDone();
     onClose();
@@ -86,12 +103,23 @@ export function ReviewRequestDialog({
           </div>
           {isApprove && (
             <p className="text-xs text-muted-foreground">
-              Approving will immediately deduct{" "}
-              <span className="font-mono">
-                {quantity} {unit}
-              </span>{" "}
-              from inventory and record a stock-out movement against this request.
+              Approval does not move stock. Inventory must issue a dispatch, then the shop confirms
+              what it received.
             </p>
+          )}
+          {isApprove && (
+            <div>
+              <Label>Approved quantity</Label>
+              <div className="flex items-center gap-2">
+                <Input
+                  type="number"
+                  min="0.001"
+                  value={approvedQuantity}
+                  onChange={(event) => setApprovedQuantity(event.target.value)}
+                />
+                <span className="text-sm text-muted-foreground">{unit}</span>
+              </div>
+            </div>
           )}
           <div>
             <Label>{isApprove ? "Notes (optional)" : "Reason"}</Label>
@@ -124,7 +152,7 @@ export function ReviewRequestDialog({
             }
           >
             {isApprove ? <Check className="size-4 mr-1" /> : <X className="size-4 mr-1" />}
-            {saving ? "Saving…" : isApprove ? "Approve & issue stock" : "Reject request"}
+            {saving ? "Saving…" : isApprove ? "Approve for issue" : "Reject request"}
           </Button>
         </DialogFooter>
       </DialogContent>

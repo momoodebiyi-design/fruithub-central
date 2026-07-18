@@ -63,11 +63,7 @@ export const CAN_VIEW_AUDIT: AppRole[] = [
   "operations_manager",
 ];
 
-export const CAN_MANAGE_SHOPS: AppRole[] = [
-  "super_admin",
-  "management",
-  "operations_manager",
-];
+export const CAN_MANAGE_SHOPS: AppRole[] = ["super_admin", "management", "operations_manager"];
 
 export const CAN_MANAGE_CLIENTS: AppRole[] = [
   "super_admin",
@@ -109,19 +105,48 @@ export const CAN_VIEW_ALL_SHOP_COUNTS: AppRole[] = [
 ];
 
 export const CAN_MANAGE_SALES: AppRole[] = [
-  "super_admin", "admin", "management", "operations_manager", "sales",
+  "super_admin",
+  "admin",
+  "management",
+  "operations_manager",
+  "sales",
 ];
 export const CAN_MANAGE_PURCHASES: AppRole[] = [
-  "super_admin", "admin", "management", "operations_manager", "procurement",
+  "super_admin",
+  "admin",
+  "management",
+  "operations_manager",
+  "procurement",
 ];
+export const CAN_REVIEW_PURCHASE_NEEDS: AppRole[] = [
+  "super_admin",
+  "management",
+  "operations_manager",
+  "inventory_officer",
+];
+export const CAN_APPROVE_PURCHASES: AppRole[] = ["super_admin", "management"];
+export const CAN_RECEIVE_PURCHASES: AppRole[] = [
+  "super_admin",
+  "management",
+  "operations_manager",
+  "inventory_officer",
+];
+export const CAN_VIEW_PURCHASING: AppRole[] = Array.from(
+  new Set([...CAN_MANAGE_PURCHASES, ...CAN_RECEIVE_PURCHASES]),
+);
 export const CAN_MANAGE_RECIPES: AppRole[] = [
-  "super_admin", "admin", "management", "operations_manager", "production",
+  "super_admin",
+  "admin",
+  "management",
+  "operations_manager",
+  "production",
 ];
-export const CAN_APPROVE_RECIPES: AppRole[] = [
-  "super_admin", "management", "operations_manager",
-];
+export const CAN_APPROVE_RECIPES: AppRole[] = ["super_admin", "management", "operations_manager"];
 export const CAN_ADJUST_STOCK: AppRole[] = [
-  "super_admin", "management", "operations_manager", "inventory_officer",
+  "super_admin",
+  "management",
+  "operations_manager",
+  "inventory_officer",
 ];
 
 export function hasAny(userRoles: AppRole[], allowed: AppRole[]): boolean {
