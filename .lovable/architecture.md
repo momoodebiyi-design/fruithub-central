@@ -18,7 +18,7 @@ Existing tables already hold the pieces:
   are reversing movements, never `UPDATE`/`DELETE`.
 - `v_item_stock` — SUM of signed movements per item. Live columns:
   `item_id, item_code, sku, name, category, subcategory, unit, min_level,
-  reorder_level, status, on_hand`. The view is **flat and not
+reorder_level, status, on_hand`. The view is **flat and not
   location-aware** — `on_hand` is a global rollup across all locations.
 
 Current state (this commit):
@@ -47,7 +47,6 @@ Current state (this commit):
 `apply_movement` trigger continues to maintain that column for legacy RPC
 validation only; a later commit will move remaining RPCs off it.
 
-
 Negative on-hand is accepted (offline-synced sales can arrive late) and
 must be flagged visibly.
 
@@ -64,11 +63,11 @@ requested → approved → picked → in_transit → received → closed
 
 Each transition posts paired movements:
 
-| Transition       | Movement A                     | Movement B                              |
-|------------------|--------------------------------|-----------------------------------------|
-| picked           | `stock_out` from source        | `stock_in` to `in_transit` location     |
-| received (match) | `stock_out` from `in_transit`  | `stock_in` to destination               |
-| received (short) | `stock_out` from `in_transit`  | `stock_in` to destination for received qty; **balance stays in `in_transit` until Inventory Manager resolves** |
+| Transition       | Movement A                    | Movement B                                                                                                     |
+| ---------------- | ----------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| picked           | `stock_out` from source       | `stock_in` to `in_transit` location                                                                            |
+| received (match) | `stock_out` from `in_transit` | `stock_in` to destination                                                                                      |
+| received (short) | `stock_out` from `in_transit` | `stock_in` to destination for received qty; **balance stays in `in_transit` until Inventory Manager resolves** |
 
 Discrepancy = `received_qty ≠ picked_qty` → new
 `stock_discrepancies(id, dispatch_line_id, expected, actual, status, resolved_by, resolution_movement_id)`.
@@ -102,7 +101,7 @@ POS keypad. No midday handover in MVP — closing the session ends the day.
 ## 5. Sales, payments, closing (Shop 1 slice)
 
 - `shop_sales(id, session_id, attendant_id, client_ref_id UUID UNIQUE,
-   occurred_at, total, status)`
+ occurred_at, total, status)`
 - `shop_sale_lines(sale_id, item_id, qty, unit_price)`
 - `shop_sale_payments(sale_id, method payment_method, amount, reference)`
   where `payment_method ∈ {cash, transfer, pos, bulk_credit, other}`.
@@ -172,3 +171,29 @@ Everything before commit 2 is fully revertible with no data change.
   unexpired invite in `user_invites`. Sign-ups without a valid invite raise
   and roll the auth insert back — no silent readonly account is created.
 - Admin-initiated invites remain the only path for new accounts.
+
+---
+
+## 9. Reversible user lifecycle
+
+- Pending invitations are cancelled by setting `cancelled_at`, `cancelled_by`
+  and a required `cancel_reason`; invitation rows are never deleted. Both the
+  public validation query and `handle_new_user` require `cancelled_at IS NULL`.
+- `cancel_user_invite()` and `set_user_active_status()` are the authoritative
+  SECURITY DEFINER mutations. Both require an active `super_admin` or `admin`
+  and write the reason, actor and before/after state to `audit_log` in the same
+  transaction. A database trigger rejects direct changes to the protected
+  cancellation and `is_active` fields, including self-reactivation attempts.
+- User removal in the MVP means reversible application-access deactivation via
+  `profiles.is_active`. Auth identities, profiles, roles and historical record
+  ownership are retained.
+- Self-deactivation and deactivation of the last active Super Admin are blocked.
+  An Admin cannot change a Super Admin; only another Super Admin can.
+- `has_role()` and `has_any_role()` require an active profile, so inactive users
+  cannot satisfy role-based RLS policies. The authenticated app also checks the
+  profile on entry, signs inactive users out locally and returns them to a clear
+  inactive-account sign-in state.
+- Deactivation does not delete or ban the underlying Supabase Auth identity.
+  Policies that grant access to every authenticated identity without a role
+  check remain outside this lifecycle guard and should be tightened in a later
+  security-policy audit.

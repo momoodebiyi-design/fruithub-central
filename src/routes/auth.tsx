@@ -7,13 +7,21 @@ import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/auth")({
-  validateSearch: (s: Record<string, unknown>) => ({
+  validateSearch: (s: Record<string, unknown>): AuthSearch => ({
     invite: typeof s.invite === "string" ? s.invite : undefined,
-    mode: s.mode === "signup" ? "signup" : "signin",
+    mode: s.mode === "signup" ? "signup" : undefined,
     next: typeof s.next === "string" ? s.next : undefined,
+    reason: s.reason === "inactive" ? "inactive" : undefined,
   }),
   component: AuthPage,
 });
+
+interface AuthSearch {
+  invite?: string;
+  mode?: "signup";
+  next?: string;
+  reason?: "inactive";
+}
 
 /** Only accept a same-origin relative path so we can't be used as an open redirect. */
 function safeNext(next: string | undefined): string | null {
@@ -23,7 +31,7 @@ function safeNext(next: string | undefined): string | null {
 }
 
 function AuthPage() {
-  const { invite, mode, next } = Route.useSearch();
+  const { invite, mode, next, reason } = Route.useSearch();
   const navigate = useNavigate();
   const [tab, setTab] = useState<"signin" | "signup">("signin");
   const [email, setEmail] = useState("");
@@ -47,7 +55,6 @@ function AuthPage() {
     })();
   }, [invite, mode]);
 
-
   // Validate the invite before exposing signup, then lock signup to its email.
   useEffect(() => {
     let cancelled = false;
@@ -63,6 +70,7 @@ function AuthPage() {
         .select("email")
         .eq("token", invite)
         .is("accepted_at", null)
+        .is("cancelled_at", null)
         .gt("expires_at", new Date().toISOString())
         .maybeSingle();
 
@@ -152,6 +160,15 @@ function AuthPage() {
         </div>
 
         <div className="bg-card ring-1 ring-black/5 rounded-lg p-6">
+          {reason === "inactive" && (
+            <div className="mb-4 rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm">
+              <p className="font-medium text-destructive">Account inactive</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Your access has been deactivated. Contact an administrator if you believe this is a
+                mistake.
+              </p>
+            </div>
+          )}
           {tab === "signin" ? (
             <form onSubmit={handleSignIn} className="space-y-4">
               <div>
