@@ -1419,6 +1419,9 @@ export type Database = {
       user_invites: {
         Row: {
           accepted_at: string | null
+          cancel_reason: string | null
+          cancelled_at: string | null
+          cancelled_by: string | null
           created_at: string
           department: string | null
           email: string
@@ -1431,6 +1434,9 @@ export type Database = {
         }
         Insert: {
           accepted_at?: string | null
+          cancel_reason?: string | null
+          cancelled_at?: string | null
+          cancelled_by?: string | null
           created_at?: string
           department?: string | null
           email: string
@@ -1443,6 +1449,9 @@ export type Database = {
         }
         Update: {
           accepted_at?: string | null
+          cancel_reason?: string | null
+          cancelled_at?: string | null
+          cancelled_by?: string | null
           created_at?: string
           department?: string | null
           email?: string
@@ -1594,6 +1603,10 @@ export type Database = {
         Returns: string
       }
       bootstrap_allowed: { Args: never; Returns: boolean }
+      cancel_user_invite: {
+        Args: { _invite_id: string; _reason: string }
+        Returns: undefined
+      }
       create_dispatch: {
         Args: {
           _client_id: string
@@ -1648,6 +1661,14 @@ export type Database = {
           _type: Database["public"]["Enums"]["movement_type"]
         }
         Returns: string
+      }
+      set_user_active_status: {
+        Args: {
+          _is_active: boolean
+          _reason: string
+          _target_user_id: string
+        }
+        Returns: undefined
       }
       record_production: {
         Args: {

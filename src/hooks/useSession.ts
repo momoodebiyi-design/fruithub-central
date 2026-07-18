@@ -7,6 +7,7 @@ export interface SessionState {
   loading: boolean;
   user: User | null;
   roles: AppRole[];
+  isActive: boolean;
   fullName: string | null;
   department: string | null;
   shopId: string | null;
@@ -17,6 +18,7 @@ export function useSession(): SessionState {
     loading: true,
     user: null,
     roles: [],
+    isActive: false,
     fullName: null,
     department: null,
     shopId: null,
@@ -28,14 +30,22 @@ export function useSession(): SessionState {
     async function hydrate(user: User | null) {
       if (!user) {
         if (mounted)
-          setState({ loading: false, user: null, roles: [], fullName: null, department: null, shopId: null });
+          setState({
+            loading: false,
+            user: null,
+            roles: [],
+            isActive: false,
+            fullName: null,
+            department: null,
+            shopId: null,
+          });
         return;
       }
       const [{ data: roleRows }, { data: profile }] = await Promise.all([
         supabase.from("user_roles").select("role").eq("user_id", user.id),
         supabase
           .from("profiles")
-          .select("full_name, department, shop_id")
+          .select("full_name, department, shop_id, is_active")
           .eq("id", user.id)
           .maybeSingle(),
       ]);
@@ -44,6 +54,7 @@ export function useSession(): SessionState {
         loading: false,
         user,
         roles: (roleRows ?? []).map((r) => r.role as AppRole),
+        isActive: profile?.is_active === true,
         fullName: profile?.full_name ?? null,
         department: profile?.department ?? null,
         shopId: (profile as { shop_id?: string | null } | null)?.shop_id ?? null,
