@@ -76,14 +76,24 @@ function DashboardPage() {
       const iso = today.toISOString();
       const since = new Date(Date.now() - 30 * 86400_000).toISOString();
 
-      const [{ count: itemsCount }, { data: lowRows }, { data: batches }, { data: pend }, { data: rest }] = await Promise.all([
-        supabase.from("inventory_items").select("*", { count: "exact", head: true }),
+      const [{ count: itemsCount }, { data: lowRows }, { count: lowCount }, { data: batches }, { data: pend }, { data: rest }] = await Promise.all([
+        supabase.from("inventory_items").select("*", { count: "exact", head: true }).eq("status", "active"),
         (supabase as any)
           .from("v_item_stock")
           .select("item_id, sku, name, on_hand, reorder_level, min_level, unit")
           .not("reorder_level", "is", null)
+          .eq("status", "active")
           .order("on_hand", { ascending: true })
-          .limit(100),
+          .limit(50),
+        // Total count of low-stock items — filtered server-side so the KPI is
+        // accurate even when the pilot has more than the visible list length.
+        (supabase as any)
+          .from("v_item_stock")
+          .select("item_id", { count: "exact", head: true })
+          .not("reorder_level", "is", null)
+          .eq("status", "active")
+          .filter("on_hand", "lte", "reorder_level"),
+
         supabase
           .from("production_batches")
           .select("id, batch_number, produced_at, quantity_produced, inventory_items!production_batches_product_item_id_fkey(name)")
