@@ -157,3 +157,18 @@ to make item/dispatch history retrieval cheap.
    WhatsApp escalation on critical alerts.
 
 Everything before commit 2 is fully revertible with no data change.
+
+---
+
+## 8. Secure bootstrap & invitations
+
+- Public sign-up is disabled once any user has an application role. The auth
+  UI calls the SECURITY DEFINER RPC `bootstrap_allowed()` (returns `true`
+  only when `user_roles` is empty) to decide whether to expose the "Create
+  super admin" path. RLS-blocked anonymous counts are never used again for
+  this decision.
+- The `handle_new_user` trigger is the enforcement point: it accepts the
+  first user as `super_admin`, then requires a matching unaccepted,
+  unexpired invite in `user_invites`. Sign-ups without a valid invite raise
+  and roll the auth insert back — no silent readonly account is created.
+- Admin-initiated invites remain the only path for new accounts.
