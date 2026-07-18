@@ -1425,11 +1425,14 @@ export type Database = {
           created_at: string
           department: string | null
           email: string
+          email_sent_at: string | null
           expires_at: string
           full_name: string | null
           id: string
           invited_by: string | null
+          last_send_error: string | null
           role: Database["public"]["Enums"]["app_role"]
+          send_count: number
           token: string
         }
         Insert: {
@@ -1440,11 +1443,14 @@ export type Database = {
           created_at?: string
           department?: string | null
           email: string
+          email_sent_at?: string | null
           expires_at?: string
           full_name?: string | null
           id?: string
           invited_by?: string | null
+          last_send_error?: string | null
           role: Database["public"]["Enums"]["app_role"]
+          send_count?: number
           token?: string
         }
         Update: {
@@ -1455,11 +1461,14 @@ export type Database = {
           created_at?: string
           department?: string | null
           email?: string
+          email_sent_at?: string | null
           expires_at?: string
           full_name?: string | null
           id?: string
           invited_by?: string | null
+          last_send_error?: string | null
           role?: Database["public"]["Enums"]["app_role"]
+          send_count?: number
           token?: string
         }
         Relationships: []
@@ -1669,6 +1678,14 @@ export type Database = {
           _target_user_id: string
         }
         Returns: undefined
+      }
+      validate_user_invite: {
+        Args: { _token: string }
+        Returns: {
+          email: string
+          expires_at: string
+          full_name: string | null
+        }[]
       }
       record_production: {
         Args: {
