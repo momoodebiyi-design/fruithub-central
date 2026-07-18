@@ -101,11 +101,12 @@ function DashboardPage() {
       setTopRestock((rest as unknown as TopRestock[]) ?? []);
 
       // Normalize v_item_stock rows to {id, quantity, ...} shape
-      const lowNormalized = ((lowRows ?? []) as any[]).map((r) => ({
+      const lowNormalized = ((allLow ?? []) as any[]).map((r) => ({
         id: r.item_id, sku: r.sku, name: r.name,
         quantity: Number(r.on_hand ?? 0),
         reorder_level: r.reorder_level, min_level: r.min_level, unit: r.unit,
       }));
+
       const low = lowNormalized.filter(
         (r) => r.reorder_level !== null && Number(r.quantity) <= Number(r.reorder_level),
       );
