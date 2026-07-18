@@ -47,3 +47,50 @@ export async function fetchOnHand(itemId: string): Promise<number> {
   const m = await fetchStockMap([itemId]);
   return m.get(itemId) ?? 0;
 }
+
+/**
+ * Location-scoped on-hand. Sums the ledger for a single (item, location).
+ * Returns 0 when the item has no movements at that location.
+ */
+export async function fetchOnHandAtLocation(
+  itemId: string,
+  locationId: string,
+): Promise<number> {
+  const { data, error } = await (supabase as any)
+    .from("v_item_location_stock")
+    .select("on_hand")
+    .eq("item_id", itemId)
+    .eq("location_id", locationId)
+    .maybeSingle();
+  if (error) {
+    throw new StockReadError(
+      `Unable to load location balance: ${error.message ?? "unknown error"}`,
+      error,
+    );
+  }
+  return Number(data?.on_hand ?? 0);
+}
+
+export interface StockLocation {
+  id: string;
+  name: string;
+  location_type: string | null;
+  is_default: boolean;
+}
+
+export async function fetchStockLocations(): Promise<StockLocation[]> {
+  const { data, error } = await supabase
+    .from("locations")
+    .select("id, name, location_type, is_default")
+    .eq("status", "active")
+    .order("is_default", { ascending: false })
+    .order("name");
+  if (error) {
+    throw new StockReadError(
+      `Unable to load locations: ${error.message ?? "unknown error"}`,
+      error,
+    );
+  }
+  return (data ?? []) as StockLocation[];
+}
+
