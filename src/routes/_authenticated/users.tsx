@@ -78,6 +78,7 @@ function UsersPage() {
   const [open, setOpen] = useState(false);
   const [reasonAction, setReasonAction] = useState<ReasonAction | null>(null);
   const [reason, setReason] = useState("");
+  const [reasonError, setReasonError] = useState("");
   const [savingAction, setSavingAction] = useState(false);
 
   const canManage = hasAny(session.roles, CAN_MANAGE_USERS);
@@ -149,14 +150,19 @@ function UsersPage() {
 
   function openReasonAction(action: ReasonAction) {
     setReason("");
+    setReasonError("");
     setReasonAction(action);
   }
 
   async function submitReasonAction() {
     if (!reasonAction) return;
     const cleanReason = reason.trim();
-    if (!cleanReason) return toast.error("A reason is required");
+    if (!cleanReason) {
+      setReasonError("A reason is required");
+      return;
+    }
 
+    setReasonError("");
     setSavingAction(true);
     const result =
       reasonAction.kind === "cancel_invite"
@@ -171,7 +177,11 @@ function UsersPage() {
           });
     setSavingAction(false);
 
-    if (result.error) return toast.error(result.error.message);
+    if (result.error) {
+      setReasonError(result.error.message);
+      toast.error(result.error.message);
+      return;
+    }
 
     const successMessage =
       reasonAction.kind === "cancel_invite"
@@ -182,6 +192,7 @@ function UsersPage() {
     toast.success(successMessage);
     setReasonAction(null);
     setReason("");
+    setReasonError("");
     await loadAll();
   }
 
@@ -388,12 +399,14 @@ function UsersPage() {
       <ReasonActionDialog
         action={reasonAction}
         reason={reason}
+        error={reasonError}
         saving={savingAction}
         onReasonChange={setReason}
         onClose={() => {
           if (savingAction) return;
           setReasonAction(null);
           setReason("");
+          setReasonError("");
         }}
         onConfirm={submitReasonAction}
       />
@@ -404,6 +417,7 @@ function UsersPage() {
 function ReasonActionDialog({
   action,
   reason,
+  error,
   saving,
   onReasonChange,
   onClose,
@@ -411,6 +425,7 @@ function ReasonActionDialog({
 }: {
   action: ReasonAction | null;
   reason: string;
+  error: string;
   saving: boolean;
   onReasonChange: (value: string) => void;
   onClose: () => void;
@@ -453,6 +468,11 @@ function ReasonActionDialog({
             disabled={saving}
             autoFocus
           />
+          {error && (
+            <p role="alert" className="text-sm text-destructive">
+              {error}
+            </p>
+          )}
         </div>
         <DialogFooter>
           <Button variant="ghost" onClick={onClose} disabled={saving}>
