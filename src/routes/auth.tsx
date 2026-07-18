@@ -26,12 +26,13 @@ function safeNext(next: string | undefined): string | null {
 function AuthPage() {
   const { invite, mode, next } = Route.useSearch();
   const navigate = useNavigate();
-  const [tab, setTab] = useState<"signin" | "signup">(invite ? "signup" : mode);
+  const [tab, setTab] = useState<"signin" | "signup">("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
   const [loading, setLoading] = useState(false);
   const [firstUserMode, setFirstUserMode] = useState(false);
+  const [inviteValid, setInviteValid] = useState<boolean | null>(invite ? null : false);
 
   // Bootstrap allowance is authoritative via SECURITY DEFINER RPC — an
   // anonymous count of user_roles would be blocked by RLS and give a false
@@ -39,23 +40,50 @@ function AuthPage() {
   useEffect(() => {
     (async () => {
       const { data, error } = await (supabase as any).rpc("bootstrap_allowed");
-      if (!error) setFirstUserMode(Boolean(data));
+      if (!error) {
+        const allowed = Boolean(data);
+        setFirstUserMode(allowed);
+        if (allowed && !invite && mode === "signup") setTab("signup");
+      }
     })();
-  }, []);
+  }, [invite, mode]);
 
 
-  // Prefill invite email
+  // Validate the invite before exposing signup, then lock signup to its email.
   useEffect(() => {
-    if (!invite) return;
+    let cancelled = false;
+
+    if (!invite) {
+      setInviteValid(false);
+      return;
+    }
+
     (async () => {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from("user_invites")
         .select("email")
         .eq("token", invite)
         .is("accepted_at", null)
+        .gt("expires_at", new Date().toISOString())
         .maybeSingle();
-      if (data?.email) setEmail(data.email);
+
+      if (cancelled) return;
+
+      if (error || !data?.email) {
+        setInviteValid(false);
+        setTab("signin");
+        toast.error("This invite is invalid or has expired.");
+        return;
+      }
+
+      setEmail(data.email);
+      setInviteValid(true);
+      setTab("signup");
     })();
+
+    return () => {
+      cancelled = true;
+    };
   }, [invite]);
 
   function goPostAuth() {
@@ -78,6 +106,12 @@ function AuthPage() {
 
   async function handleSignUp(e: React.FormEvent) {
     e.preventDefault();
+
+    if (!firstUserMode && inviteValid !== true) {
+      setTab("signin");
+      return toast.error("A valid invitation is required to create an account.");
+    }
+
     setLoading(true);
     const dest = safeNext(next);
     const { error } = await supabase.auth.signUp({
@@ -85,7 +119,10 @@ function AuthPage() {
       password,
       options: {
         emailRedirectTo: `${window.location.origin}${dest ?? "/dashboard"}`,
-        data: { full_name: fullName },
+        data: {
+          full_name: fullName,
+          ...(inviteValid === true && invite ? { invite_token: invite } : {}),
+        },
       },
     });
     setLoading(false);
@@ -103,7 +140,7 @@ function AuthPage() {
     else toast.success("If that email exists, a reset link was sent.");
   }
 
-  const canSignup = !!invite || firstUserMode;
+  const canSignup = inviteValid === true || firstUserMode;
 
   return (
     <div className="min-h-screen bg-background flex flex-col items-center justify-center px-4">
@@ -164,13 +201,24 @@ function AuthPage() {
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="email2">Email</Label>
-                <Input id="email2" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+                <Input
+                  id="email2"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  readOnly={inviteValid === true}
+                  required
+                />
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="password2">Password</Label>
                 <Input id="password2" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={8} />
               </div>
-              <Button type="submit" className="w-full" disabled={loading}>
+              <Button
+                type="submit"
+                className="w-full"
+                disabled={loading || (!firstUserMode && inviteValid !== true)}
+              >
                 {loading ? "Creating…" : firstUserMode ? "Create account" : "Accept invite"}
               </Button>
               <div className="text-center">
