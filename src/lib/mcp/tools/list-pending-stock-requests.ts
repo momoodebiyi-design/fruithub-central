@@ -17,8 +17,8 @@ export default defineTool({
     const sb = supabaseForCaller(ctx);
     const { data, error } = await sb
       .from("stock_requests")
-      .select("id, request_number, status, priority, notes, created_at, shop_id")
-      .in("status", ["pending", "approved"])
+      .select("id, status, quantity, purpose, destination_shop_id, item_id, requested_by, created_at")
+      .eq("status", "pending")
       .order("created_at", { ascending: false })
       .limit(limit ?? 25);
     if (error) {
@@ -33,14 +33,14 @@ export default defineTool({
         {
           type: "text",
           text: rows.length
-            ? `${rows.length} open stock request(s):\n` +
+            ? `${rows.length} pending stock request(s):\n` +
               rows
                 .map(
-                  (r) =>
-                    `- ${r.request_number ?? r.id} — ${r.status}${r.priority ? ` (${r.priority})` : ""}`,
+                  (r: any) =>
+                    `- ${r.quantity} unit(s) · ${r.purpose}${r.destination_shop_id ? ` → shop ${r.destination_shop_id}` : ""}`,
                 )
                 .join("\n")
-            : "No open stock requests.",
+            : "No pending stock requests."
         },
       ],
       structuredContent: { requests: rows },

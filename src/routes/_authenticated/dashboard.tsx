@@ -76,14 +76,19 @@ function DashboardPage() {
       const iso = today.toISOString();
       const since = new Date(Date.now() - 30 * 86400_000).toISOString();
 
-      const [{ count: itemsCount }, { data: lowRows }, { data: batches }, { data: pend }, { data: rest }] = await Promise.all([
-        supabase.from("inventory_items").select("*", { count: "exact", head: true }),
+      const [{ count: itemsCount }, { data: allLow }, { data: batches }, { data: pend }, { data: rest }] = await Promise.all([
+        supabase.from("inventory_items").select("*", { count: "exact", head: true }).eq("status", "active"),
+        // Pull every active item that has a reorder threshold. PostgREST can't
+        // compare two columns directly, so we filter for on_hand <= reorder_level
+        // in JS. Fast for the pilot's SKU count and correct without a limit-bug.
         (supabase as any)
           .from("v_item_stock")
           .select("item_id, sku, name, on_hand, reorder_level, min_level, unit")
           .not("reorder_level", "is", null)
-          .order("on_hand", { ascending: true })
-          .limit(100),
+          .eq("status", "active")
+          .order("on_hand", { ascending: true }),
+
+
         supabase
           .from("production_batches")
           .select("id, batch_number, produced_at, quantity_produced, inventory_items!production_batches_product_item_id_fkey(name)")
@@ -96,11 +101,12 @@ function DashboardPage() {
       setTopRestock((rest as unknown as TopRestock[]) ?? []);
 
       // Normalize v_item_stock rows to {id, quantity, ...} shape
-      const lowNormalized = ((lowRows ?? []) as any[]).map((r) => ({
+      const lowNormalized = ((allLow ?? []) as any[]).map((r) => ({
         id: r.item_id, sku: r.sku, name: r.name,
         quantity: Number(r.on_hand ?? 0),
         reorder_level: r.reorder_level, min_level: r.min_level, unit: r.unit,
       }));
+
       const low = lowNormalized.filter(
         (r) => r.reorder_level !== null && Number(r.quantity) <= Number(r.reorder_level),
       );

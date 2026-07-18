@@ -21,28 +21,32 @@ Existing tables already hold the pieces:
   reorder_level, status, on_hand`. The view is **flat and not
   location-aware** — `on_hand` is a global rollup across all locations.
 
-Target additions:
+Current state (this commit):
 
-- Extend `locations` with `kind location_kind` where
-  `location_kind ∈ {factory, central_store, shop, quarantine, in_transit}`
-  and nullable `shop_id UUID REFERENCES shops(id)`. Seed: Factory, Central
-  Store, Shop 1, Shop 1 Quarantine, In-Transit(Shop 1).
-- `inventory_movements.location_id` is already present but not enforced.
-  **Current data state:** 105 of 133 existing movements have a null
-  `location_id`, and the non-null rows point to only one distinct location.
-  Location-aware balances (`v_item_stock_by_location`, per-location UI,
-  `NOT NULL` enforcement) MUST NOT be enabled until a migration backfills
-  historical rows and that backfill is validated against physical counts.
-- New view `v_item_stock_by_location(item_id, location_id, on_hand)` —
-  same SUM logic grouped by `(item_id, location_id)`, gated on the backfill
-  above. The flat `v_item_stock` becomes a rollup over this view for
-  back-compat.
+- `locations` seeded with **Main Store** (default) and **Shop 1**. Kinds
+  (factory / quarantine / in-transit) remain a later extension.
+- `inventory_movements.location_id` is present. As of 17 July 2026 all rows
+  have a non-null `location_id` (post-reset baseline). New manual movements
+  MUST include `location_id` — enforced via the `record_manual_movement`
+  RPC and the location-required UI.
+- **`v_item_location_stock(item_id, location_id, on_hand)`** — SUM of signed
+  movements grouped by (item, location). Location-aware balance reads and
+  stock-out validation MUST use this view; the flat `v_item_stock` is a
+  cross-location rollup for the central catalog only.
+- Manual entry is funneled through two RPCs so validation is transactional:
+  - `record_manual_movement(_item, _location, _type, _qty, _reason)` blocks
+    the generic `transfer` type and rejects any stock-out that would drive
+    the location balance below zero.
+  - `record_location_stock_count(_item, _location, _physical, _reason)`
+    writes a signed adjustment against a specific location with actor,
+    timestamp and reason recorded in `audit_log`.
+- Transfers between locations remain in the dedicated balanced dispatch /
+  receipt workflow (`create_dispatch` + receipt) — never a raw negative.
 
 **Guarantee.** No app code reads `inventory_items.quantity`. The
-`apply_movement` trigger continues to maintain that column for RPC
-validation until a later commit migrates every RPC to `v_item_stock`; the
-trigger's `.quantity` write is removed in that same migration to eliminate
-the two-writer risk.
+`apply_movement` trigger continues to maintain that column for legacy RPC
+validation only; a later commit will move remaining RPCs off it.
+
 
 Negative on-hand is accepted (offline-synced sales can arrive late) and
 must be flagged visibly.
@@ -153,3 +157,18 @@ to make item/dispatch history retrieval cheap.
    WhatsApp escalation on critical alerts.
 
 Everything before commit 2 is fully revertible with no data change.
+
+---
+
+## 8. Secure bootstrap & invitations
+
+- Public sign-up is disabled once any user has an application role. The auth
+  UI calls the SECURITY DEFINER RPC `bootstrap_allowed()` (returns `true`
+  only when `user_roles` is empty) to decide whether to expose the "Create
+  super admin" path. RLS-blocked anonymous counts are never used again for
+  this decision.
+- The `handle_new_user` trigger is the enforcement point: it accepts the
+  first user as `super_admin`, then requires a matching unaccepted,
+  unexpired invite in `user_invites`. Sign-ups without a valid invite raise
+  and roll the auth insert back — no silent readonly account is created.
+- Admin-initiated invites remain the only path for new accounts.

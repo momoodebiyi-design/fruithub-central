@@ -33,13 +33,16 @@ function AuthPage() {
   const [loading, setLoading] = useState(false);
   const [firstUserMode, setFirstUserMode] = useState(false);
 
-  // Check if any users exist — if none, allow first-user signup even without invite
+  // Bootstrap allowance is authoritative via SECURITY DEFINER RPC — an
+  // anonymous count of user_roles would be blocked by RLS and give a false
+  // "first user" state. Never show the super-admin path once initialized.
   useEffect(() => {
     (async () => {
-      const { count } = await supabase.from("user_roles").select("*", { count: "exact", head: true });
-      setFirstUserMode((count ?? 0) === 0);
+      const { data, error } = await (supabase as any).rpc("bootstrap_allowed");
+      if (!error) setFirstUserMode(Boolean(data));
     })();
   }, []);
+
 
   // Prefill invite email
   useEffect(() => {

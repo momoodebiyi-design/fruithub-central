@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { fetchOnHand, StockReadError } from "@/lib/stock";
+import { fetchOnHandAtLocation, fetchStockLocations, StockLocation, StockReadError } from "@/lib/stock";
 import {
   Dialog,
   DialogContent,
@@ -12,6 +12,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { toast } from "sonner";
 
 export function StockCountDialog({
@@ -26,60 +33,55 @@ export function StockCountDialog({
   const [count, setCount] = useState("");
   const [reason, setReason] = useState("");
   const [saving, setSaving] = useState(false);
-  // Never trust legacy `item.quantity` — the authoritative on-hand comes
-  // from the ledger. Start as null (loading) and fail closed on error.
+  const [locations, setLocations] = useState<StockLocation[]>([]);
+  const [locationId, setLocationId] = useState<string>("");
   const [system, setSystem] = useState<number | null>(null);
-  const [loadingSystem, setLoadingSystem] = useState(true);
+  const [loadingSystem, setLoadingSystem] = useState(false);
   const [systemError, setSystemError] = useState<string | null>(null);
 
   useEffect(() => {
+    fetchStockLocations()
+      .then((locs) => {
+        setLocations(locs);
+        const def = locs.find((l) => l.is_default) ?? locs[0];
+        if (def) setLocationId(def.id);
+      })
+      .catch((e) => toast.error(e instanceof StockReadError ? e.message : "Unable to load locations"));
+  }, []);
+
+  useEffect(() => {
+    if (!locationId) return;
     let cancelled = false;
     setLoadingSystem(true);
     setSystemError(null);
-    fetchOnHand(item.id)
-      .then((v) => {
-        if (!cancelled) {
-          setSystem(v);
-          setLoadingSystem(false);
-        }
-      })
+    fetchOnHandAtLocation(item.id, locationId)
+      .then((v) => { if (!cancelled) { setSystem(v); setLoadingSystem(false); } })
       .catch((e) => {
         if (!cancelled) {
-          setSystem(null);
-          setLoadingSystem(false);
-          setSystemError(
-            e instanceof StockReadError
-              ? e.message
-              : "Unable to load ledger balance",
-          );
+          setSystem(null); setLoadingSystem(false);
+          setSystemError(e instanceof StockReadError ? e.message : "Unable to load ledger balance");
         }
       });
     return () => { cancelled = true; };
-  }, [item.id]);
+  }, [item.id, locationId]);
 
   const physical = Number(count);
   const delta = count === "" || system === null ? 0 : physical - system;
 
   async function save() {
+    if (!locationId) return toast.error("Select a stock location");
     if (loadingSystem) return toast.error("Still reading current stock — try again in a moment");
-    if (systemError !== null || system === null) {
-      return toast.error("Cannot record adjustment without a ledger balance");
-    }
-    if (count === "" || Number.isNaN(physical) || physical < 0) {
-      return toast.error("Enter a physical count (0 or more)");
-    }
+    if (systemError !== null || system === null) return toast.error("Cannot record adjustment without a ledger balance");
+    if (count === "" || Number.isNaN(physical) || physical < 0) return toast.error("Enter a physical count (0 or more)");
     if (delta === 0) return toast.info("No difference to record");
     if (!reason.trim()) return toast.error("Add a reason for the adjustment");
 
     setSaving(true);
-    const { data: userData } = await supabase.auth.getUser();
-    // Trigger treats `adjustment` as an additive delta — insert the signed delta.
-    const { error } = await supabase.from("inventory_movements").insert({
-      item_id: item.id,
-      type: "adjustment",
-      quantity: delta,
-      reason: `Stock count: physical ${physical} vs system ${system} — ${reason.trim()}`,
-      performed_by: userData.user?.id,
+    const { error } = await (supabase as any).rpc("record_location_stock_count", {
+      _item_id: item.id,
+      _location_id: locationId,
+      _physical_qty: physical,
+      _reason: reason.trim(),
     });
     setSaving(false);
     if (error) return toast.error(error.message);
@@ -87,7 +89,6 @@ export function StockCountDialog({
     onSaved();
     onClose();
   }
-
 
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()}>
@@ -98,56 +99,57 @@ export function StockCountDialog({
             <p className="text-sm font-medium">{item.name}</p>
             <p className="text-xs text-muted-foreground font-mono">{item.sku}</p>
           </div>
+          <div>
+            <Label>Location</Label>
+            <Select value={locationId} onValueChange={setLocationId}>
+              <SelectTrigger><SelectValue placeholder="Choose location…" /></SelectTrigger>
+              <SelectContent>
+                {locations.map((l) => (
+                  <SelectItem key={l.id} value={l.id}>
+                    {l.name}{l.is_default ? " (default)" : ""}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
               <Label>System count</Label>
               <Input
                 value={
-                  loadingSystem
-                    ? "…"
-                    : systemError !== null || system === null
-                      ? "Unavailable"
-                      : `${system.toLocaleString()} ${item.unit}`
+                  loadingSystem ? "…" :
+                  systemError !== null || system === null ? "Unavailable" :
+                  `${system.toLocaleString()} ${item.unit}`
                 }
                 readOnly
                 className="font-mono"
               />
               {systemError !== null && !loadingSystem && (
-                <p className="text-[11px] text-brand-orange mt-1">
-                  Unable to load ledger balance
-                </p>
+                <p className="text-[11px] text-brand-orange mt-1">Unable to load ledger balance</p>
               )}
             </div>
             <div>
               <Label>Physical count</Label>
               <Input
-                type="number"
-                min="0"
-                step="0.01"
-                value={count}
-                onChange={(e) => setCount(e.target.value)}
+                type="number" min="0" step="0.01"
+                value={count} onChange={(e) => setCount(e.target.value)}
                 placeholder="Actual on shelf"
               />
             </div>
           </div>
-          {count !== "" && (
+          {count !== "" && system !== null && (
             <div className="text-sm">
               Difference:{" "}
-              <span
-                className={`font-mono font-semibold ${delta === 0 ? "" : delta > 0 ? "text-brand-green" : "text-brand-orange"}`}
-              >
-                {delta > 0 ? "+" : ""}
-                {delta.toLocaleString()} {item.unit}
+              <span className={`font-mono font-semibold ${delta === 0 ? "" : delta > 0 ? "text-brand-green" : "text-brand-orange"}`}>
+                {delta > 0 ? "+" : ""}{delta.toLocaleString()} {item.unit}
               </span>
             </div>
           )}
           <div>
             <Label>Reason</Label>
             <Textarea
-              value={reason}
-              onChange={(e) => setReason(e.target.value)}
-              rows={2}
-              placeholder="Breakage, miscount, theft, expiry cleared, etc."
+              value={reason} onChange={(e) => setReason(e.target.value)}
+              rows={2} placeholder="Breakage, miscount, theft, expiry cleared, etc."
             />
           </div>
         </div>
@@ -155,7 +157,7 @@ export function StockCountDialog({
           <Button variant="ghost" onClick={onClose}>Cancel</Button>
           <Button
             onClick={save}
-            disabled={saving || loadingSystem || systemError !== null || system === null}
+            disabled={saving || !locationId || loadingSystem || systemError !== null || system === null}
             className="bg-brand-orange text-white hover:bg-brand-orange/90"
           >
             {saving ? "Recording…" : "Record adjustment"}
