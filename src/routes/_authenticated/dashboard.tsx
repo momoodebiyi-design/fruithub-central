@@ -151,7 +151,7 @@ function DashboardPage() {
 
       setStats({
         totalItems: itemsCount ?? 0,
-        lowStock: low.length,
+        lowStock: lowCount ?? low.length,
         batchesToday: batches?.length ?? 0,
         outputToday,
       });
