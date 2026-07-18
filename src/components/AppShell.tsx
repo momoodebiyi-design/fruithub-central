@@ -11,6 +11,7 @@ import {
   Users,
   Building2,
   PackageSearch,
+  ShoppingCart,
   Search,
   LogOut,
   Menu,
@@ -29,6 +30,7 @@ import {
   CAN_DISPATCH,
   CAN_MANAGE_SHOPS,
   CAN_MANAGE_PURCHASES,
+  CAN_VIEW_PURCHASING,
   hasAny,
   isShopSupervisorOnly,
   ROLE_LABELS,
@@ -62,14 +64,20 @@ const FULL_NAV: NavItem[] = [
   { to: "/production", label: "Production", icon: FlaskConical, roles: CAN_RECORD_PRODUCTION },
   { to: "/dispatches", label: "Transfers / Dispatches", icon: Send, roles: CAN_DISPATCH },
   { to: "/shops", label: "Shops", icon: Store, roles: CAN_MANAGE_SHOPS },
-  { to: "/shop-counts", label: "Daily counts", icon: ClipboardCheck, roles: [...CAN_MANAGE_SHOPS, "shop_supervisor"] },
-  { to: "/requests", label: "Stock requests", icon: ClipboardList },
+  {
+    to: "/shop-counts",
+    label: "Daily counts",
+    icon: ClipboardCheck,
+    roles: [...CAN_MANAGE_SHOPS, "shop_supervisor"],
+  },
+  { to: "/replenishment", label: "Replenishment", icon: ClipboardList },
+  { to: "/purchasing", label: "Purchasing", icon: ShoppingCart, roles: CAN_VIEW_PURCHASING },
 ];
 
 const SUPERVISOR_NAV: NavItem[] = [
   { to: "/dashboard", label: "Today", icon: LayoutDashboard },
   { to: "/shop-counts", label: "Daily counts", icon: ClipboardCheck },
-  { to: "/requests", label: "Stock requests", icon: ClipboardList },
+  { to: "/replenishment", label: "Replenishment", icon: ClipboardList },
 ];
 
 const SUPERVISOR_UPCOMING: DisabledItem[] = [
@@ -110,10 +118,16 @@ export function AppShell({ children }: { children: ReactNode }) {
     ? SUPERVISOR_NAV
     : [
         ...FULL_NAV.filter((n) => !n.roles || hasAny(session.roles, n.roles)),
-        ...(canManageClients ? [{ to: "/clients", label: "Bulk clients", icon: Building2 } as NavItem] : []),
-        ...(canViewSuppliers ? [{ to: "/suppliers", label: "Suppliers", icon: PackageSearch } as NavItem] : []),
+        ...(canManageClients
+          ? [{ to: "/clients", label: "Bulk clients", icon: Building2 } as NavItem]
+          : []),
+        ...(canViewSuppliers
+          ? [{ to: "/suppliers", label: "Suppliers", icon: PackageSearch } as NavItem]
+          : []),
         ...(canManageUsers ? [{ to: "/users", label: "Users", icon: Users } as NavItem] : []),
-        ...(canViewAudit ? [{ to: "/audit", label: "Audit Log", icon: ShieldCheck } as NavItem] : []),
+        ...(canViewAudit
+          ? [{ to: "/audit", label: "Audit Log", icon: ShieldCheck } as NavItem]
+          : []),
       ];
 
   const primaryRole = session.roles[0];
@@ -162,30 +176,33 @@ export function AppShell({ children }: { children: ReactNode }) {
                 )}
               >
                 <Icon
-                  className={cn("size-4 flex-shrink-0", active ? "text-brand-orange" : "text-muted-foreground")}
+                  className={cn(
+                    "size-4 flex-shrink-0",
+                    active ? "text-brand-orange" : "text-muted-foreground",
+                  )}
                 />
                 {item.label}
               </Link>
             );
           })}
-          {supervisorOnly && SUPERVISOR_UPCOMING.map((u) => {
-            const Icon = u.icon;
-            return (
-              <span
-                key={u.label}
-                title={u.hint}
-                className="flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md text-muted-foreground/50 cursor-not-allowed select-none"
-              >
-                <Icon className="size-4 flex-shrink-0 opacity-60" />
-                <span className="flex-1">{u.label}</span>
-                <span className="text-[9px] uppercase tracking-wider border border-current/30 rounded px-1 py-0.5">
-                  soon
+          {supervisorOnly &&
+            SUPERVISOR_UPCOMING.map((u) => {
+              const Icon = u.icon;
+              return (
+                <span
+                  key={u.label}
+                  title={u.hint}
+                  className="flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md text-muted-foreground/50 cursor-not-allowed select-none"
+                >
+                  <Icon className="size-4 flex-shrink-0 opacity-60" />
+                  <span className="flex-1">{u.label}</span>
+                  <span className="text-[9px] uppercase tracking-wider border border-current/30 rounded px-1 py-0.5">
+                    soon
+                  </span>
                 </span>
-              </span>
-            );
-          })}
+              );
+            })}
         </nav>
-
 
         <div className="p-4 border-t border-sidebar-border">
           <Link
@@ -234,7 +251,9 @@ export function AppShell({ children }: { children: ReactNode }) {
                 className="w-full pl-9 pr-16 py-1.5 bg-muted rounded-md text-sm text-left text-muted-foreground/80 hover:bg-muted/70 outline-none focus:ring-1 focus:ring-brand-orange/40"
               >
                 Search inventory, batches, suppliers…
-                <kbd className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-mono bg-background/80 border rounded px-1.5 py-0.5">⌘K</kbd>
+                <kbd className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-mono bg-background/80 border rounded px-1.5 py-0.5">
+                  ⌘K
+                </kbd>
               </button>
             </div>
           )}

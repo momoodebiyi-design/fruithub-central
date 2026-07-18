@@ -19,7 +19,9 @@ import { Route as AuthenticatedSuppliersRouteImport } from './routes/_authentica
 import { Route as AuthenticatedShopsRouteImport } from './routes/_authenticated/shops'
 import { Route as AuthenticatedShopCountsRouteImport } from './routes/_authenticated/shop-counts'
 import { Route as AuthenticatedRequestsRouteImport } from './routes/_authenticated/requests'
+import { Route as AuthenticatedReplenishmentRouteImport } from './routes/_authenticated/replenishment'
 import { Route as AuthenticatedRecipesRouteImport } from './routes/_authenticated/recipes'
+import { Route as AuthenticatedPurchasingRouteImport } from './routes/_authenticated/purchasing'
 import { Route as AuthenticatedProductionRouteImport } from './routes/_authenticated/production'
 import { Route as AuthenticatedNotificationsRouteImport } from './routes/_authenticated/notifications'
 import { Route as AuthenticatedInventoryRouteImport } from './routes/_authenticated/inventory'
@@ -86,9 +88,20 @@ const AuthenticatedRequestsRoute = AuthenticatedRequestsRouteImport.update({
   path: '/requests',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedReplenishmentRoute =
+  AuthenticatedReplenishmentRouteImport.update({
+    id: '/replenishment',
+    path: '/replenishment',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedRecipesRoute = AuthenticatedRecipesRouteImport.update({
   id: '/recipes',
   path: '/recipes',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedPurchasingRoute = AuthenticatedPurchasingRouteImport.update({
+  id: '/purchasing',
+  path: '/purchasing',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedProductionRoute = AuthenticatedProductionRouteImport.update({
@@ -195,7 +208,9 @@ export interface FileRoutesByFullPath {
   '/inventory': typeof AuthenticatedInventoryRouteWithChildren
   '/notifications': typeof AuthenticatedNotificationsRoute
   '/production': typeof AuthenticatedProductionRoute
+  '/purchasing': typeof AuthenticatedPurchasingRoute
   '/recipes': typeof AuthenticatedRecipesRoute
+  '/replenishment': typeof AuthenticatedReplenishmentRoute
   '/requests': typeof AuthenticatedRequestsRoute
   '/shop-counts': typeof AuthenticatedShopCountsRouteWithChildren
   '/shops': typeof AuthenticatedShopsRoute
@@ -222,7 +237,9 @@ export interface FileRoutesByTo {
   '/dispatches': typeof AuthenticatedDispatchesRoute
   '/notifications': typeof AuthenticatedNotificationsRoute
   '/production': typeof AuthenticatedProductionRoute
+  '/purchasing': typeof AuthenticatedPurchasingRoute
   '/recipes': typeof AuthenticatedRecipesRoute
+  '/replenishment': typeof AuthenticatedReplenishmentRoute
   '/requests': typeof AuthenticatedRequestsRoute
   '/shops': typeof AuthenticatedShopsRoute
   '/suppliers': typeof AuthenticatedSuppliersRoute
@@ -251,7 +268,9 @@ export interface FileRoutesById {
   '/_authenticated/inventory': typeof AuthenticatedInventoryRouteWithChildren
   '/_authenticated/notifications': typeof AuthenticatedNotificationsRoute
   '/_authenticated/production': typeof AuthenticatedProductionRoute
+  '/_authenticated/purchasing': typeof AuthenticatedPurchasingRoute
   '/_authenticated/recipes': typeof AuthenticatedRecipesRoute
+  '/_authenticated/replenishment': typeof AuthenticatedReplenishmentRoute
   '/_authenticated/requests': typeof AuthenticatedRequestsRoute
   '/_authenticated/shop-counts': typeof AuthenticatedShopCountsRouteWithChildren
   '/_authenticated/shops': typeof AuthenticatedShopsRoute
@@ -281,7 +300,9 @@ export interface FileRouteTypes {
     | '/inventory'
     | '/notifications'
     | '/production'
+    | '/purchasing'
     | '/recipes'
+    | '/replenishment'
     | '/requests'
     | '/shop-counts'
     | '/shops'
@@ -308,7 +329,9 @@ export interface FileRouteTypes {
     | '/dispatches'
     | '/notifications'
     | '/production'
+    | '/purchasing'
     | '/recipes'
+    | '/replenishment'
     | '/requests'
     | '/shops'
     | '/suppliers'
@@ -336,7 +359,9 @@ export interface FileRouteTypes {
     | '/_authenticated/inventory'
     | '/_authenticated/notifications'
     | '/_authenticated/production'
+    | '/_authenticated/purchasing'
     | '/_authenticated/recipes'
+    | '/_authenticated/replenishment'
     | '/_authenticated/requests'
     | '/_authenticated/shop-counts'
     | '/_authenticated/shops'
@@ -435,11 +460,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedRequestsRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/replenishment': {
+      id: '/_authenticated/replenishment'
+      path: '/replenishment'
+      fullPath: '/replenishment'
+      preLoaderRoute: typeof AuthenticatedReplenishmentRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/recipes': {
       id: '/_authenticated/recipes'
       path: '/recipes'
       fullPath: '/recipes'
       preLoaderRoute: typeof AuthenticatedRecipesRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/purchasing': {
+      id: '/_authenticated/purchasing'
+      path: '/purchasing'
+      fullPath: '/purchasing'
+      preLoaderRoute: typeof AuthenticatedPurchasingRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/production': {
@@ -597,7 +636,9 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedInventoryRoute: typeof AuthenticatedInventoryRouteWithChildren
   AuthenticatedNotificationsRoute: typeof AuthenticatedNotificationsRoute
   AuthenticatedProductionRoute: typeof AuthenticatedProductionRoute
+  AuthenticatedPurchasingRoute: typeof AuthenticatedPurchasingRoute
   AuthenticatedRecipesRoute: typeof AuthenticatedRecipesRoute
+  AuthenticatedReplenishmentRoute: typeof AuthenticatedReplenishmentRoute
   AuthenticatedRequestsRoute: typeof AuthenticatedRequestsRoute
   AuthenticatedShopCountsRoute: typeof AuthenticatedShopCountsRouteWithChildren
   AuthenticatedShopsRoute: typeof AuthenticatedShopsRoute
@@ -614,7 +655,9 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedInventoryRoute: AuthenticatedInventoryRouteWithChildren,
   AuthenticatedNotificationsRoute: AuthenticatedNotificationsRoute,
   AuthenticatedProductionRoute: AuthenticatedProductionRoute,
+  AuthenticatedPurchasingRoute: AuthenticatedPurchasingRoute,
   AuthenticatedRecipesRoute: AuthenticatedRecipesRoute,
+  AuthenticatedReplenishmentRoute: AuthenticatedReplenishmentRoute,
   AuthenticatedRequestsRoute: AuthenticatedRequestsRoute,
   AuthenticatedShopCountsRoute: AuthenticatedShopCountsRouteWithChildren,
   AuthenticatedShopsRoute: AuthenticatedShopsRoute,
