@@ -60,17 +60,22 @@ function InventoryList() {
   const [showImport, setShowImport] = useState(false);
 
   async function load() {
-    const { data } = await (supabase as any)
+    const { data, error } = await (supabase as any)
       .from("v_item_stock")
-      .select("id, item_id, sku, name, category, subcategory, unit, min_level, reorder_level, status, on_hand")
-      .order("item_id", { nullsFirst: false });
+      .select("item_id, item_code, sku, name, category, subcategory, unit, min_level, reorder_level, status, on_hand")
+      .order("item_code", { nullsFirst: false });
+    if (error) {
+      toast.error(`Unable to load inventory: ${error.message}`);
+      return;
+    }
     setItems(((data ?? []) as any[]).map((r) => ({
-      id: r.id, item_id: r.item_id, sku: r.sku, name: r.name,
+      id: r.item_id, item_id: r.item_code, sku: r.sku, name: r.name,
       category: r.category, subcategory: r.subcategory, unit: r.unit,
       quantity: Number(r.on_hand ?? 0), reorder_level: r.reorder_level,
       min_level: r.min_level, status: r.status,
     })));
   }
+
 
   useEffect(() => {
     load();
