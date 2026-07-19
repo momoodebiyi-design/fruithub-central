@@ -210,7 +210,9 @@ export type Database = {
       dispatches: {
         Row: {
           client_id: string | null
+          client_reference_id: string | null
           created_at: string
+          destination_location_id: string | null
           dispatched_at: string
           dispatched_by: string | null
           id: string
@@ -220,14 +222,18 @@ export type Database = {
           received_at: string | null
           received_by: string | null
           reference: string
+          replenishment_request_id: string | null
           shop_id: string | null
+          source_location_id: string | null
           status: Database["public"]["Enums"]["dispatch_status"]
           updated_at: string
           vehicle: string | null
         }
         Insert: {
           client_id?: string | null
+          client_reference_id?: string | null
           created_at?: string
+          destination_location_id?: string | null
           dispatched_at?: string
           dispatched_by?: string | null
           id?: string
@@ -237,14 +243,18 @@ export type Database = {
           received_at?: string | null
           received_by?: string | null
           reference: string
+          replenishment_request_id?: string | null
           shop_id?: string | null
+          source_location_id?: string | null
           status?: Database["public"]["Enums"]["dispatch_status"]
           updated_at?: string
           vehicle?: string | null
         }
         Update: {
           client_id?: string | null
+          client_reference_id?: string | null
           created_at?: string
+          destination_location_id?: string | null
           dispatched_at?: string
           dispatched_by?: string | null
           id?: string
@@ -254,7 +264,9 @@ export type Database = {
           received_at?: string | null
           received_by?: string | null
           reference?: string
+          replenishment_request_id?: string | null
           shop_id?: string | null
+          source_location_id?: string | null
           status?: Database["public"]["Enums"]["dispatch_status"]
           updated_at?: string
           vehicle?: string | null
@@ -265,6 +277,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dispatches_destination_location_id_fkey"
+            columns: ["destination_location_id"]
+            isOneToOne: false
+            referencedRelation: "locations"
             referencedColumns: ["id"]
           },
           {
@@ -282,10 +301,24 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "dispatches_replenishment_request_id_fkey"
+            columns: ["replenishment_request_id"]
+            isOneToOne: false
+            referencedRelation: "stock_requests"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "dispatches_shop_id_fkey"
             columns: ["shop_id"]
             isOneToOne: false
             referencedRelation: "shops"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dispatches_source_location_id_fkey"
+            columns: ["source_location_id"]
+            isOneToOne: false
+            referencedRelation: "locations"
             referencedColumns: ["id"]
           },
         ]
@@ -552,6 +585,7 @@ export type Database = {
           location_type: string | null
           name: string
           notes: string | null
+          shop_id: string | null
           status: string
           updated_at: string
         }
@@ -563,6 +597,7 @@ export type Database = {
           location_type?: string | null
           name: string
           notes?: string | null
+          shop_id?: string | null
           status?: string
           updated_at?: string
         }
@@ -574,10 +609,19 @@ export type Database = {
           location_type?: string | null
           name?: string
           notes?: string | null
+          shop_id?: string | null
           status?: string
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "locations_shop_id_fkey"
+            columns: ["shop_id"]
+            isOneToOne: false
+            referencedRelation: "shops"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       notifications: {
         Row: {
@@ -586,7 +630,9 @@ export type Database = {
           id: string
           level: Database["public"]["Enums"]["notification_level"]
           link: string | null
+          notification_key: string | null
           read_at: string | null
+          resolved_at: string | null
           title: string
           user_id: string | null
         }
@@ -596,7 +642,9 @@ export type Database = {
           id?: string
           level?: Database["public"]["Enums"]["notification_level"]
           link?: string | null
+          notification_key?: string | null
           read_at?: string | null
+          resolved_at?: string | null
           title: string
           user_id?: string | null
         }
@@ -606,7 +654,9 @@ export type Database = {
           id?: string
           level?: Database["public"]["Enums"]["notification_level"]
           link?: string | null
+          notification_key?: string | null
           read_at?: string | null
+          resolved_at?: string | null
           title?: string
           user_id?: string | null
         }
@@ -753,32 +803,274 @@ export type Database = {
           },
         ]
       }
+      purchase_discrepancies: {
+        Row: {
+          discrepancy_type: string
+          id: string
+          notes: string
+          purchase_order_id: string
+          purchase_order_item_id: string
+          purchase_receipt_id: string
+          quantity: number
+          reported_at: string
+          reported_by: string | null
+          resolution_notes: string | null
+          resolved_at: string | null
+          resolved_by: string | null
+          severity: string
+          status: string
+        }
+        Insert: {
+          discrepancy_type: string
+          id?: string
+          notes: string
+          purchase_order_id: string
+          purchase_order_item_id: string
+          purchase_receipt_id: string
+          quantity: number
+          reported_at?: string
+          reported_by?: string | null
+          resolution_notes?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          severity?: string
+          status?: string
+        }
+        Update: {
+          discrepancy_type?: string
+          id?: string
+          notes?: string
+          purchase_order_id?: string
+          purchase_order_item_id?: string
+          purchase_receipt_id?: string
+          quantity?: number
+          reported_at?: string
+          reported_by?: string | null
+          resolution_notes?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          severity?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "purchase_discrepancies_purchase_order_id_fkey"
+            columns: ["purchase_order_id"]
+            isOneToOne: false
+            referencedRelation: "purchase_orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchase_discrepancies_purchase_order_item_id_fkey"
+            columns: ["purchase_order_item_id"]
+            isOneToOne: false
+            referencedRelation: "purchase_order_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchase_discrepancies_purchase_receipt_id_fkey"
+            columns: ["purchase_receipt_id"]
+            isOneToOne: false
+            referencedRelation: "purchase_receipts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchase_discrepancies_reported_by_fkey"
+            columns: ["reported_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchase_discrepancies_resolved_by_fkey"
+            columns: ["resolved_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      purchase_needs: {
+        Row: {
+          available_stock_snapshot: number
+          client_reference_id: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          in_transit_snapshot: number
+          is_automatic: boolean
+          item_id: string
+          location_id: string
+          need_number: string
+          policy_id: string | null
+          priority: string
+          reason: string | null
+          requested_quantity: number
+          required_date: string | null
+          resolution_notes: string | null
+          resolved_at: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          source: string
+          source_location_id: string | null
+          source_type: string
+          status: string
+          stock_recovered_at: string | null
+          suggested_quantity: number
+          updated_at: string
+        }
+        Insert: {
+          available_stock_snapshot?: number
+          client_reference_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          in_transit_snapshot?: number
+          is_automatic?: boolean
+          item_id: string
+          location_id: string
+          need_number?: string
+          policy_id?: string | null
+          priority?: string
+          reason?: string | null
+          requested_quantity: number
+          required_date?: string | null
+          resolution_notes?: string | null
+          resolved_at?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          source?: string
+          source_location_id?: string | null
+          source_type: string
+          status?: string
+          stock_recovered_at?: string | null
+          suggested_quantity: number
+          updated_at?: string
+        }
+        Update: {
+          available_stock_snapshot?: number
+          client_reference_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          in_transit_snapshot?: number
+          is_automatic?: boolean
+          item_id?: string
+          location_id?: string
+          need_number?: string
+          policy_id?: string | null
+          priority?: string
+          reason?: string | null
+          requested_quantity?: number
+          required_date?: string | null
+          resolution_notes?: string | null
+          resolved_at?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          source?: string
+          source_location_id?: string | null
+          source_type?: string
+          status?: string
+          stock_recovered_at?: string | null
+          suggested_quantity?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "purchase_needs_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchase_needs_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchase_needs_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "v_item_stock"
+            referencedColumns: ["item_id"]
+          },
+          {
+            foreignKeyName: "purchase_needs_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchase_needs_policy_id_fkey"
+            columns: ["policy_id"]
+            isOneToOne: false
+            referencedRelation: "stock_level_policies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchase_needs_reviewed_by_fkey"
+            columns: ["reviewed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchase_needs_source_location_id_fkey"
+            columns: ["source_location_id"]
+            isOneToOne: false
+            referencedRelation: "locations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       purchase_order_items: {
         Row: {
           created_at: string
           id: string
           item_id: string
+          location_id: string | null
+          purchase_need_id: string | null
           purchase_order_id: string
+          quantity_accepted: number
+          quantity_delivered: number
           quantity_ordered: number
+          quantity_quoted: number | null
           quantity_received: number
+          quantity_rejected: number
           unit_cost: number | null
         }
         Insert: {
           created_at?: string
           id?: string
           item_id: string
+          location_id?: string | null
+          purchase_need_id?: string | null
           purchase_order_id: string
+          quantity_accepted?: number
+          quantity_delivered?: number
           quantity_ordered: number
+          quantity_quoted?: number | null
           quantity_received?: number
+          quantity_rejected?: number
           unit_cost?: number | null
         }
         Update: {
           created_at?: string
           id?: string
           item_id?: string
+          location_id?: string | null
+          purchase_need_id?: string | null
           purchase_order_id?: string
+          quantity_accepted?: number
+          quantity_delivered?: number
           quantity_ordered?: number
+          quantity_quoted?: number | null
           quantity_received?: number
+          quantity_rejected?: number
           unit_cost?: number | null
         }
         Relationships: [
@@ -797,6 +1089,20 @@ export type Database = {
             referencedColumns: ["item_id"]
           },
           {
+            foreignKeyName: "purchase_order_items_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchase_order_items_purchase_need_id_fkey"
+            columns: ["purchase_need_id"]
+            isOneToOne: false
+            referencedRelation: "purchase_needs"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "purchase_order_items_purchase_order_id_fkey"
             columns: ["purchase_order_id"]
             isOneToOne: false
@@ -807,47 +1113,283 @@ export type Database = {
       }
       purchase_orders: {
         Row: {
+          approved_at: string | null
+          approved_by: string | null
+          cancellation_reason: string | null
+          cancelled_at: string | null
+          cancelled_by: string | null
+          client_reference_id: string | null
           created_at: string
           created_by: string | null
+          currency: string
+          delivered_at: string | null
           expected_date: string | null
           id: string
           notes: string | null
           order_date: string
+          payment_evidence_path: string | null
+          payment_recorded_at: string | null
+          payment_recorded_by: string | null
+          payment_reference: string | null
           po_number: string
+          quotation_evidence_path: string | null
+          quotation_reference: string | null
+          quoted_total: number
+          rejection_reason: string | null
           status: Database["public"]["Enums"]["purchase_order_status"]
+          submitted_at: string | null
+          submitted_by: string | null
           supplier_id: string | null
           updated_at: string
+          workflow_status: string
         }
         Insert: {
+          approved_at?: string | null
+          approved_by?: string | null
+          cancellation_reason?: string | null
+          cancelled_at?: string | null
+          cancelled_by?: string | null
+          client_reference_id?: string | null
           created_at?: string
           created_by?: string | null
+          currency?: string
+          delivered_at?: string | null
           expected_date?: string | null
           id?: string
           notes?: string | null
           order_date?: string
+          payment_evidence_path?: string | null
+          payment_recorded_at?: string | null
+          payment_recorded_by?: string | null
+          payment_reference?: string | null
           po_number: string
+          quotation_evidence_path?: string | null
+          quotation_reference?: string | null
+          quoted_total?: number
+          rejection_reason?: string | null
           status?: Database["public"]["Enums"]["purchase_order_status"]
+          submitted_at?: string | null
+          submitted_by?: string | null
           supplier_id?: string | null
           updated_at?: string
+          workflow_status?: string
         }
         Update: {
+          approved_at?: string | null
+          approved_by?: string | null
+          cancellation_reason?: string | null
+          cancelled_at?: string | null
+          cancelled_by?: string | null
+          client_reference_id?: string | null
           created_at?: string
           created_by?: string | null
+          currency?: string
+          delivered_at?: string | null
           expected_date?: string | null
           id?: string
           notes?: string | null
           order_date?: string
+          payment_evidence_path?: string | null
+          payment_recorded_at?: string | null
+          payment_recorded_by?: string | null
+          payment_reference?: string | null
           po_number?: string
+          quotation_evidence_path?: string | null
+          quotation_reference?: string | null
+          quoted_total?: number
+          rejection_reason?: string | null
           status?: Database["public"]["Enums"]["purchase_order_status"]
+          submitted_at?: string | null
+          submitted_by?: string | null
           supplier_id?: string | null
           updated_at?: string
+          workflow_status?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "purchase_orders_approved_by_fkey"
+            columns: ["approved_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchase_orders_cancelled_by_fkey"
+            columns: ["cancelled_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchase_orders_payment_recorded_by_fkey"
+            columns: ["payment_recorded_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchase_orders_submitted_by_fkey"
+            columns: ["submitted_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "purchase_orders_supplier_id_fkey"
             columns: ["supplier_id"]
             isOneToOne: false
             referencedRelation: "suppliers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      purchase_receipt_lines: {
+        Row: {
+          id: string
+          inventory_movement_id: string | null
+          purchase_order_item_id: string
+          purchase_receipt_id: string
+          quality_notes: string | null
+          quantity_accepted: number | null
+          quantity_delivered: number
+          quantity_rejected: number | null
+        }
+        Insert: {
+          id?: string
+          inventory_movement_id?: string | null
+          purchase_order_item_id: string
+          purchase_receipt_id: string
+          quality_notes?: string | null
+          quantity_accepted?: number | null
+          quantity_delivered: number
+          quantity_rejected?: number | null
+        }
+        Update: {
+          id?: string
+          inventory_movement_id?: string | null
+          purchase_order_item_id?: string
+          purchase_receipt_id?: string
+          quality_notes?: string | null
+          quantity_accepted?: number | null
+          quantity_delivered?: number
+          quantity_rejected?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "purchase_receipt_lines_inventory_movement_id_fkey"
+            columns: ["inventory_movement_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_movements"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchase_receipt_lines_purchase_order_item_id_fkey"
+            columns: ["purchase_order_item_id"]
+            isOneToOne: false
+            referencedRelation: "purchase_order_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchase_receipt_lines_purchase_receipt_id_fkey"
+            columns: ["purchase_receipt_id"]
+            isOneToOne: false
+            referencedRelation: "purchase_receipts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      purchase_receipts: {
+        Row: {
+          client_reference_id: string
+          delivery_evidence_path: string
+          delivery_notes: string | null
+          id: string
+          inspected_at: string | null
+          inspected_by: string | null
+          purchase_order_id: string
+          quality_notes: string | null
+          receipt_number: string
+          recorded_at: string
+          recorded_by: string
+          status: string
+        }
+        Insert: {
+          client_reference_id: string
+          delivery_evidence_path: string
+          delivery_notes?: string | null
+          id?: string
+          inspected_at?: string | null
+          inspected_by?: string | null
+          purchase_order_id: string
+          quality_notes?: string | null
+          receipt_number: string
+          recorded_at?: string
+          recorded_by: string
+          status?: string
+        }
+        Update: {
+          client_reference_id?: string
+          delivery_evidence_path?: string
+          delivery_notes?: string | null
+          id?: string
+          inspected_at?: string | null
+          inspected_by?: string | null
+          purchase_order_id?: string
+          quality_notes?: string | null
+          receipt_number?: string
+          recorded_at?: string
+          recorded_by?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "purchase_receipts_inspected_by_fkey"
+            columns: ["inspected_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchase_receipts_purchase_order_id_fkey"
+            columns: ["purchase_order_id"]
+            isOneToOne: false
+            referencedRelation: "purchase_orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchase_receipts_recorded_by_fkey"
+            columns: ["recorded_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      purchasing_settings: {
+        Row: {
+          id: boolean
+          routine_approval_threshold_naira: number | null
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          id?: boolean
+          routine_approval_threshold_naira?: number | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          id?: boolean
+          routine_approval_threshold_naira?: number | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "purchasing_settings_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -970,6 +1512,100 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "v_item_stock"
             referencedColumns: ["item_id"]
+          },
+        ]
+      }
+      replenishment_discrepancies: {
+        Row: {
+          difference: number | null
+          dispatch_id: string
+          expected_quantity: number
+          id: string
+          item_id: string
+          notes: string
+          received_quantity: number
+          reported_at: string
+          reported_by: string | null
+          request_id: string
+          resolution_notes: string | null
+          resolved_at: string | null
+          resolved_by: string | null
+          status: string
+        }
+        Insert: {
+          difference?: number | null
+          dispatch_id: string
+          expected_quantity: number
+          id?: string
+          item_id: string
+          notes: string
+          received_quantity: number
+          reported_at?: string
+          reported_by?: string | null
+          request_id: string
+          resolution_notes?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          status?: string
+        }
+        Update: {
+          difference?: number | null
+          dispatch_id?: string
+          expected_quantity?: number
+          id?: string
+          item_id?: string
+          notes?: string
+          received_quantity?: number
+          reported_at?: string
+          reported_by?: string | null
+          request_id?: string
+          resolution_notes?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "replenishment_discrepancies_dispatch_id_fkey"
+            columns: ["dispatch_id"]
+            isOneToOne: false
+            referencedRelation: "dispatches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "replenishment_discrepancies_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "replenishment_discrepancies_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "v_item_stock"
+            referencedColumns: ["item_id"]
+          },
+          {
+            foreignKeyName: "replenishment_discrepancies_reported_by_fkey"
+            columns: ["reported_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "replenishment_discrepancies_request_id_fkey"
+            columns: ["request_id"]
+            isOneToOne: false
+            referencedRelation: "stock_requests"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "replenishment_discrepancies_resolved_by_fkey"
+            columns: ["resolved_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -1295,58 +1931,205 @@ export type Database = {
           },
         ]
       }
+      stock_level_policies: {
+        Row: {
+          configured_at: string
+          configured_by: string | null
+          critical_level: number
+          id: string
+          is_active: boolean
+          item_id: string
+          location_id: string
+          reorder_level: number
+          source_location_id: string | null
+          source_type: string
+          target_level: number
+          updated_at: string
+        }
+        Insert: {
+          configured_at?: string
+          configured_by?: string | null
+          critical_level: number
+          id?: string
+          is_active?: boolean
+          item_id: string
+          location_id: string
+          reorder_level: number
+          source_location_id?: string | null
+          source_type: string
+          target_level: number
+          updated_at?: string
+        }
+        Update: {
+          configured_at?: string
+          configured_by?: string | null
+          critical_level?: number
+          id?: string
+          is_active?: boolean
+          item_id?: string
+          location_id?: string
+          reorder_level?: number
+          source_location_id?: string | null
+          source_type?: string
+          target_level?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "stock_level_policies_configured_by_fkey"
+            columns: ["configured_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stock_level_policies_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stock_level_policies_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "v_item_stock"
+            referencedColumns: ["item_id"]
+          },
+          {
+            foreignKeyName: "stock_level_policies_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stock_level_policies_source_location_id_fkey"
+            columns: ["source_location_id"]
+            isOneToOne: false
+            referencedRelation: "locations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       stock_requests: {
         Row: {
+          adjustment_reason: string | null
+          approved_quantity: number | null
+          archive_reason: string | null
+          archived_at: string | null
+          archived_by: string | null
+          client_reference_id: string | null
           created_at: string
+          destination_location_id: string | null
           destination_shop_id: string | null
+          dispatch_id: string | null
           fulfilled_movement_id: string | null
           id: string
           item_id: string
           purpose: string
           quantity: number
+          receipt_notes: string | null
+          received_at: string | null
+          received_quantity: number | null
+          replenishment_status: string
+          request_kind: string
           requested_by: string
           review_notes: string | null
           reviewed_at: string | null
           reviewer_id: string | null
+          routed_need_id: string | null
+          source_location_id: string | null
           status: Database["public"]["Enums"]["stock_request_status"]
           updated_at: string
         }
         Insert: {
+          adjustment_reason?: string | null
+          approved_quantity?: number | null
+          archive_reason?: string | null
+          archived_at?: string | null
+          archived_by?: string | null
+          client_reference_id?: string | null
           created_at?: string
+          destination_location_id?: string | null
           destination_shop_id?: string | null
+          dispatch_id?: string | null
           fulfilled_movement_id?: string | null
           id?: string
           item_id: string
           purpose: string
           quantity: number
+          receipt_notes?: string | null
+          received_at?: string | null
+          received_quantity?: number | null
+          replenishment_status?: string
+          request_kind?: string
           requested_by: string
           review_notes?: string | null
           reviewed_at?: string | null
           reviewer_id?: string | null
+          routed_need_id?: string | null
+          source_location_id?: string | null
           status?: Database["public"]["Enums"]["stock_request_status"]
           updated_at?: string
         }
         Update: {
+          adjustment_reason?: string | null
+          approved_quantity?: number | null
+          archive_reason?: string | null
+          archived_at?: string | null
+          archived_by?: string | null
+          client_reference_id?: string | null
           created_at?: string
+          destination_location_id?: string | null
           destination_shop_id?: string | null
+          dispatch_id?: string | null
           fulfilled_movement_id?: string | null
           id?: string
           item_id?: string
           purpose?: string
           quantity?: number
+          receipt_notes?: string | null
+          received_at?: string | null
+          received_quantity?: number | null
+          replenishment_status?: string
+          request_kind?: string
           requested_by?: string
           review_notes?: string | null
           reviewed_at?: string | null
           reviewer_id?: string | null
+          routed_need_id?: string | null
+          source_location_id?: string | null
           status?: Database["public"]["Enums"]["stock_request_status"]
           updated_at?: string
         }
         Relationships: [
           {
+            foreignKeyName: "stock_requests_archived_by_fkey"
+            columns: ["archived_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stock_requests_destination_location_id_fkey"
+            columns: ["destination_location_id"]
+            isOneToOne: false
+            referencedRelation: "locations"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "stock_requests_destination_shop_id_fkey"
             columns: ["destination_shop_id"]
             isOneToOne: false
             referencedRelation: "shops"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stock_requests_dispatch_id_fkey"
+            columns: ["dispatch_id"]
+            isOneToOne: false
+            referencedRelation: "dispatches"
             referencedColumns: ["id"]
           },
           {
@@ -1382,6 +2165,20 @@ export type Database = {
             columns: ["reviewer_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stock_requests_routed_need_id_fkey"
+            columns: ["routed_need_id"]
+            isOneToOne: false
+            referencedRelation: "purchase_needs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stock_requests_source_location_id_fkey"
+            columns: ["source_location_id"]
+            isOneToOne: false
+            referencedRelation: "locations"
             referencedColumns: ["id"]
           },
         ]
@@ -1607,14 +2404,39 @@ export type Database = {
     }
     Functions: {
       approve_recipe: { Args: { _recipe_id: string }; Returns: undefined }
+      approve_replenishment_request: {
+        Args: {
+          _approved_quantity: number
+          _notes?: string
+          _request_id: string
+        }
+        Returns: string
+      }
       approve_stock_request: {
         Args: { _notes?: string; _request_id: string }
         Returns: string
       }
       bootstrap_allowed: { Args: never; Returns: boolean }
+      cancel_purchase_order: {
+        Args: { _purchase_order_id: string; _reason: string }
+        Returns: string
+      }
+      cancel_replenishment_request: {
+        Args: { _reason: string; _request_id: string }
+        Returns: undefined
+      }
       cancel_user_invite: {
         Args: { _invite_id: string; _reason: string }
         Returns: undefined
+      }
+      confirm_replenishment_receipt: {
+        Args: {
+          _client_reference_id: string
+          _notes?: string
+          _received_quantity: number
+          _request_id: string
+        }
+        Returns: string
       }
       create_dispatch: {
         Args: {
@@ -1629,10 +2451,43 @@ export type Database = {
         }
         Returns: string
       }
+      create_manual_purchase_need: {
+        Args: {
+          _client_reference_id: string
+          _item_id: string
+          _location_id: string
+          _priority: string
+          _quantity: number
+          _reason: string
+          _required_date: string
+        }
+        Returns: string
+      }
+      create_quoted_purchase_order: {
+        Args: {
+          _client_reference_id: string
+          _expected_date: string
+          _lines: Json
+          _notes: string
+          _quotation_evidence_path: string
+          _quotation_reference: string
+          _supplier_id: string
+        }
+        Returns: string
+      }
+      decide_purchase_order: {
+        Args: {
+          _approve: boolean
+          _purchase_order_id: string
+          _reason?: string
+        }
+        Returns: string
+      }
       delete_shop_stock_count: {
         Args: { _count_id: string }
         Returns: undefined
       }
+      evaluate_stock_policy: { Args: { _policy_id: string }; Returns: string }
       fulfill_sales_order: { Args: { _order_id: string }; Returns: undefined }
       has_any_role: {
         Args: {
@@ -1648,9 +2503,37 @@ export type Database = {
         }
         Returns: boolean
       }
-      receive_purchase_order: {
-        Args: { _lines: Json; _po_id: string }
-        Returns: undefined
+      inspect_purchase_receipt: {
+        Args: {
+          _client_reference_id: string
+          _lines: Json
+          _purchase_receipt_id: string
+          _quality_notes: string
+        }
+        Returns: string
+      }
+      issue_replenishment_request: {
+        Args: {
+          _client_reference_id: string
+          _notes?: string
+          _request_id: string
+          _vehicle?: string
+        }
+        Returns: string
+      }
+      mark_purchase_need_ready: {
+        Args: {
+          _need_id: string
+          _priority: string
+          _quantity: number
+          _reason: string
+          _required_date: string
+        }
+        Returns: string
+      }
+      prepare_morning_replenishment: {
+        Args: { _client_reference_id: string; _need_id: string }
+        Returns: string
       }
       record_location_stock_count: {
         Args: {
@@ -1671,22 +2554,6 @@ export type Database = {
         }
         Returns: string
       }
-      set_user_active_status: {
-        Args: {
-          _is_active: boolean
-          _reason: string
-          _target_user_id: string
-        }
-        Returns: undefined
-      }
-      validate_user_invite: {
-        Args: { _token: string }
-        Returns: {
-          email: string
-          expires_at: string
-          full_name: string | null
-        }[]
-      }
       record_production: {
         Args: {
           _batch_number: string
@@ -1694,6 +2561,24 @@ export type Database = {
           _product_item_id: string
           _qc_notes?: string
           _quantity: number
+        }
+        Returns: string
+      }
+      record_purchase_delivery: {
+        Args: {
+          _client_reference_id: string
+          _delivery_evidence_path: string
+          _lines: Json
+          _notes: string
+          _purchase_order_id: string
+        }
+        Returns: string
+      }
+      record_purchase_payment: {
+        Args: {
+          _payment_evidence_path: string
+          _payment_reference: string
+          _purchase_order_id: string
         }
         Returns: string
       }
@@ -1714,9 +2599,37 @@ export type Database = {
         Args: { _notes: string; _request_id: string }
         Returns: undefined
       }
+      set_user_active_status: {
+        Args: { _is_active: boolean; _reason: string; _target_user_id: string }
+        Returns: undefined
+      }
+      submit_quoted_purchase_order: {
+        Args: { _purchase_order_id: string }
+        Returns: string
+      }
       submit_shop_stock_count: {
         Args: { _count_id: string }
         Returns: undefined
+      }
+      upsert_stock_level_policy: {
+        Args: {
+          _critical_level: number
+          _item_id: string
+          _location_id: string
+          _reorder_level: number
+          _source_location_id?: string
+          _source_type: string
+          _target_level: number
+        }
+        Returns: string
+      }
+      validate_user_invite: {
+        Args: { _token: string }
+        Returns: {
+          email: string
+          expires_at: string
+          full_name: string
+        }[]
       }
       void_sales_order: {
         Args: { _order_id: string; _reason: string }
