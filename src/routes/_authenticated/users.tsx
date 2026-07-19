@@ -30,7 +30,17 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Plus, Copy, Mail, UserCheck, UserX, XCircle } from "lucide-react";
+import { Plus, Copy, Mail, UserCheck, UserX, XCircle, Trash2, KeyRound } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { ALL_ROLES, CAN_MANAGE_USERS, hasAny, ROLE_LABELS, type AppRole } from "@/lib/permissions";
 import { useSession } from "@/hooks/useSession";
 import { formatDistanceToNow } from "date-fns";
@@ -62,6 +72,7 @@ interface UserRow {
   is_active: boolean;
   shop_id: string | null;
   roles: AppRole[];
+  email_confirmed_at: string | null;
 }
 
 interface ShopOpt {
@@ -86,7 +97,11 @@ async function postInviteAction(body: Record<string, unknown>) {
     },
     body: JSON.stringify(body),
   });
-  const result = (await response.json().catch(() => ({}))) as { error?: string; message?: string };
+  const result = (await response.json().catch(() => ({}))) as {
+    error?: string;
+    message?: string;
+    users?: Array<{ id: string; email_confirmed_at: string | null }>;
+  };
   if (!response.ok) throw new Error(result.error || "Unable to send the email");
   return result;
 }
@@ -116,20 +131,22 @@ function UsersPage() {
   }, [session.loading, canManage]);
 
   async function loadAll() {
-    const [inviteResult, profileResult, roleResult, shopResult] = await Promise.all([
-      supabase
-        .from("user_invites")
-        .select("*")
-        .is("accepted_at", null)
-        .is("cancelled_at", null)
-        .order("created_at", { ascending: false }),
-      supabase
-        .from("profiles")
-        .select("id, full_name, email, department, is_active, shop_id")
-        .order("full_name"),
-      supabase.from("user_roles").select("user_id, role"),
-      supabase.from("shops").select("id, name").eq("is_active", true).order("name"),
-    ]);
+    const [inviteResult, profileResult, roleResult, shopResult, authStatusResult] =
+      await Promise.all([
+        supabase
+          .from("user_invites")
+          .select("*")
+          .is("accepted_at", null)
+          .is("cancelled_at", null)
+          .order("created_at", { ascending: false }),
+        supabase
+          .from("profiles")
+          .select("id, full_name, email, department, is_active, shop_id")
+          .order("full_name"),
+        supabase.from("user_roles").select("user_id, role"),
+        supabase.from("shops").select("id, name").eq("is_active", true).order("name"),
+        postInviteAction({ action: "list_auth_status" }).catch(() => ({ users: [] })),
+      ]);
 
     const firstError = [
       inviteResult.error,
@@ -150,6 +167,10 @@ function UsersPage() {
       arr.push(r.role as AppRole);
       roleMap.set(r.user_id, arr);
     }
+    const confirmedMap = new Map<string, string | null>();
+    for (const u of authStatusResult.users ?? []) {
+      confirmedMap.set(u.id, u.email_confirmed_at);
+    }
     setUsers(
       (profileResult.data ?? []).map((p) => ({
         id: p.id,
@@ -159,6 +180,7 @@ function UsersPage() {
         is_active: p.is_active,
         shop_id: p.shop_id ?? null,
         roles: roleMap.get(p.id) ?? [],
+        email_confirmed_at: confirmedMap.get(p.id) ?? null,
       })),
     );
   }
@@ -194,6 +216,37 @@ function UsersPage() {
       setSendingEmailFor(null);
     }
   }
+
+  async function sendPasswordReset(userId: string) {
+    setSendingEmailFor(userId);
+    try {
+      const result = await postInviteAction({ action: "send_password_reset", user_id: userId });
+      toast.success(result.message ?? "Password reset email sent");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Unable to send the password reset");
+    } finally {
+      setSendingEmailFor(null);
+    }
+  }
+
+  const [deleteTarget, setDeleteTarget] = useState<UserRow | null>(null);
+  const [deleting, setDeleting] = useState(false);
+
+  async function confirmDelete() {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    try {
+      const result = await postInviteAction({ action: "delete_user", user_id: deleteTarget.id });
+      toast.success(result.message ?? "User deleted");
+      setDeleteTarget(null);
+      await loadAll();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Unable to delete the user");
+    } finally {
+      setDeleting(false);
+    }
+  }
+
 
   function openReasonAction(action: ReasonAction) {
     setReason("");
@@ -430,35 +483,42 @@ function UsersPage() {
                     </TableCell>
                     <TableCell>
                       {u.is_active ? (
-                        <Badge className="bg-brand-green/15 text-brand-green border-0">
-                          Active
-                        </Badge>
+                        u.email_confirmed_at ? (
+                          <Badge className="bg-brand-green/15 text-brand-green border-0">
+                            Active
+                          </Badge>
+                        ) : (
+                          <Badge className="bg-amber-500/15 text-amber-700 border-0">
+                            Unconfirmed
+                          </Badge>
+                        )
                       ) : (
                         <Badge variant="outline">Inactive</Badge>
                       )}
                     </TableCell>
                     <TableCell className="text-right">
-                      {statusActionDisabled ? (
-                        <span className="text-xs text-muted-foreground whitespace-nowrap">
-                          {isCurrentUser
-                            ? "Current user"
-                            : isProtectedFromActor
-                              ? "Super Admin protected"
-                              : "Last Super Admin"}
-                        </span>
-                      ) : (
-                        <div className="flex justify-end gap-1">
-                          {!u.is_active && (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => resendUserConfirmation(u.id)}
-                              disabled={sendingEmailFor === u.id}
-                            >
-                              <Mail className="size-3.5 mr-1" />
-                              {sendingEmailFor === u.id ? "Sending…" : "Resend access email"}
-                            </Button>
-                          )}
+                      <div className="flex flex-wrap justify-end gap-1">
+                        {(!u.is_active || !u.email_confirmed_at) && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => resendUserConfirmation(u.id)}
+                            disabled={sendingEmailFor === u.id}
+                          >
+                            <Mail className="size-3.5 mr-1" />
+                            {sendingEmailFor === u.id ? "Sending…" : "Resend access"}
+                          </Button>
+                        )}
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => sendPasswordReset(u.id)}
+                          disabled={sendingEmailFor === u.id}
+                        >
+                          <KeyRound className="size-3.5 mr-1" />
+                          Password reset
+                        </Button>
+                        {!statusActionDisabled && (
                           <Button
                             variant={u.is_active ? "outline" : "default"}
                             size="sm"
@@ -480,8 +540,27 @@ function UsersPage() {
                               </>
                             )}
                           </Button>
-                        </div>
-                      )}
+                        )}
+                        {!isCurrentUser && !isProtectedFromActor && !isLastActiveSuperAdmin && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-destructive hover:text-destructive"
+                            onClick={() => setDeleteTarget(u)}
+                          >
+                            <Trash2 className="size-3.5 mr-1" /> Delete
+                          </Button>
+                        )}
+                        {statusActionDisabled && (
+                          <span className="text-xs text-muted-foreground whitespace-nowrap self-center">
+                            {isCurrentUser
+                              ? "Current user"
+                              : isProtectedFromActor
+                                ? "Super Admin protected"
+                                : "Last Super Admin"}
+                          </span>
+                        )}
+                      </div>
                     </TableCell>
                   </TableRow>
                 );
@@ -490,6 +569,27 @@ function UsersPage() {
           </Table>
         </div>
       </section>
+
+      <AlertDialog open={deleteTarget !== null} onOpenChange={(o) => !o && !deleting && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete {deleteTarget?.full_name ?? deleteTarget?.email}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This permanently removes the login and profile. History (audit log, stock movements) is retained but no longer linked to this user. If the user has purchase orders, recipes or sales, deletion will fail — deactivate instead.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => { e.preventDefault(); void confirmDelete(); }}
+              disabled={deleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleting ? "Deleting…" : "Delete permanently"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <ReasonActionDialog
         action={reasonAction}
