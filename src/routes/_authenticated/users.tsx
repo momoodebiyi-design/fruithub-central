@@ -483,35 +483,42 @@ function UsersPage() {
                     </TableCell>
                     <TableCell>
                       {u.is_active ? (
-                        <Badge className="bg-brand-green/15 text-brand-green border-0">
-                          Active
-                        </Badge>
+                        u.email_confirmed_at ? (
+                          <Badge className="bg-brand-green/15 text-brand-green border-0">
+                            Active
+                          </Badge>
+                        ) : (
+                          <Badge className="bg-amber-500/15 text-amber-700 border-0">
+                            Unconfirmed
+                          </Badge>
+                        )
                       ) : (
                         <Badge variant="outline">Inactive</Badge>
                       )}
                     </TableCell>
                     <TableCell className="text-right">
-                      {statusActionDisabled ? (
-                        <span className="text-xs text-muted-foreground whitespace-nowrap">
-                          {isCurrentUser
-                            ? "Current user"
-                            : isProtectedFromActor
-                              ? "Super Admin protected"
-                              : "Last Super Admin"}
-                        </span>
-                      ) : (
-                        <div className="flex justify-end gap-1">
-                          {!u.is_active && (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => resendUserConfirmation(u.id)}
-                              disabled={sendingEmailFor === u.id}
-                            >
-                              <Mail className="size-3.5 mr-1" />
-                              {sendingEmailFor === u.id ? "Sending…" : "Resend access email"}
-                            </Button>
-                          )}
+                      <div className="flex flex-wrap justify-end gap-1">
+                        {(!u.is_active || !u.email_confirmed_at) && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => resendUserConfirmation(u.id)}
+                            disabled={sendingEmailFor === u.id}
+                          >
+                            <Mail className="size-3.5 mr-1" />
+                            {sendingEmailFor === u.id ? "Sending…" : "Resend access"}
+                          </Button>
+                        )}
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => sendPasswordReset(u.id)}
+                          disabled={sendingEmailFor === u.id}
+                        >
+                          <KeyRound className="size-3.5 mr-1" />
+                          Password reset
+                        </Button>
+                        {!statusActionDisabled && (
                           <Button
                             variant={u.is_active ? "outline" : "default"}
                             size="sm"
@@ -533,8 +540,27 @@ function UsersPage() {
                               </>
                             )}
                           </Button>
-                        </div>
-                      )}
+                        )}
+                        {!isCurrentUser && !isProtectedFromActor && !isLastActiveSuperAdmin && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-destructive hover:text-destructive"
+                            onClick={() => setDeleteTarget(u)}
+                          >
+                            <Trash2 className="size-3.5 mr-1" /> Delete
+                          </Button>
+                        )}
+                        {statusActionDisabled && (
+                          <span className="text-xs text-muted-foreground whitespace-nowrap self-center">
+                            {isCurrentUser
+                              ? "Current user"
+                              : isProtectedFromActor
+                                ? "Super Admin protected"
+                                : "Last Super Admin"}
+                          </span>
+                        )}
+                      </div>
                     </TableCell>
                   </TableRow>
                 );
