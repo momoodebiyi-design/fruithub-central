@@ -25,7 +25,7 @@ function ResetPage() {
     let settled = false;
     const timeout = window.setTimeout(() => {
       if (!settled) setSessionState("invalid");
-    }, 2500);
+    }, 8000);
 
     void supabase.auth.getSession().then(({ data }) => {
       if (data.session) {
