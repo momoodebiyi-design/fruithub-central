@@ -13,6 +13,7 @@ export const Route = createFileRoute("/auth")({
     next: typeof s.next === "string" ? s.next : undefined,
     reason: s.reason === "inactive" ? "inactive" : undefined,
   }),
+  pendingComponent: AuthPage,
   component: AuthPage,
 });
 
