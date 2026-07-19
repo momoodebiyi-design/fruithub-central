@@ -43,11 +43,21 @@ function redirectOrigin(request: Request) {
   return (configured || new URL(request.url).origin).replace(/\/$/, "");
 }
 
+function isExistingUserError(message: string | undefined) {
+  const normalized = message?.toLowerCase() ?? "";
+  return (
+    normalized.includes("already been registered") ||
+    normalized.includes("already exists") ||
+    normalized.includes("email address is already")
+  );
+}
+
 /**
- * Send the "come set your password" email for an invited person.
- * inviteUserByEmail fails once the auth user already exists (i.e. after
- * the first send), so fall back to a recovery email that lands on the
- * same /reset-password?mode=invite screen.
+ * Send a genuine Supabase invitation. If a previous invitation created an
+ * auth identity that was never confirmed or used, recycle only that dormant
+ * identity and issue a fresh invite. A password-reset email cannot activate
+ * an unconfirmed invite-created user, which was the source of the stuck
+ * accounts this recovery path fixes.
  */
 async function sendInviteEmail(
   admin: import("@supabase/supabase-js").SupabaseClient,
@@ -63,27 +73,42 @@ async function sendInviteEmail(
   });
   if (!invite.error) return;
 
-  const msg = invite.error.message?.toLowerCase() ?? "";
-  const alreadyExists =
-    msg.includes("already been registered") ||
-    msg.includes("already exists") ||
-    msg.includes("email address is already");
-  if (!alreadyExists) throw invite.error;
+  if (!isExistingUserError(invite.error.message)) throw invite.error;
 
-  // Ensure metadata still carries the invite token so the DB trigger
-  // path stays valid if it re-runs, then send a recovery email.
-  const { data: existing } = await admin
+  const { data: existingProfile, error: profileError } = await admin
     .from("profiles")
-    .select("id")
+    .select("id, is_active")
     .ilike("email", email)
     .maybeSingle();
-  if (existing?.id) {
-    await admin.auth.admin.updateUserById(existing.id, {
-      user_metadata: { invite_token: inviteToken, full_name: fullName },
-    });
+  if (profileError || !existingProfile?.id) {
+    throw new Error("An account already exists for this email and cannot be reissued safely.");
   }
-  const reset = await admin.auth.resetPasswordForEmail(email, { redirectTo });
-  if (reset.error) throw reset.error;
+  if (!existingProfile.is_active) {
+    throw new Error("Reactivate this account before resending access.");
+  }
+
+  const { data: existingAuth, error: existingAuthError } =
+    await admin.auth.admin.getUserById(existingProfile.id);
+  const existingUser = existingAuth?.user;
+  if (existingAuthError || !existingUser) {
+    throw new Error("The existing login could not be verified. No changes were made.");
+  }
+  if (existingUser.email_confirmed_at || existingUser.last_sign_in_at) {
+    throw new Error("This account is already activated. Send a password reset instead.");
+  }
+
+  const deletion = await admin.auth.admin.deleteUser(existingUser.id);
+  if (deletion.error) throw deletion.error;
+
+  const reissued = await admin.auth.admin.inviteUserByEmail(email, {
+    redirectTo,
+    data: { invite_token: inviteToken, full_name: fullName },
+  });
+  if (reissued.error) {
+    throw new Error(
+      `The old unused login was cleared, but the fresh invitation could not be sent: ${reissued.error.message}`,
+    );
+  }
 }
 
 export const Route = createFileRoute("/api/invites")({
@@ -302,25 +327,80 @@ export const Route = createFileRoute("/api/invites")({
 
           const [{ data: userResult, error: userError }, { data: profile }] = await Promise.all([
             supabaseAdmin.auth.admin.getUserById(body.user_id),
-            supabaseAdmin.from("profiles").select("email").eq("id", body.user_id).maybeSingle(),
+            supabaseAdmin
+              .from("profiles")
+              .select("email, full_name, is_active")
+              .eq("id", body.user_id)
+              .maybeSingle(),
           ]);
 
           const user = userResult?.user;
           const email = profile?.email ?? user?.email;
           if (userError || !user || !email) return json({ error: "User not found" }, 404);
+          if (!profile?.is_active) {
+            return json({ error: "Reactivate this account before resending access" }, 400);
+          }
+          if (user.email_confirmed_at || user.last_sign_in_at) {
+            return json(
+              { error: "This account is already activated. Send a password reset instead." },
+              400,
+            );
+          }
 
-          const redirectTo = `${origin}/reset-password?mode=invite`;
-          const { error } = await supabaseAdmin.auth.resetPasswordForEmail(email, { redirectTo });
-          if (error) return json({ error: error.message }, 400);
+          const { data: pendingInvite, error: pendingInviteError } = await supabaseAdmin
+            .from("user_invites")
+            .select("id, token, full_name, role, send_count")
+            .ilike("email", email)
+            .is("accepted_at", null)
+            .is("cancelled_at", null)
+            .gt("expires_at", new Date().toISOString())
+            .order("created_at", { ascending: false })
+            .limit(1)
+            .maybeSingle();
+          if (pendingInviteError || !pendingInvite) {
+            return json(
+              { error: "No valid pending invitation exists. Cancel it and create a new invite." },
+              404,
+            );
+          }
 
-          await supabaseAdmin.from("audit_log").insert({
-            user_id: actorId,
-            action: "user.access_email_resent",
-            entity: "profiles",
-            entity_id: body.user_id,
-            new_value: { email },
-          });
-          return json({ ok: true, message: "Access email sent" });
+          try {
+            await sendInviteEmail(
+              supabaseAdmin,
+              email,
+              pendingInvite.full_name ?? profile.full_name,
+              pendingInvite.token,
+              origin,
+            );
+            await Promise.all([
+              supabaseAdmin
+                .from("user_invites")
+                .update({
+                  email_sent_at: new Date().toISOString(),
+                  send_count: pendingInvite.send_count + 1,
+                  last_send_error: null,
+                })
+                .eq("id", pendingInvite.id),
+              supabaseAdmin.from("audit_log").insert({
+                user_id: actorId,
+                action: "user.access_invite_reissued",
+                entity: "user_invites",
+                entity_id: pendingInvite.id,
+                new_value: { email, role: pendingInvite.role, replaced_user_id: body.user_id },
+              }),
+            ]);
+            return json({
+              ok: true,
+              message: "A fresh access email was sent. The previous link no longer works.",
+            });
+          } catch (error) {
+            const message = messageFrom(error, "Unable to reissue the access invitation");
+            await supabaseAdmin
+              .from("user_invites")
+              .update({ last_send_error: message })
+              .eq("id", pendingInvite.id);
+            return json({ error: message }, 400);
+          }
         }
 
         if (body.action === "send_password_reset") {

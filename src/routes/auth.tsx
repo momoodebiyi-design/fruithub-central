@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useEffect, useState, useSyncExternalStore } from "react";
+import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -30,25 +30,18 @@ function safeNext(next: string | undefined): string | null {
   return next;
 }
 
-const subscribeToHydration = (onStoreChange: () => void) => {
-  const timeoutId = window.setTimeout(onStoreChange, 0);
-  return () => window.clearTimeout(timeoutId);
-};
-const getClientHydrationSnapshot = () => true;
-const getServerHydrationSnapshot = () => false;
-
-function AuthPage() {
-  const hydrated = useSyncExternalStore(
-    subscribeToHydration,
-    getClientHydrationSnapshot,
-    getServerHydrationSnapshot,
-  );
-
-  if (!hydrated) return null;
-  return <AuthContent />;
+function signInErrorMessage(message: string) {
+  const normalized = message.toLowerCase();
+  if (normalized.includes("email not confirmed")) {
+    return "This account has not been activated. Ask an administrator to resend access.";
+  }
+  if (normalized.includes("invalid login credentials")) {
+    return "Incorrect email or password.";
+  }
+  return "Sign in failed. Please try again.";
 }
 
-function AuthContent() {
+function AuthPage() {
   const { invite, mode, next, reason } = Route.useSearch();
   const navigate = useNavigate();
   const [tab, setTab] = useState<"signin" | "signup">("signin");
@@ -59,6 +52,7 @@ function AuthContent() {
   const [firstUserMode, setFirstUserMode] = useState(false);
   const [inviteValid, setInviteValid] = useState<boolean | null>(invite ? null : false);
   const [awaitingEmail, setAwaitingEmail] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
 
   // Bootstrap allowance is authoritative via SECURITY DEFINER RPC — an
   // anonymous count of user_roles would be blocked by RLS and give a false
@@ -92,7 +86,9 @@ function AuthContent() {
       if (error || !validInvite?.email) {
         setInviteValid(false);
         setTab("signin");
-        toast.error("This invite is invalid or has expired.");
+        const message = "This invite is invalid or has expired.";
+        setAuthError(message);
+        toast.error(message);
         return;
       }
 
@@ -118,19 +114,35 @@ function AuthContent() {
 
   async function handleSignIn(e: React.FormEvent) {
     e.preventDefault();
+    setAuthError(null);
     setLoading(true);
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    setLoading(false);
-    if (error) return toast.error(error.message);
-    goPostAuth();
+    try {
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) {
+        const message = signInErrorMessage(error.message);
+        setAuthError(message);
+        toast.error(message);
+        return;
+      }
+      goPostAuth();
+    } catch {
+      const message = "Sign in failed. Check your connection and try again.";
+      setAuthError(message);
+      toast.error(message);
+    } finally {
+      setLoading(false);
+    }
   }
 
   async function handleSignUp(e: React.FormEvent) {
     e.preventDefault();
+    setAuthError(null);
 
     if (!firstUserMode && inviteValid !== true) {
       setTab("signin");
-      return toast.error("A valid invitation is required to create an account.");
+      const message = "A valid invitation is required to create an account.";
+      setAuthError(message);
+      return toast.error(message);
     }
 
     setLoading(true);
@@ -171,7 +183,12 @@ function AuthContent() {
   }
 
   async function handleReset() {
-    if (!email) return toast.error("Enter your email first");
+    setAuthError(null);
+    if (!email) {
+      const message = "Enter your email first.";
+      setAuthError(message);
+      return toast.error(message);
+    }
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
       redirectTo: `${window.location.origin}/reset-password`,
     });
@@ -263,6 +280,14 @@ function AuthContent() {
               <Button type="submit" className="w-full" disabled={loading}>
                 {loading ? "Signing in…" : "Sign in"}
               </Button>
+              {authError && (
+                <p
+                  role="alert"
+                  className="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive"
+                >
+                  {authError}
+                </p>
+              )}
               <div className="flex items-center justify-between text-xs">
                 <button
                   type="button"
@@ -332,6 +357,14 @@ function AuthContent() {
               >
                 {loading ? "Creating…" : firstUserMode ? "Create account" : "Accept invite"}
               </Button>
+              {authError && (
+                <p
+                  role="alert"
+                  className="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive"
+                >
+                  {authError}
+                </p>
+              )}
               <div className="text-center">
                 <button
                   type="button"
