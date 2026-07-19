@@ -30,7 +30,17 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Plus, Copy, Mail, UserCheck, UserX, XCircle } from "lucide-react";
+import { Plus, Copy, Mail, UserCheck, UserX, XCircle, Trash2, KeyRound } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { ALL_ROLES, CAN_MANAGE_USERS, hasAny, ROLE_LABELS, type AppRole } from "@/lib/permissions";
 import { useSession } from "@/hooks/useSession";
 import { formatDistanceToNow } from "date-fns";
