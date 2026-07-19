@@ -570,6 +570,27 @@ function UsersPage() {
         </div>
       </section>
 
+      <AlertDialog open={deleteTarget !== null} onOpenChange={(o) => !o && !deleting && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete {deleteTarget?.full_name ?? deleteTarget?.email}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This permanently removes the login and profile. History (audit log, stock movements) is retained but no longer linked to this user. If the user has purchase orders, recipes or sales, deletion will fail — deactivate instead.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => { e.preventDefault(); void confirmDelete(); }}
+              disabled={deleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleting ? "Deleting…" : "Delete permanently"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       <ReasonActionDialog
         action={reasonAction}
         reason={reason}
