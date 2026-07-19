@@ -131,20 +131,22 @@ function UsersPage() {
   }, [session.loading, canManage]);
 
   async function loadAll() {
-    const [inviteResult, profileResult, roleResult, shopResult] = await Promise.all([
-      supabase
-        .from("user_invites")
-        .select("*")
-        .is("accepted_at", null)
-        .is("cancelled_at", null)
-        .order("created_at", { ascending: false }),
-      supabase
-        .from("profiles")
-        .select("id, full_name, email, department, is_active, shop_id")
-        .order("full_name"),
-      supabase.from("user_roles").select("user_id, role"),
-      supabase.from("shops").select("id, name").eq("is_active", true).order("name"),
-    ]);
+    const [inviteResult, profileResult, roleResult, shopResult, authStatusResult] =
+      await Promise.all([
+        supabase
+          .from("user_invites")
+          .select("*")
+          .is("accepted_at", null)
+          .is("cancelled_at", null)
+          .order("created_at", { ascending: false }),
+        supabase
+          .from("profiles")
+          .select("id, full_name, email, department, is_active, shop_id")
+          .order("full_name"),
+        supabase.from("user_roles").select("user_id, role"),
+        supabase.from("shops").select("id, name").eq("is_active", true).order("name"),
+        postInviteAction({ action: "list_auth_status" }).catch(() => ({ users: [] })),
+      ]);
 
     const firstError = [
       inviteResult.error,
@@ -165,6 +167,10 @@ function UsersPage() {
       arr.push(r.role as AppRole);
       roleMap.set(r.user_id, arr);
     }
+    const confirmedMap = new Map<string, string | null>();
+    for (const u of authStatusResult.users ?? []) {
+      confirmedMap.set(u.id, u.email_confirmed_at);
+    }
     setUsers(
       (profileResult.data ?? []).map((p) => ({
         id: p.id,
@@ -174,6 +180,7 @@ function UsersPage() {
         is_active: p.is_active,
         shop_id: p.shop_id ?? null,
         roles: roleMap.get(p.id) ?? [],
+        email_confirmed_at: confirmedMap.get(p.id) ?? null,
       })),
     );
   }
@@ -209,6 +216,37 @@ function UsersPage() {
       setSendingEmailFor(null);
     }
   }
+
+  async function sendPasswordReset(userId: string) {
+    setSendingEmailFor(userId);
+    try {
+      const result = await postInviteAction({ action: "send_password_reset", user_id: userId });
+      toast.success(result.message ?? "Password reset email sent");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Unable to send the password reset");
+    } finally {
+      setSendingEmailFor(null);
+    }
+  }
+
+  const [deleteTarget, setDeleteTarget] = useState<UserRow | null>(null);
+  const [deleting, setDeleting] = useState(false);
+
+  async function confirmDelete() {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    try {
+      const result = await postInviteAction({ action: "delete_user", user_id: deleteTarget.id });
+      toast.success(result.message ?? "User deleted");
+      setDeleteTarget(null);
+      await loadAll();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Unable to delete the user");
+    } finally {
+      setDeleting(false);
+    }
+  }
+
 
   function openReasonAction(action: ReasonAction) {
     setReason("");
