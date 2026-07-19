@@ -85,10 +85,10 @@ BEGIN
   --    invite matched — see 2026-07-19 security fix.)
   ----------------------------------------------------------------------------
   PERFORM pg_temp.assert(
-    v_src !~* $$values\s*\([^)]*'readonly'$$,
+    v_src !~* $re$values\s*\([^)]*'readonly'$re$,
     'handle_new_user must not insert a default ''readonly'' user_roles row');
   PERFORM pg_temp.assert(
-    v_src !~* $$coalesce\([^)]*'readonly'$$,
+    v_src !~* $re$coalesce\([^)]*'readonly'$re$,
     'handle_new_user must not COALESCE role to ''readonly''');
 
   ----------------------------------------------------------------------------
