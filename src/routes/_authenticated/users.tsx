@@ -74,6 +74,17 @@ interface UserRow {
   roles: AppRole[];
 }
 
+interface UserRow {
+  id: string;
+  full_name: string | null;
+  email: string;
+  department: string | null;
+  is_active: boolean;
+  shop_id: string | null;
+  roles: AppRole[];
+  email_confirmed_at: string | null;
+}
+
 interface ShopOpt {
   id: string;
   name: string;
@@ -82,13 +93,6 @@ interface ShopOpt {
 type ReasonAction =
   | { kind: "cancel_invite"; invite: Invite }
   | { kind: "set_status"; user: UserRow; isActive: boolean };
-
-async function postInviteAction(body: Record<string, unknown>) {
-  const { data } = await supabase.auth.getSession();
-  const accessToken = data.session?.access_token;
-  if (!accessToken) throw new Error("Your session has expired. Sign in again.");
-
-  const response = await fetch("/api/invites", {
     method: "POST",
     headers: {
       Authorization: `Bearer ${accessToken}`,
