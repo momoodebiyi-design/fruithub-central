@@ -210,6 +210,7 @@ function UsersPage() {
     try {
       const result = await postInviteAction({ action: "resend_confirmation", user_id: userId });
       toast.success(result.message ?? "Access email sent");
+      await loadAll();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Unable to send the access email");
     } finally {
@@ -318,6 +319,10 @@ function UsersPage() {
         <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
           Pending invites
         </h2>
+        <p className="text-xs text-muted-foreground">
+          The date below tracks the invitation record. Email links use a shorter security window;
+          use Resend when a link has expired.
+        </p>
         <div className="bg-card rounded-lg ring-1 ring-black/5 overflow-x-auto">
           <Table>
             <TableHeader>
@@ -498,7 +503,7 @@ function UsersPage() {
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex flex-wrap justify-end gap-1">
-                        {(!u.is_active || !u.email_confirmed_at) && (
+                        {u.is_active && !u.email_confirmed_at && (
                           <Button
                             variant="outline"
                             size="sm"
