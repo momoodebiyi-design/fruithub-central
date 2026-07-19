@@ -30,7 +30,7 @@ function safeNext(next: string | undefined): string | null {
   return next;
 }
 
-function AuthPage() {
+export function AuthPage() {
   const { invite, mode, next, reason } = Route.useSearch();
   const navigate = useNavigate();
   const [tab, setTab] = useState<"signin" | "signup">("signin");
