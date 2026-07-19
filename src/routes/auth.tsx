@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,7 +13,6 @@ export const Route = createFileRoute("/auth")({
     next: typeof s.next === "string" ? s.next : undefined,
     reason: s.reason === "inactive" ? "inactive" : undefined,
   }),
-  pendingComponent: AuthPage,
   component: AuthPage,
 });
 
@@ -31,7 +30,22 @@ function safeNext(next: string | undefined): string | null {
   return next;
 }
 
-export function AuthPage() {
+const subscribeToHydration = () => () => {};
+const getClientHydrationSnapshot = () => true;
+const getServerHydrationSnapshot = () => false;
+
+function AuthPage() {
+  const hydrated = useSyncExternalStore(
+    subscribeToHydration,
+    getClientHydrationSnapshot,
+    getServerHydrationSnapshot,
+  );
+
+  if (!hydrated) return null;
+  return <AuthContent />;
+}
+
+function AuthContent() {
   const { invite, mode, next, reason } = Route.useSearch();
   const navigate = useNavigate();
   const [tab, setTab] = useState<"signin" | "signup">("signin");
@@ -305,7 +319,8 @@ export function AuthPage() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
-                  minLength={8}
+                  minL
+ength={8}
                 />
               </div>
               <Button
