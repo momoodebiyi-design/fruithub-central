@@ -30,7 +30,10 @@ function safeNext(next: string | undefined): string | null {
   return next;
 }
 
-const subscribeToHydration = () => () => {};
+const subscribeToHydration = (onStoreChange: () => void) => {
+  const timeoutId = window.setTimeout(onStoreChange, 0);
+  return () => window.clearTimeout(timeoutId);
+};
 const getClientHydrationSnapshot = () => true;
 const getServerHydrationSnapshot = () => false;
 
@@ -319,8 +322,7 @@ function AuthContent() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
-                  minL
-ength={8}
+                  minLength={8}
                 />
               </div>
               <Button
