@@ -14,6 +14,7 @@ import { Route as McpRouteImport } from './routes/mcp'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ApiInvitesRouteImport } from './routes/api/invites'
 import { Route as AuthenticatedUsersRouteImport } from './routes/_authenticated/users'
 import { Route as AuthenticatedSuppliersRouteImport } from './routes/_authenticated/suppliers'
 import { Route as AuthenticatedShopsRouteImport } from './routes/_authenticated/shops'
@@ -61,6 +62,11 @@ const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiInvitesRoute = ApiInvitesRouteImport.update({
+  id: '/api/invites',
+  path: '/api/invites',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthenticatedUsersRoute = AuthenticatedUsersRouteImport.update({
@@ -216,6 +222,7 @@ export interface FileRoutesByFullPath {
   '/shops': typeof AuthenticatedShopsRoute
   '/suppliers': typeof AuthenticatedSuppliersRoute
   '/users': typeof AuthenticatedUsersRoute
+  '/api/invites': typeof ApiInvitesRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
   '/inventory/$itemId': typeof AuthenticatedInventoryItemIdRoute
@@ -244,6 +251,7 @@ export interface FileRoutesByTo {
   '/shops': typeof AuthenticatedShopsRoute
   '/suppliers': typeof AuthenticatedSuppliersRoute
   '/users': typeof AuthenticatedUsersRoute
+  '/api/invites': typeof ApiInvitesRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
   '/inventory/$itemId': typeof AuthenticatedInventoryItemIdRoute
@@ -276,6 +284,7 @@ export interface FileRoutesById {
   '/_authenticated/shops': typeof AuthenticatedShopsRoute
   '/_authenticated/suppliers': typeof AuthenticatedSuppliersRoute
   '/_authenticated/users': typeof AuthenticatedUsersRoute
+  '/api/invites': typeof ApiInvitesRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
   '/_authenticated/inventory/$itemId': typeof AuthenticatedInventoryItemIdRoute
@@ -308,6 +317,7 @@ export interface FileRouteTypes {
     | '/shops'
     | '/suppliers'
     | '/users'
+    | '/api/invites'
     | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
     | '/inventory/$itemId'
@@ -336,6 +346,7 @@ export interface FileRouteTypes {
     | '/shops'
     | '/suppliers'
     | '/users'
+    | '/api/invites'
     | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
     | '/inventory/$itemId'
@@ -367,6 +378,7 @@ export interface FileRouteTypes {
     | '/_authenticated/shops'
     | '/_authenticated/suppliers'
     | '/_authenticated/users'
+    | '/api/invites'
     | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
     | '/_authenticated/inventory/$itemId'
@@ -384,6 +396,7 @@ export interface RootRouteChildren {
   ResetPasswordRoute: typeof ResetPasswordRoute
   Char91DotmcpChar93ListToolsRoute: typeof Char91DotmcpChar93ListToolsRoute
   Char91DotwellKnownChar93OauthProtectedResourceRoute: typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
+  ApiInvitesRoute: typeof ApiInvitesRoute
   DotlovableOauthConsentRoute: typeof DotlovableOauthConsentRoute
   Char91DotmcpChar93InvokeToolToolRoute: typeof Char91DotmcpChar93InvokeToolToolRoute
 }
@@ -423,6 +436,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/invites': {
+      id: '/api/invites'
+      path: '/api/invites'
+      fullPath: '/api/invites'
+      preLoaderRoute: typeof ApiInvitesRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_authenticated/users': {
@@ -678,6 +698,7 @@ const rootRouteChildren: RootRouteChildren = {
   Char91DotmcpChar93ListToolsRoute: Char91DotmcpChar93ListToolsRoute,
   Char91DotwellKnownChar93OauthProtectedResourceRoute:
     Char91DotwellKnownChar93OauthProtectedResourceRoute,
+  ApiInvitesRoute: ApiInvitesRoute,
   DotlovableOauthConsentRoute: DotlovableOauthConsentRoute,
   Char91DotmcpChar93InvokeToolToolRoute: Char91DotmcpChar93InvokeToolToolRoute,
 }

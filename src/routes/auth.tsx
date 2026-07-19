@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -40,13 +40,14 @@ function AuthPage() {
   const [loading, setLoading] = useState(false);
   const [firstUserMode, setFirstUserMode] = useState(false);
   const [inviteValid, setInviteValid] = useState<boolean | null>(invite ? null : false);
+  const [awaitingEmail, setAwaitingEmail] = useState(false);
 
   // Bootstrap allowance is authoritative via SECURITY DEFINER RPC — an
   // anonymous count of user_roles would be blocked by RLS and give a false
   // "first user" state. Never show the super-admin path once initialized.
   useEffect(() => {
     (async () => {
-      const { data, error } = await (supabase as any).rpc("bootstrap_allowed");
+      const { data, error } = await supabase.rpc("bootstrap_allowed");
       if (!error) {
         const allowed = Boolean(data);
         setFirstUserMode(allowed);
@@ -65,25 +66,20 @@ function AuthPage() {
     }
 
     (async () => {
-      const { data, error } = await supabase
-        .from("user_invites")
-        .select("email")
-        .eq("token", invite)
-        .is("accepted_at", null)
-        .is("cancelled_at", null)
-        .gt("expires_at", new Date().toISOString())
-        .maybeSingle();
+      const { data, error } = await supabase.rpc("validate_user_invite", { _token: invite });
+      const validInvite = data?.[0];
 
       if (cancelled) return;
 
-      if (error || !data?.email) {
+      if (error || !validInvite?.email) {
         setInviteValid(false);
         setTab("signin");
         toast.error("This invite is invalid or has expired.");
         return;
       }
 
-      setEmail(data.email);
+      setEmail(validInvite.email);
+      setFullName(validInvite.full_name ?? "");
       setInviteValid(true);
       setTab("signup");
     })();
@@ -121,7 +117,7 @@ function AuthPage() {
 
     setLoading(true);
     const dest = safeNext(next);
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
@@ -134,8 +130,26 @@ function AuthPage() {
     });
     setLoading(false);
     if (error) return toast.error(error.message);
-    toast.success("Account created — you're signed in.");
-    goPostAuth();
+    if (data.session) {
+      toast.success("Account created");
+      goPostAuth();
+      return;
+    }
+    setAwaitingEmail(true);
+    toast.success("Check your email to confirm your account");
+  }
+
+  async function resendConfirmation() {
+    if (!email) return;
+    setLoading(true);
+    const { error } = await supabase.auth.resend({
+      type: "signup",
+      email,
+      options: { emailRedirectTo: `${window.location.origin}/auth?mode=signin` },
+    });
+    setLoading(false);
+    if (error) return toast.error(error.message);
+    toast.success("Confirmation email resent");
   }
 
   async function handleReset() {
@@ -169,7 +183,38 @@ function AuthPage() {
               </p>
             </div>
           )}
-          {tab === "signin" ? (
+          {awaitingEmail ? (
+            <div className="space-y-4">
+              <div>
+                <h1 className="text-xl font-semibold">Check your email</h1>
+                <p className="text-sm text-muted-foreground mt-2">
+                  We sent a confirmation link to{" "}
+                  <span className="font-medium text-foreground">{email}</span>. Open it to finish
+                  activating your account.
+                </p>
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full"
+                onClick={resendConfirmation}
+                disabled={loading}
+              >
+                {loading ? "Sending…" : "Resend confirmation email"}
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                className="w-full"
+                onClick={() => {
+                  setAwaitingEmail(false);
+                  setTab("signin");
+                }}
+              >
+                Back to sign in
+              </Button>
+            </div>
+          ) : tab === "signin" ? (
             <form onSubmit={handleSignIn} className="space-y-4">
               <div>
                 <h1 className="text-xl font-semibold">Sign in</h1>
@@ -179,21 +224,41 @@ function AuthPage() {
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="email">Email</Label>
-                <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+                <Input
+                  id="email"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                />
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="password">Password</Label>
-                <Input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
+                <Input
+                  id="password"
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                />
               </div>
               <Button type="submit" className="w-full" disabled={loading}>
                 {loading ? "Signing in…" : "Sign in"}
               </Button>
               <div className="flex items-center justify-between text-xs">
-                <button type="button" onClick={handleReset} className="text-muted-foreground hover:text-foreground">
+                <button
+                  type="button"
+                  onClick={handleReset}
+                  className="text-muted-foreground hover:text-foreground"
+                >
                   Forgot password?
                 </button>
                 {canSignup && (
-                  <button type="button" onClick={() => setTab("signup")} className="text-brand-orange font-medium">
+                  <button
+                    type="button"
+                    onClick={() => setTab("signup")}
+                    className="text-brand-orange font-medium"
+                  >
                     {firstUserMode ? "Create super admin →" : "Accept invite →"}
                   </button>
                 )}
@@ -213,7 +278,12 @@ function AuthPage() {
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="full_name">Full name</Label>
-                <Input id="full_name" value={fullName} onChange={(e) => setFullName(e.target.value)} required />
+                <Input
+                  id="full_name"
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value)}
+                  required
+                />
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="email2">Email</Label>
@@ -228,7 +298,14 @@ function AuthPage() {
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="password2">Password</Label>
-                <Input id="password2" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={8} />
+                <Input
+                  id="password2"
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  minLength={8}
+                />
               </div>
               <Button
                 type="submit"
@@ -238,16 +315,17 @@ function AuthPage() {
                 {loading ? "Creating…" : firstUserMode ? "Create account" : "Accept invite"}
               </Button>
               <div className="text-center">
-                <button type="button" onClick={() => setTab("signin")} className="text-xs text-muted-foreground">
+                <button
+                  type="button"
+                  onClick={() => setTab("signin")}
+                  className="text-xs text-muted-foreground"
+                >
                   Already have an account? Sign in
                 </button>
               </div>
             </form>
           )}
         </div>
-        <p className="text-center text-[11px] text-muted-foreground mt-6">
-          <Link to="/reset-password" className="hover:text-foreground">Reset password</Link>
-        </p>
       </div>
     </div>
   );

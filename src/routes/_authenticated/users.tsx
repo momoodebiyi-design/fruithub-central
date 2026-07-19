@@ -30,7 +30,7 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Plus, Copy, UserCheck, UserX, XCircle } from "lucide-react";
+import { Plus, Copy, Mail, UserCheck, UserX, XCircle } from "lucide-react";
 import { ALL_ROLES, CAN_MANAGE_USERS, hasAny, ROLE_LABELS, type AppRole } from "@/lib/permissions";
 import { useSession } from "@/hooks/useSession";
 import { formatDistanceToNow } from "date-fns";
@@ -49,6 +49,9 @@ interface Invite {
   expires_at: string;
   accepted_at: string | null;
   created_at: string;
+  email_sent_at: string | null;
+  send_count: number;
+  last_send_error: string | null;
 }
 
 interface UserRow {
@@ -70,6 +73,24 @@ type ReasonAction =
   | { kind: "cancel_invite"; invite: Invite }
   | { kind: "set_status"; user: UserRow; isActive: boolean };
 
+async function postInviteAction(body: Record<string, unknown>) {
+  const { data } = await supabase.auth.getSession();
+  const accessToken = data.session?.access_token;
+  if (!accessToken) throw new Error("Your session has expired. Sign in again.");
+
+  const response = await fetch("/api/invites", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(body),
+  });
+  const result = (await response.json().catch(() => ({}))) as { error?: string; message?: string };
+  if (!response.ok) throw new Error(result.error || "Unable to send the email");
+  return result;
+}
+
 function UsersPage() {
   const session = useSession();
   const [invites, setInvites] = useState<Invite[]>([]);
@@ -80,6 +101,7 @@ function UsersPage() {
   const [reason, setReason] = useState("");
   const [reasonError, setReasonError] = useState("");
   const [savingAction, setSavingAction] = useState(false);
+  const [sendingEmailFor, setSendingEmailFor] = useState<string | null>(null);
 
   const canManage = hasAny(session.roles, CAN_MANAGE_USERS);
   const actorIsSuperAdmin = session.roles.includes("super_admin");
@@ -146,6 +168,31 @@ function UsersPage() {
     if (error) return toast.error(error.message);
     toast.success("Shop assignment updated");
     setUsers((us) => us.map((u) => (u.id === userId ? { ...u, shop_id: shopId } : u)));
+  }
+
+  async function sendPendingInvite(inviteId: string) {
+    setSendingEmailFor(inviteId);
+    try {
+      const result = await postInviteAction({ action: "send_existing", invite_id: inviteId });
+      toast.success(result.message ?? "Invitation email sent");
+      await loadAll();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Unable to send the invitation");
+    } finally {
+      setSendingEmailFor(null);
+    }
+  }
+
+  async function resendUserConfirmation(userId: string) {
+    setSendingEmailFor(userId);
+    try {
+      const result = await postInviteAction({ action: "resend_confirmation", user_id: userId });
+      toast.success(result.message ?? "Access email sent");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Unable to send the access email");
+    } finally {
+      setSendingEmailFor(null);
+    }
   }
 
   function openReasonAction(action: ReasonAction) {
@@ -224,6 +271,7 @@ function UsersPage() {
               <TableRow>
                 <TableHead>Email</TableHead>
                 <TableHead>Role</TableHead>
+                <TableHead>Email delivery</TableHead>
                 <TableHead>Invite link</TableHead>
                 <TableHead>Expires</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
@@ -237,6 +285,25 @@ function UsersPage() {
                     <TableCell className="font-medium">{i.email}</TableCell>
                     <TableCell>
                       <Badge variant="outline">{ROLE_LABELS[i.role]}</Badge>
+                    </TableCell>
+                    <TableCell className="text-xs">
+                      {i.last_send_error ? (
+                        <div>
+                          <Badge variant="destructive">Failed</Badge>
+                          <p
+                            className="mt-1 max-w-48 truncate text-muted-foreground"
+                            title={i.last_send_error}
+                          >
+                            {i.last_send_error}
+                          </p>
+                        </div>
+                      ) : i.email_sent_at ? (
+                        <span className="text-muted-foreground">
+                          Sent {formatDistanceToNow(new Date(i.email_sent_at), { addSuffix: true })}
+                        </span>
+                      ) : (
+                        <Badge variant="outline">Not emailed</Badge>
+                      )}
                     </TableCell>
                     <TableCell>
                       <Button
@@ -255,21 +322,36 @@ function UsersPage() {
                       {formatDistanceToNow(new Date(i.expires_at), { addSuffix: true })}
                     </TableCell>
                     <TableCell className="text-right">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => openReasonAction({ kind: "cancel_invite", invite: i })}
-                        className="text-destructive hover:text-destructive"
-                      >
-                        <XCircle className="size-3.5 mr-1" /> Cancel
-                      </Button>
+                      <div className="flex justify-end gap-1">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => sendPendingInvite(i.id)}
+                          disabled={sendingEmailFor === i.id}
+                        >
+                          <Mail className="size-3.5 mr-1" />
+                          {sendingEmailFor === i.id
+                            ? "Sending…"
+                            : i.send_count > 0
+                              ? "Resend"
+                              : "Send email"}
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => openReasonAction({ kind: "cancel_invite", invite: i })}
+                          className="text-destructive hover:text-destructive"
+                        >
+                          <XCircle className="size-3.5 mr-1" /> Cancel
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 );
               })}
               {invites.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={5} className="text-center text-sm text-muted-foreground py-6">
+                  <TableCell colSpan={6} className="text-center text-sm text-muted-foreground py-6">
                     No pending invites
                   </TableCell>
                 </TableRow>
@@ -365,27 +447,40 @@ function UsersPage() {
                               : "Last Super Admin"}
                         </span>
                       ) : (
-                        <Button
-                          variant={u.is_active ? "outline" : "default"}
-                          size="sm"
-                          onClick={() =>
-                            openReasonAction({
-                              kind: "set_status",
-                              user: u,
-                              isActive: !u.is_active,
-                            })
-                          }
-                        >
-                          {u.is_active ? (
-                            <>
-                              <UserX className="size-3.5 mr-1" /> Deactivate
-                            </>
-                          ) : (
-                            <>
-                              <UserCheck className="size-3.5 mr-1" /> Reactivate
-                            </>
+                        <div className="flex justify-end gap-1">
+                          {!u.is_active && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => resendUserConfirmation(u.id)}
+                              disabled={sendingEmailFor === u.id}
+                            >
+                              <Mail className="size-3.5 mr-1" />
+                              {sendingEmailFor === u.id ? "Sending…" : "Resend access email"}
+                            </Button>
                           )}
-                        </Button>
+                          <Button
+                            variant={u.is_active ? "outline" : "default"}
+                            size="sm"
+                            onClick={() =>
+                              openReasonAction({
+                                kind: "set_status",
+                                user: u,
+                                isActive: !u.is_active,
+                              })
+                            }
+                          >
+                            {u.is_active ? (
+                              <>
+                                <UserX className="size-3.5 mr-1" /> Deactivate
+                              </>
+                            ) : (
+                              <>
+                                <UserCheck className="size-3.5 mr-1" /> Reactivate
+                              </>
+                            )}
+                          </Button>
+                        </div>
                       )}
                     </TableCell>
                   </TableRow>
@@ -515,25 +610,25 @@ function NewInviteDialog({
   async function submit() {
     if (!email) return toast.error("Email is required");
     setSaving(true);
-    const token = crypto.randomUUID().replace(/-/g, "");
-    const { data: userData } = await supabase.auth.getUser();
-    const { error } = await supabase.from("user_invites").insert({
-      email: email.toLowerCase().trim(),
-      role,
-      full_name: fullName || null,
-      department: department || null,
-      token,
-      invited_by: userData.user?.id,
-      expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-    } as any);
-    setSaving(false);
-    if (error) return toast.error(error.message);
-    toast.success("Invite created — copy the link from the list");
-    setEmail("");
-    setFullName("");
-    setDepartment("");
-    setOpen(false);
-    onSaved();
+    try {
+      const result = await postInviteAction({
+        action: "create",
+        email,
+        role,
+        full_name: fullName,
+        department,
+      });
+      toast.success(result.message ?? "Invitation email sent");
+      setEmail("");
+      setFullName("");
+      setDepartment("");
+      setOpen(false);
+      await onSaved();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Unable to create the invitation");
+    } finally {
+      setSaving(false);
+    }
   }
 
   return (
@@ -587,7 +682,7 @@ function NewInviteDialog({
             disabled={saving}
             className="bg-brand-orange text-white hover:bg-brand-orange/90"
           >
-            {saving ? "Creating…" : "Create invite"}
+            {saving ? "Sending…" : "Send invitation"}
           </Button>
         </DialogFooter>
       </DialogContent>
