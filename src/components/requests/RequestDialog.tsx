@@ -53,6 +53,7 @@ export function RequestDialog({ onClose, onSaved }: { onClose: () => void; onSav
   const [saving, setSaving] = useState(false);
   const [sourceLocationId, setSourceLocationId] = useState("");
   const [destinationLocationId, setDestinationLocationId] = useState("");
+  const [shopLocations, setShopLocations] = useState<LocationOpt[]>([]);
 
   useEffect(() => {
     (async () => {
@@ -74,15 +75,14 @@ export function RequestDialog({ onClose, onSaved }: { onClose: () => void; onSav
       const central =
         locations.find((location) => location.is_default) ??
         locations.find((location) => location.name === "Main Store");
-      const shopOne =
-        ((s as ShopOpt[]) ?? []).find((shop) => shop.name.toLowerCase() === "shop 1") ??
-        (s as ShopOpt[] | null)?.[0];
-      const destination =
-        locations.find((location) => location.shop_id === shopOne?.id) ??
-        locations.find((location) => location.name.toLowerCase() === "shop 1");
+      const activeShops = ((s as ShopOpt[]) ?? []).filter((shop) =>
+        locations.some((location) => location.shop_id === shop.id),
+      );
+      const defaultShop =
+        activeShops.find((shop) => shop.name.toLowerCase() === "shop 1") ?? activeShops[0];
       setSourceLocationId(central?.id ?? "");
-      setDestinationLocationId(destination?.id ?? "");
-      if (!supervisorOnly && shopOne) setShopId(shopOne.id);
+      setShopLocations(locations.filter((location) => location.shop_id));
+      if (!supervisorOnly && defaultShop) setShopId(defaultShop.id);
       const ids = ((inventory as any[]) ?? []).map((row) => row.id);
       const { data: balances } =
         ids.length && central
@@ -103,7 +103,7 @@ export function RequestDialog({ onClose, onSaved }: { onClose: () => void; onSav
           quantity: balanceMap.get(row.id) ?? 0,
         })),
       );
-      setShops(((s as ShopOpt[]) ?? []).filter((shop) => shop.name.toLowerCase() === "shop 1"));
+      setShops(activeShops);
       if (supervisorOnly && session.shopId) {
         const shop = ((s as ShopOpt[]) ?? []).find((x) => x.id === session.shopId);
         setSupervisorShopName(shop?.name ?? "");
@@ -111,6 +111,11 @@ export function RequestDialog({ onClose, onSaved }: { onClose: () => void; onSav
       }
     })();
   }, [supervisorOnly, session.shopId]);
+
+  useEffect(() => {
+    const destination = shopLocations.find((location) => location.shop_id === shopId);
+    setDestinationLocationId(destination?.id ?? "");
+  }, [shopId, shopLocations]);
 
   async function save() {
     if (
@@ -153,7 +158,7 @@ export function RequestDialog({ onClose, onSaved }: { onClose: () => void; onSav
     <Dialog open onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>Urgent Shop 1 replenishment</DialogTitle>
+          <DialogTitle>Urgent shop replenishment</DialogTitle>
         </DialogHeader>
         <div className="space-y-4">
           <div>
@@ -194,7 +199,7 @@ export function RequestDialog({ onClose, onSaved }: { onClose: () => void; onSav
             ) : (
               <Select value={shopId} onValueChange={setShopId}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Shop 1" />
+                  <SelectValue placeholder="Select destination shop" />
                 </SelectTrigger>
                 <SelectContent>
                   {shops.map((s) => (
