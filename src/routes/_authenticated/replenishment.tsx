@@ -113,7 +113,7 @@ function ReplenishmentPage() {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Replenishment</h1>
           <p className="text-sm text-muted-foreground">
-            Internal Shop 1 movement from Central. Approval, dispatch and receipt remain separate.
+            Internal shop movements from Central. Approval, dispatch and receipt remain separate.
           </p>
         </div>
         <Button
@@ -220,6 +220,7 @@ function RequestsTable({
         <thead className="bg-muted/50 text-xs uppercase text-muted-foreground">
           <tr>
             <th className="px-4 py-2 text-left">Requested</th>
+            <th className="px-4 py-2 text-left">Shop</th>
             <th className="px-4 py-2 text-left">Item</th>
             <th className="px-4 py-2 text-left">Quantity</th>
             <th className="px-4 py-2 text-left">Reason</th>
@@ -230,13 +231,13 @@ function RequestsTable({
         <tbody className="divide-y">
           {loading ? (
             <tr>
-              <td colSpan={6} className="px-4 py-10 text-center text-muted-foreground">
+              <td colSpan={7} className="px-4 py-10 text-center text-muted-foreground">
                 Loading…
               </td>
             </tr>
           ) : rows.length === 0 ? (
             <tr>
-              <td colSpan={6} className="px-4 py-12 text-center text-muted-foreground">
+              <td colSpan={7} className="px-4 py-12 text-center text-muted-foreground">
                 <ClipboardList className="mx-auto mb-2 size-8 opacity-40" />
                 Nothing awaiting action.
               </td>
@@ -250,6 +251,7 @@ function RequestsTable({
                     {format(new Date(row.created_at), "d MMM · HH:mm")} · {row.request_kind}
                   </p>
                 </td>
+                <td className="px-4 py-3 font-medium">{row.shops?.name ?? "—"}</td>
                 <td className="px-4 py-3">{row.inventory_items?.name ?? "—"}</td>
                 <td className="px-4 py-3 font-mono">
                   {row.quantity} {row.inventory_items?.unit}
@@ -326,6 +328,7 @@ function SuggestionsTable({
       <table className="w-full text-sm">
         <thead className="bg-muted/50 text-xs uppercase text-muted-foreground">
           <tr>
+            <th className="px-4 py-2 text-left">Shop</th>
             <th className="px-4 py-2 text-left">Item</th>
             <th className="px-4 py-2 text-right">Approved closing</th>
             <th className="px-4 py-2 text-right">In transit</th>
@@ -337,13 +340,14 @@ function SuggestionsTable({
         <tbody className="divide-y">
           {rows.length === 0 ? (
             <tr>
-              <td colSpan={6} className="px-4 py-12 text-center text-muted-foreground">
-                No configured Shop 1 item is currently below reorder level.
+              <td colSpan={7} className="px-4 py-12 text-center text-muted-foreground">
+                No configured shop item is currently below reorder level.
               </td>
             </tr>
           ) : (
             rows.map((row) => (
               <tr key={row.id}>
+                <td className="px-4 py-3 font-medium">{row.locations?.name ?? "—"}</td>
                 <td className="px-4 py-3">
                   {row.inventory_items?.name ?? "—"}
                   <p className="font-mono text-xs text-muted-foreground">{row.need_number}</p>
@@ -393,6 +397,7 @@ function MovementActionDialog({
   const [notes, setNotes] = useState("");
   const [vehicle, setVehicle] = useState("");
   const [saving, setSaving] = useState(false);
+  const shopName = row.shops?.name ?? "the shop";
   async function submit() {
     if (mode === "receive" && Number(quantity) !== expected && !notes.trim())
       return toast.error("Explain any receipt mismatch");
@@ -415,7 +420,7 @@ function MovementActionDialog({
     if (error) return toast.error(error.message);
     toast.success(
       mode === "issue"
-        ? "Dispatch issued; Shop 1 must confirm receipt"
+        ? `Dispatch issued; ${shopName} must confirm receipt`
         : Number(quantity) === expected
           ? "Receipt confirmed"
           : "Receipt recorded and discrepancy opened",
@@ -428,7 +433,7 @@ function MovementActionDialog({
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle>
-            {mode === "issue" ? "Issue replenishment dispatch" : "Confirm Shop 1 receipt"}
+            {mode === "issue" ? "Issue replenishment dispatch" : `Confirm ${shopName} receipt`}
           </DialogTitle>
         </DialogHeader>
         <div className="space-y-4">
