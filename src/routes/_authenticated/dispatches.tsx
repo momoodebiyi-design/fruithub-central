@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -24,6 +25,7 @@ interface DispatchRow {
   status: string;
   invoice_number: string | null;
   invoice_url: string | null;
+  replenishment_request_id: string | null;
   shops: { name: string } | null;
   clients: { name: string } | null;
   dispatch_lines: { quantity_dispatched: number; quantity_returned: number }[];
@@ -50,7 +52,9 @@ function DispatchesPage() {
     setLoading(true);
     const { data, error } = await supabase
       .from("dispatches")
-      .select("id, reference, dispatched_at, vehicle, notes, status, invoice_number, invoice_url, shops(name), clients(name), dispatch_lines(quantity_dispatched, quantity_returned)")
+      .select(
+        "id, reference, dispatched_at, vehicle, notes, status, invoice_number, invoice_url, replenishment_request_id, shops(name), clients(name), dispatch_lines(quantity_dispatched, quantity_returned)",
+      )
       .order("dispatched_at", { ascending: false })
       .limit(100);
     if (error) toast.error(error.message);
@@ -63,12 +67,12 @@ function DispatchesPage() {
   }, []);
 
   async function markReceived(id: string) {
-    const { error } = await supabase
-      .from("dispatches")
-      .update({ status: "received", received_at: new Date().toISOString() })
-      .eq("id", id);
+    const { error } = await supabase.rpc("confirm_dispatch_receipt" as any, {
+      _dispatch_id: id,
+      _client_reference_id: crypto.randomUUID(),
+    });
     if (error) return toast.error(error.message);
-    toast.success("Marked as received");
+    toast.success("Full receipt confirmed and destination stock updated");
     load();
   }
 
@@ -77,10 +81,16 @@ function DispatchesPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Dispatches</h1>
-          <p className="text-sm text-muted-foreground">Shipments sent to your shops. Stock moves out atomically when recorded.</p>
+          <p className="text-sm text-muted-foreground">
+            Central stock moves out on dispatch; shop stock moves in only after receipt
+            confirmation.
+          </p>
         </div>
         {canDispatch && (
-          <Button onClick={() => setOpenNew(true)} className="bg-brand-orange text-white hover:bg-brand-orange/90">
+          <Button
+            onClick={() => setOpenNew(true)}
+            className="bg-brand-orange text-white hover:bg-brand-orange/90"
+          >
             <Plus className="size-4 mr-2" />
             New dispatch
           </Button>
@@ -102,7 +112,11 @@ function DispatchesPage() {
           </thead>
           <tbody className="divide-y">
             {loading ? (
-              <tr><td colSpan={7} className="px-4 py-8 text-center text-muted-foreground">Loading…</td></tr>
+              <tr>
+                <td colSpan={7} className="px-4 py-8 text-center text-muted-foreground">
+                  Loading…
+                </td>
+              </tr>
             ) : rows.length === 0 ? (
               <tr>
                 <td colSpan={7} className="px-4 py-12 text-center text-muted-foreground">
@@ -112,8 +126,14 @@ function DispatchesPage() {
               </tr>
             ) : (
               rows.map((d) => {
-                const totalOut = d.dispatch_lines.reduce((s, l) => s + Number(l.quantity_dispatched), 0);
-                const totalReturned = d.dispatch_lines.reduce((s, l) => s + Number(l.quantity_returned), 0);
+                const totalOut = d.dispatch_lines.reduce(
+                  (s, l) => s + Number(l.quantity_dispatched),
+                  0,
+                );
+                const totalReturned = d.dispatch_lines.reduce(
+                  (s, l) => s + Number(l.quantity_returned),
+                  0,
+                );
                 const isExpanded = expanded === d.id;
                 return (
                   <>
@@ -122,12 +142,18 @@ function DispatchesPage() {
                       className="hover:bg-muted/30 cursor-pointer"
                       onClick={() => setExpanded(isExpanded ? null : d.id)}
                     >
-                      <td className="px-2"><ChevronRight className={`size-4 transition-transform ${isExpanded ? "rotate-90" : ""}`} /></td>
+                      <td className="px-2">
+                        <ChevronRight
+                          className={`size-4 transition-transform ${isExpanded ? "rotate-90" : ""}`}
+                        />
+                      </td>
                       <td className="px-4 py-3 font-mono text-xs">{d.reference}</td>
                       <td className="px-4 py-3">
                         {d.shops?.name ?? (d.clients?.name ? `${d.clients.name} (bulk)` : "—")}
                         {d.invoice_number && (
-                          <span className="ml-2 text-xs text-muted-foreground font-mono">· {d.invoice_number}</span>
+                          <span className="ml-2 text-xs text-muted-foreground font-mono">
+                            · {d.invoice_number}
+                          </span>
                         )}
                       </td>
                       <td className="px-4 py-3 text-muted-foreground">
@@ -135,22 +161,38 @@ function DispatchesPage() {
                       </td>
                       <td className="px-4 py-3 font-mono">
                         {d.dispatch_lines.length}
-                        <span className="text-muted-foreground text-xs ml-1">({totalOut} out / {totalReturned} back)</span>
+                        <span className="text-muted-foreground text-xs ml-1">
+                          ({totalOut} out / {totalReturned} back)
+                        </span>
                       </td>
                       <td className="px-4 py-3">
-                        <Badge variant="outline" className={STATUS_COLORS[d.status] ?? ""}>{d.status}</Badge>
+                        <Badge variant="outline" className={STATUS_COLORS[d.status] ?? ""}>
+                          {d.status}
+                        </Badge>
                       </td>
                       <td className="px-4 py-3 text-right whitespace-nowrap">
-                        {canDispatch && d.status === "dispatched" && (
-                          <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); markReceived(d.id); }}>
-                            Mark received
-                          </Button>
-                        )}
+                        {canDispatch &&
+                          d.status === "dispatched" &&
+                          !d.replenishment_request_id && (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                markReceived(d.id);
+                              }}
+                            >
+                              Confirm full receipt
+                            </Button>
+                          )}
                         {canDispatch && (d.status === "dispatched" || d.status === "received") && (
                           <Button
                             size="sm"
                             variant="ghost"
-                            onClick={(e) => { e.stopPropagation(); setReturning({ id: d.id, reference: d.reference }); }}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setReturning({ id: d.id, reference: d.reference });
+                            }}
                           >
                             <Undo2 className="size-3 mr-1" /> Return
                           </Button>
@@ -186,8 +228,23 @@ function DispatchesPage() {
   );
 }
 
-function ExpandedLines({ dispatchId, vehicle, notes }: { dispatchId: string; vehicle: string | null; notes: string | null }) {
-  const [lines, setLines] = useState<Array<{ id: string; quantity_dispatched: number; quantity_returned: number; inventory_items: { name: string; unit: string } | null }>>([]);
+function ExpandedLines({
+  dispatchId,
+  vehicle,
+  notes,
+}: {
+  dispatchId: string;
+  vehicle: string | null;
+  notes: string | null;
+}) {
+  const [lines, setLines] = useState<
+    Array<{
+      id: string;
+      quantity_dispatched: number;
+      quantity_returned: number;
+      inventory_items: { name: string; unit: string } | null;
+    }>
+  >([]);
 
   useEffect(() => {
     (async () => {
@@ -203,7 +260,11 @@ function ExpandedLines({ dispatchId, vehicle, notes }: { dispatchId: string; veh
     <div className="space-y-2">
       {(vehicle || notes) && (
         <div className="text-xs text-muted-foreground">
-          {vehicle && <span>Vehicle: <span className="text-foreground">{vehicle}</span> · </span>}
+          {vehicle && (
+            <span>
+              Vehicle: <span className="text-foreground">{vehicle}</span> ·{" "}
+            </span>
+          )}
           {notes && <span>{notes}</span>}
         </div>
       )}
@@ -221,10 +282,15 @@ function ExpandedLines({ dispatchId, vehicle, notes }: { dispatchId: string; veh
             {lines.map((l) => (
               <tr key={l.id}>
                 <td className="px-3 py-1.5">{l.inventory_items?.name ?? "—"}</td>
-                <td className="px-3 py-1.5 text-right font-mono">{Number(l.quantity_dispatched)} {l.inventory_items?.unit}</td>
-                <td className="px-3 py-1.5 text-right font-mono">{Number(l.quantity_returned)} {l.inventory_items?.unit}</td>
                 <td className="px-3 py-1.5 text-right font-mono">
-                  {Number(l.quantity_dispatched) - Number(l.quantity_returned)} {l.inventory_items?.unit}
+                  {Number(l.quantity_dispatched)} {l.inventory_items?.unit}
+                </td>
+                <td className="px-3 py-1.5 text-right font-mono">
+                  {Number(l.quantity_returned)} {l.inventory_items?.unit}
+                </td>
+                <td className="px-3 py-1.5 text-right font-mono">
+                  {Number(l.quantity_dispatched) - Number(l.quantity_returned)}{" "}
+                  {l.inventory_items?.unit}
                 </td>
               </tr>
             ))}

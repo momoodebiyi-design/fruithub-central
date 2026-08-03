@@ -1,18 +1,46 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Plus, Trash2, Upload, FileText } from "lucide-react";
 import { toast } from "sonner";
 
-interface ShopOpt { id: string; name: string }
-interface ClientOpt { id: string; name: string }
-interface ItemOpt { id: string; name: string; sku: string; unit: string; quantity: number }
-interface Line { item_id: string; quantity: string }
+interface ShopOpt {
+  id: string;
+  name: string;
+}
+interface ClientOpt {
+  id: string;
+  name: string;
+}
+interface ItemOpt {
+  id: string;
+  name: string;
+  sku: string;
+  unit: string;
+  quantity: number;
+}
+interface Line {
+  item_id: string;
+  quantity: string;
+}
 
 type Destination = "shop" | "client";
 
@@ -37,19 +65,25 @@ export function DispatchDialog({ onClose, onSaved }: { onClose: () => void; onSa
       const [{ data: s }, { data: c }, { data: i }] = await Promise.all([
         supabase.from("shops").select("id, name").eq("is_active", true).order("name"),
         supabase.from("clients").select("id, name").eq("is_active", true).order("name"),
-        (supabase as any).from("v_item_stock")
+        (supabase as any)
+          .from("v_central_item_stock")
           .select("item_id, name, sku, unit, on_hand")
           .eq("status", "active")
           .order("name"),
       ]);
       setShops((s as ShopOpt[]) ?? []);
       setClients((c as ClientOpt[]) ?? []);
-      setItems(((i as any[]) ?? []).map((r) => ({
-        id: r.item_id, name: r.name, sku: r.sku, unit: r.unit, quantity: Number(r.on_hand ?? 0),
-      })));
+      setItems(
+        ((i as any[]) ?? []).map((r) => ({
+          id: r.item_id,
+          name: r.name,
+          sku: r.sku,
+          unit: r.unit,
+          quantity: Number(r.on_hand ?? 0),
+        })),
+      );
     })();
   }, []);
-
 
   function updateLine(idx: number, patch: Partial<Line>) {
     setLines((ls) => ls.map((l, i) => (i === idx ? { ...l, ...patch } : l)));
@@ -66,10 +100,12 @@ export function DispatchDialog({ onClose, onSaved }: { onClose: () => void; onSa
     if (invoiceFile) {
       const ext = invoiceFile.name.split(".").pop() ?? "pdf";
       const path = `${new Date().getFullYear()}/${reference.replace(/[^A-Za-z0-9_-]/g, "_")}-${Date.now()}.${ext}`;
-      const { error: upErr } = await supabase.storage.from("dispatch-invoices").upload(path, invoiceFile, {
-        contentType: invoiceFile.type || "application/octet-stream",
-        upsert: false,
-      });
+      const { error: upErr } = await supabase.storage
+        .from("dispatch-invoices")
+        .upload(path, invoiceFile, {
+          contentType: invoiceFile.type || "application/octet-stream",
+          upsert: false,
+        });
       if (upErr) {
         setSaving(false);
         return toast.error(`Invoice upload failed: ${upErr.message}`);
@@ -113,16 +149,28 @@ export function DispatchDialog({ onClose, onSaved }: { onClose: () => void; onSa
               <Label>{destination === "shop" ? "Shop" : "Client"}</Label>
               {destination === "shop" ? (
                 <Select value={shopId} onValueChange={setShopId}>
-                  <SelectTrigger><SelectValue placeholder="Select shop" /></SelectTrigger>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select shop" />
+                  </SelectTrigger>
                   <SelectContent>
-                    {shops.map((s) => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
+                    {shops.map((s) => (
+                      <SelectItem key={s.id} value={s.id}>
+                        {s.name}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               ) : (
                 <Select value={clientId} onValueChange={setClientId}>
-                  <SelectTrigger><SelectValue placeholder="Select client" /></SelectTrigger>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select client" />
+                  </SelectTrigger>
                   <SelectContent>
-                    {clients.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                    {clients.map((c) => (
+                      <SelectItem key={c.id} value={c.id}>
+                        {c.name}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               )}
@@ -136,11 +184,19 @@ export function DispatchDialog({ onClose, onSaved }: { onClose: () => void; onSa
           <div className="grid grid-cols-2 gap-3">
             <div>
               <Label>Vehicle</Label>
-              <Input value={vehicle} onChange={(e) => setVehicle(e.target.value)} placeholder="Optional" />
+              <Input
+                value={vehicle}
+                onChange={(e) => setVehicle(e.target.value)}
+                placeholder="Optional"
+              />
             </div>
             <div>
               <Label>Notes</Label>
-              <Input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Optional" />
+              <Input
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                placeholder="Optional"
+              />
             </div>
           </div>
 
@@ -170,9 +226,13 @@ export function DispatchDialog({ onClose, onSaved }: { onClose: () => void; onSa
                   onClick={() => fileRef.current?.click()}
                 >
                   {invoiceFile ? (
-                    <><FileText className="size-4 mr-2" /> {invoiceFile.name}</>
+                    <>
+                      <FileText className="size-4 mr-2" /> {invoiceFile.name}
+                    </>
                   ) : (
-                    <><Upload className="size-4 mr-2" /> Attach invoice</>
+                    <>
+                      <Upload className="size-4 mr-2" /> Attach invoice
+                    </>
                   )}
                 </Button>
               </div>
@@ -182,7 +242,11 @@ export function DispatchDialog({ onClose, onSaved }: { onClose: () => void; onSa
           <div>
             <div className="flex items-center justify-between mb-2">
               <Label>Items</Label>
-              <Button size="sm" variant="ghost" onClick={() => setLines([...lines, { item_id: "", quantity: "" }])}>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => setLines([...lines, { item_id: "", quantity: "" }])}
+              >
                 <Plus className="size-3 mr-1" /> Add line
               </Button>
             </div>
@@ -191,8 +255,13 @@ export function DispatchDialog({ onClose, onSaved }: { onClose: () => void; onSa
                 const item = items.find((i) => i.id === line.item_id);
                 return (
                   <div key={idx} className="flex items-center gap-2">
-                    <Select value={line.item_id} onValueChange={(v) => updateLine(idx, { item_id: v })}>
-                      <SelectTrigger className="flex-1"><SelectValue placeholder="Item" /></SelectTrigger>
+                    <Select
+                      value={line.item_id}
+                      onValueChange={(v) => updateLine(idx, { item_id: v })}
+                    >
+                      <SelectTrigger className="flex-1">
+                        <SelectValue placeholder="Item" />
+                      </SelectTrigger>
                       <SelectContent>
                         {items.map((i) => (
                           <SelectItem key={i.id} value={i.id}>
@@ -209,7 +278,11 @@ export function DispatchDialog({ onClose, onSaved }: { onClose: () => void; onSa
                       onChange={(e) => updateLine(idx, { quantity: e.target.value })}
                     />
                     <span className="w-10 text-xs text-muted-foreground">{item?.unit ?? ""}</span>
-                    <Button size="icon" variant="ghost" onClick={() => setLines(lines.filter((_, i) => i !== idx))}>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      onClick={() => setLines(lines.filter((_, i) => i !== idx))}
+                    >
                       <Trash2 className="size-4" />
                     </Button>
                   </div>
@@ -219,8 +292,14 @@ export function DispatchDialog({ onClose, onSaved }: { onClose: () => void; onSa
           </div>
         </div>
         <DialogFooter>
-          <Button variant="ghost" onClick={onClose}>Cancel</Button>
-          <Button onClick={save} disabled={saving} className="bg-brand-orange text-white hover:bg-brand-orange/90">
+          <Button variant="ghost" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button
+            onClick={save}
+            disabled={saving}
+            className="bg-brand-orange text-white hover:bg-brand-orange/90"
+          >
             {saving ? "Recording…" : "Record dispatch"}
           </Button>
         </DialogFooter>
