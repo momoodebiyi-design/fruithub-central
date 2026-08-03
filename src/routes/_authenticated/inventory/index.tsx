@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
@@ -47,7 +48,14 @@ export interface Item {
   status: string;
 }
 
-const CATEGORIES = ["all", "raw_material", "packaging", "finished_good", "consumable", "semi_finished"] as const;
+const CATEGORIES = [
+  "all",
+  "raw_material",
+  "packaging",
+  "finished_good",
+  "consumable",
+  "semi_finished",
+] as const;
 
 function InventoryList() {
   const navigate = useNavigate();
@@ -63,21 +71,31 @@ function InventoryList() {
 
   async function load() {
     const { data, error } = await (supabase as any)
-      .from("v_item_stock")
-      .select("item_id, item_code, sku, name, category, subcategory, unit, min_level, reorder_level, status, on_hand")
+      .from("v_central_item_stock")
+      .select(
+        "item_id, item_code, sku, name, category, subcategory, unit, min_level, reorder_level, status, on_hand",
+      )
       .order("item_code", { nullsFirst: false });
     if (error) {
       toast.error(`Unable to load inventory: ${error.message}`);
       return;
     }
-    setItems(((data ?? []) as any[]).map((r) => ({
-      id: r.item_id, item_id: r.item_code, sku: r.sku, name: r.name,
-      category: r.category, subcategory: r.subcategory, unit: r.unit,
-      quantity: Number(r.on_hand ?? 0), reorder_level: r.reorder_level,
-      min_level: r.min_level, status: r.status,
-    })));
+    setItems(
+      ((data ?? []) as any[]).map((r) => ({
+        id: r.item_id,
+        item_id: r.item_code,
+        sku: r.sku,
+        name: r.name,
+        category: r.category,
+        subcategory: r.subcategory,
+        unit: r.unit,
+        quantity: Number(r.on_hand ?? 0),
+        reorder_level: r.reorder_level,
+        min_level: r.min_level,
+        status: r.status,
+      })),
+    );
   }
-
 
   useEffect(() => {
     load();
@@ -86,7 +104,9 @@ function InventoryList() {
       .on("postgres_changes", { event: "*", schema: "public", table: "inventory_movements" }, load)
       .on("postgres_changes", { event: "*", schema: "public", table: "inventory_items" }, load)
       .subscribe();
-    return () => { supabase.removeChannel(ch); };
+    return () => {
+      supabase.removeChannel(ch);
+    };
   }, []);
 
   const filtered = useMemo(() => {
@@ -101,7 +121,7 @@ function InventoryList() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Inventory</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">Central Inventory</h1>
           <p className="text-sm text-muted-foreground mt-1">
             {items.length} SKUs · {filtered.length} shown · stock changes via movements only
           </p>
@@ -111,7 +131,10 @@ function InventoryList() {
             <Button variant="outline" onClick={() => setShowImport(true)}>
               <Upload className="size-4 mr-2" /> Bulk import
             </Button>
-            <Button onClick={() => setDialogItem(null)} className="bg-brand-orange text-white hover:bg-brand-orange/90">
+            <Button
+              onClick={() => setDialogItem(null)}
+              className="bg-brand-orange text-white hover:bg-brand-orange/90"
+            >
               <Plus className="size-4 mr-2" /> New item
             </Button>
           </div>
@@ -119,12 +142,21 @@ function InventoryList() {
       </div>
 
       <div className="flex flex-col sm:flex-row gap-3">
-        <Input placeholder="Search SKU or name…" value={q} onChange={(e) => setQ(e.target.value)} className="max-w-sm" />
+        <Input
+          placeholder="Search SKU or name…"
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          className="max-w-sm"
+        />
         <Select value={cat} onValueChange={setCat}>
-          <SelectTrigger className="w-52"><SelectValue /></SelectTrigger>
+          <SelectTrigger className="w-52">
+            <SelectValue />
+          </SelectTrigger>
           <SelectContent>
             {CATEGORIES.map((c) => (
-              <SelectItem key={c} value={c}>{c === "all" ? "All categories" : c.replace("_", " ")}</SelectItem>
+              <SelectItem key={c} value={c}>
+                {c === "all" ? "All categories" : c.replace("_", " ")}
+              </SelectItem>
             ))}
           </SelectContent>
         </Select>
@@ -145,7 +177,8 @@ function InventoryList() {
           </TableHeader>
           <TableBody>
             {filtered.map((it) => {
-              const low = it.reorder_level !== null && Number(it.quantity) <= Number(it.reorder_level);
+              const low =
+                it.reorder_level !== null && Number(it.quantity) <= Number(it.reorder_level);
               return (
                 <TableRow
                   key={it.id}
@@ -154,28 +187,48 @@ function InventoryList() {
                 >
                   <TableCell className="font-mono text-xs">{it.sku}</TableCell>
                   <TableCell className="font-medium">{it.name}</TableCell>
-                  <TableCell className="text-xs text-muted-foreground">{it.category.replace("_", " ")}</TableCell>
-                  <TableCell className="text-right font-mono tabular-nums">{Number(it.quantity).toLocaleString()}</TableCell>
+                  <TableCell className="text-xs text-muted-foreground">
+                    {it.category.replace("_", " ")}
+                  </TableCell>
+                  <TableCell className="text-right font-mono tabular-nums">
+                    {Number(it.quantity).toLocaleString()}
+                  </TableCell>
                   <TableCell className="text-xs">{it.unit}</TableCell>
                   <TableCell>
                     {it.status !== "active" ? (
                       <Badge variant="outline">Inactive</Badge>
                     ) : low ? (
-                      <Badge className="bg-brand-orange/15 text-brand-orange hover:bg-brand-orange/15 border-0">Low</Badge>
+                      <Badge className="bg-brand-orange/15 text-brand-orange hover:bg-brand-orange/15 border-0">
+                        Low
+                      </Badge>
                     ) : (
-                      <Badge className="bg-brand-green/15 text-brand-green hover:bg-brand-green/15 border-0">OK</Badge>
+                      <Badge className="bg-brand-green/15 text-brand-green hover:bg-brand-green/15 border-0">
+                        OK
+                      </Badge>
                     )}
                   </TableCell>
                   <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
                     {canEdit && (
                       <div className="flex justify-end gap-1">
-                        <Button size="sm" variant="ghost" title="Record movement" onClick={() => setMoveItem(it)}>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          title="Record movement"
+                          onClick={() => setMoveItem(it)}
+                        >
                           <ArrowUpDown className="size-3.5" />
                         </Button>
-                        <Button size="sm" variant="ghost" title="Stock count" onClick={() => setCountItem(it)}>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          title="Stock count"
+                          onClick={() => setCountItem(it)}
+                        >
                           <ClipboardList className="size-3.5" />
                         </Button>
-                        <Button size="sm" variant="ghost" onClick={() => setDialogItem(it)}>Edit</Button>
+                        <Button size="sm" variant="ghost" onClick={() => setDialogItem(it)}>
+                          Edit
+                        </Button>
                       </div>
                     )}
                   </TableCell>
@@ -183,14 +236,22 @@ function InventoryList() {
               );
             })}
             {filtered.length === 0 && (
-              <TableRow><TableCell colSpan={7} className="text-center text-sm text-muted-foreground py-8">No items</TableCell></TableRow>
+              <TableRow>
+                <TableCell colSpan={7} className="text-center text-sm text-muted-foreground py-8">
+                  No items
+                </TableCell>
+              </TableRow>
             )}
           </TableBody>
         </Table>
       </div>
 
       {dialogItem !== undefined && (
-        <ItemDialog item={dialogItem as any} onClose={() => setDialogItem(undefined)} onSaved={load} />
+        <ItemDialog
+          item={dialogItem as any}
+          onClose={() => setDialogItem(undefined)}
+          onSaved={load}
+        />
       )}
       {moveItem && (
         <MovementDialog item={moveItem} onClose={() => setMoveItem(null)} onSaved={load} />
@@ -198,9 +259,7 @@ function InventoryList() {
       {countItem && (
         <StockCountDialog item={countItem} onClose={() => setCountItem(null)} onSaved={load} />
       )}
-      {showImport && (
-        <BulkImportDialog onClose={() => setShowImport(false)} onImported={load} />
-      )}
+      {showImport && <BulkImportDialog onClose={() => setShowImport(false)} onImported={load} />}
     </div>
   );
 }

@@ -80,7 +80,11 @@ function ItemDetail() {
   async function load() {
     const [{ data: it }, { data: stockRow }, { count: policies }] = await Promise.all([
       supabase.from("inventory_items").select("*").eq("id", itemId).maybeSingle(),
-      (supabase as any).from("v_item_stock").select("on_hand").eq("item_id", itemId).maybeSingle(),
+      (supabase as any)
+        .from("v_central_item_stock")
+        .select("on_hand, location_id")
+        .eq("item_id", itemId)
+        .maybeSingle(),
       (supabase as any)
         .from("stock_level_policies")
         .select("id", { count: "exact", head: true })
@@ -106,12 +110,15 @@ function ItemDetail() {
       setSupplier(null);
     }
 
-    const { data: ms } = await supabase
+    let movementQuery = supabase
       .from("inventory_movements")
       .select("id, type, quantity, reason, performed_by, created_at")
       .eq("item_id", itemId)
       .order("created_at", { ascending: false })
       .limit(200);
+    const centralLocationId = (stockRow as any)?.location_id as string | undefined;
+    if (centralLocationId) movementQuery = movementQuery.eq("location_id", centralLocationId);
+    const { data: ms } = await movementQuery;
 
     const list = (ms ?? []) as Movement[];
     const userIds = Array.from(

@@ -134,6 +134,16 @@ export const CAN_RECEIVE_PURCHASES: AppRole[] = [
 export const CAN_VIEW_PURCHASING: AppRole[] = Array.from(
   new Set([...CAN_MANAGE_PURCHASES, ...CAN_RECEIVE_PURCHASES]),
 );
+export const CAN_VIEW_REPORTS: AppRole[] = [
+  "super_admin",
+  "admin",
+  "management",
+  "operations_manager",
+  "inventory_officer",
+  "production",
+  "procurement",
+  "sales",
+];
 export const CAN_MANAGE_RECIPES: AppRole[] = [
   "super_admin",
   "admin",

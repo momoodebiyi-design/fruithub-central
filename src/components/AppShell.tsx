@@ -18,6 +18,7 @@ import {
   X,
   ShieldCheck,
   Lock,
+  ChartNoAxesCombined,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useSession } from "@/hooks/useSession";
@@ -31,6 +32,7 @@ import {
   CAN_MANAGE_SHOPS,
   CAN_MANAGE_PURCHASES,
   CAN_VIEW_PURCHASING,
+  CAN_VIEW_REPORTS,
   hasAny,
   isShopSupervisorOnly,
   ROLE_LABELS,
@@ -55,7 +57,7 @@ type DisabledItem = {
 };
 
 // Scope-controlled nav: placeholder / not-yet-built modules
-// (Sales orders, Purchases, Reports, Procurement) are intentionally omitted.
+// (Sales orders and separate Procurement modules) are intentionally omitted.
 // See .lovable/architecture.md for the roadmap.
 const FULL_NAV: NavItem[] = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -72,6 +74,7 @@ const FULL_NAV: NavItem[] = [
   },
   { to: "/replenishment", label: "Replenishment", icon: ClipboardList },
   { to: "/purchasing", label: "Purchasing", icon: ShoppingCart, roles: CAN_VIEW_PURCHASING },
+  { to: "/reports", label: "Reports", icon: ChartNoAxesCombined, roles: CAN_VIEW_REPORTS },
 ];
 
 const SUPERVISOR_NAV: NavItem[] = [

@@ -20,6 +20,7 @@ import { Route as AuthenticatedSuppliersRouteImport } from './routes/_authentica
 import { Route as AuthenticatedShopsRouteImport } from './routes/_authenticated/shops'
 import { Route as AuthenticatedShopCountsRouteImport } from './routes/_authenticated/shop-counts'
 import { Route as AuthenticatedRequestsRouteImport } from './routes/_authenticated/requests'
+import { Route as AuthenticatedReportsRouteImport } from './routes/_authenticated/reports'
 import { Route as AuthenticatedReplenishmentRouteImport } from './routes/_authenticated/replenishment'
 import { Route as AuthenticatedRecipesRouteImport } from './routes/_authenticated/recipes'
 import { Route as AuthenticatedPurchasingRouteImport } from './routes/_authenticated/purchasing'
@@ -92,6 +93,11 @@ const AuthenticatedShopCountsRoute = AuthenticatedShopCountsRouteImport.update({
 const AuthenticatedRequestsRoute = AuthenticatedRequestsRouteImport.update({
   id: '/requests',
   path: '/requests',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedReportsRoute = AuthenticatedReportsRouteImport.update({
+  id: '/reports',
+  path: '/reports',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedReplenishmentRoute =
@@ -217,6 +223,7 @@ export interface FileRoutesByFullPath {
   '/purchasing': typeof AuthenticatedPurchasingRoute
   '/recipes': typeof AuthenticatedRecipesRoute
   '/replenishment': typeof AuthenticatedReplenishmentRoute
+  '/reports': typeof AuthenticatedReportsRoute
   '/requests': typeof AuthenticatedRequestsRoute
   '/shop-counts': typeof AuthenticatedShopCountsRouteWithChildren
   '/shops': typeof AuthenticatedShopsRoute
@@ -247,6 +254,7 @@ export interface FileRoutesByTo {
   '/purchasing': typeof AuthenticatedPurchasingRoute
   '/recipes': typeof AuthenticatedRecipesRoute
   '/replenishment': typeof AuthenticatedReplenishmentRoute
+  '/reports': typeof AuthenticatedReportsRoute
   '/requests': typeof AuthenticatedRequestsRoute
   '/shops': typeof AuthenticatedShopsRoute
   '/suppliers': typeof AuthenticatedSuppliersRoute
@@ -279,6 +287,7 @@ export interface FileRoutesById {
   '/_authenticated/purchasing': typeof AuthenticatedPurchasingRoute
   '/_authenticated/recipes': typeof AuthenticatedRecipesRoute
   '/_authenticated/replenishment': typeof AuthenticatedReplenishmentRoute
+  '/_authenticated/reports': typeof AuthenticatedReportsRoute
   '/_authenticated/requests': typeof AuthenticatedRequestsRoute
   '/_authenticated/shop-counts': typeof AuthenticatedShopCountsRouteWithChildren
   '/_authenticated/shops': typeof AuthenticatedShopsRoute
@@ -312,6 +321,7 @@ export interface FileRouteTypes {
     | '/purchasing'
     | '/recipes'
     | '/replenishment'
+    | '/reports'
     | '/requests'
     | '/shop-counts'
     | '/shops'
@@ -342,6 +352,7 @@ export interface FileRouteTypes {
     | '/purchasing'
     | '/recipes'
     | '/replenishment'
+    | '/reports'
     | '/requests'
     | '/shops'
     | '/suppliers'
@@ -373,6 +384,7 @@ export interface FileRouteTypes {
     | '/_authenticated/purchasing'
     | '/_authenticated/recipes'
     | '/_authenticated/replenishment'
+    | '/_authenticated/reports'
     | '/_authenticated/requests'
     | '/_authenticated/shop-counts'
     | '/_authenticated/shops'
@@ -478,6 +490,13 @@ declare module '@tanstack/react-router' {
       path: '/requests'
       fullPath: '/requests'
       preLoaderRoute: typeof AuthenticatedRequestsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/reports': {
+      id: '/_authenticated/reports'
+      path: '/reports'
+      fullPath: '/reports'
+      preLoaderRoute: typeof AuthenticatedReportsRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/replenishment': {
@@ -659,6 +678,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedPurchasingRoute: typeof AuthenticatedPurchasingRoute
   AuthenticatedRecipesRoute: typeof AuthenticatedRecipesRoute
   AuthenticatedReplenishmentRoute: typeof AuthenticatedReplenishmentRoute
+  AuthenticatedReportsRoute: typeof AuthenticatedReportsRoute
   AuthenticatedRequestsRoute: typeof AuthenticatedRequestsRoute
   AuthenticatedShopCountsRoute: typeof AuthenticatedShopCountsRouteWithChildren
   AuthenticatedShopsRoute: typeof AuthenticatedShopsRoute
@@ -678,6 +698,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedPurchasingRoute: AuthenticatedPurchasingRoute,
   AuthenticatedRecipesRoute: AuthenticatedRecipesRoute,
   AuthenticatedReplenishmentRoute: AuthenticatedReplenishmentRoute,
+  AuthenticatedReportsRoute: AuthenticatedReportsRoute,
   AuthenticatedRequestsRoute: AuthenticatedRequestsRoute,
   AuthenticatedShopCountsRoute: AuthenticatedShopCountsRouteWithChildren,
   AuthenticatedShopsRoute: AuthenticatedShopsRoute,
