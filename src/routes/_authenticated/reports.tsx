@@ -26,6 +26,7 @@ export const Route = createFileRoute("/_authenticated/reports")({
 });
 
 type Location = { id: string; name: string };
+type Product = { id: string; name: string; sku: string };
 
 type DispatchRow = {
   dispatch_id: string;
@@ -90,6 +91,51 @@ type MovementSummary = {
   closing: number;
 };
 
+type ProductionRow = {
+  batch_id: string;
+  batch_number: string;
+  produced_at: string;
+  status: string;
+  qc_notes: string | null;
+  quantity_produced: number;
+  product_item_id: string;
+  product_sku: string;
+  product_name: string;
+  product_unit: string;
+  location_id: string | null;
+  location_name: string | null;
+  staff_id: string | null;
+  staff_name: string | null;
+  consumption_id: string | null;
+  material_item_id: string | null;
+  material_sku: string | null;
+  material_name: string | null;
+  material_unit: string | null;
+  quantity_used: number | null;
+};
+
+type ProductionBatch = {
+  batch_id: string;
+  batch_number: string;
+  produced_at: string;
+  status: string;
+  qc_notes: string | null;
+  quantity_produced: number;
+  product_item_id: string;
+  product_sku: string;
+  product_name: string;
+  product_unit: string;
+  location_name: string | null;
+  staff_name: string | null;
+  materials: Array<{
+    id: string;
+    sku: string;
+    name: string;
+    unit: string;
+    quantity: number;
+  }>;
+};
+
 const STATUS_COLORS: Record<string, string> = {
   dispatched: "border-brand-orange/30 bg-brand-orange/5 text-brand-orange",
   received: "border-blue-200 bg-blue-50 text-blue-700",
@@ -137,9 +183,12 @@ function ReportsPage() {
   const [fromDate, setFromDate] = useState(today);
   const [toDate, setToDate] = useState(today);
   const [locationId, setLocationId] = useState("all");
+  const [productId, setProductId] = useState("all");
   const [locations, setLocations] = useState<Location[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
   const [dispatches, setDispatches] = useState<DispatchRow[]>([]);
   const [movements, setMovements] = useState<MovementRow[]>([]);
+  const [productionRows, setProductionRows] = useState<ProductionRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState("dispatches");
 
@@ -153,29 +202,49 @@ function ReportsPage() {
     const start = lagosBoundary(fromDate);
     const endExclusive = lagosBoundary(toDate, 1);
 
-    const [{ data: locationRows, error: locationError }, dispatchResult, movementResult] =
-      await Promise.all([
-        supabase.from("locations").select("id, name").eq("status", "active").order("name"),
-        (supabase as any)
-          .from("v_daily_dispatch_report")
-          .select("*")
-          .gte("dispatched_at", start)
-          .lt("dispatched_at", endExclusive)
-          .order("dispatched_at", { ascending: false })
-          .limit(10000),
-        (supabase as any)
-          .from("v_inventory_movement_report")
-          .select("*")
-          .lt("created_at", endExclusive)
-          .order("created_at", { ascending: false })
-          .limit(10000),
-      ]);
+    const [
+      { data: locationRows, error: locationError },
+      { data: productRows, error: productError },
+      dispatchResult,
+      movementResult,
+      productionResult,
+    ] = await Promise.all([
+      supabase.from("locations").select("id, name").eq("status", "active").order("name"),
+      supabase.from("inventory_items").select("id, name, sku").eq("status", "active").order("name"),
+      (supabase as any)
+        .from("v_daily_dispatch_report")
+        .select("*")
+        .gte("dispatched_at", start)
+        .lt("dispatched_at", endExclusive)
+        .order("dispatched_at", { ascending: false })
+        .limit(10000),
+      (supabase as any)
+        .from("v_inventory_movement_report")
+        .select("*")
+        .lt("created_at", endExclusive)
+        .order("created_at", { ascending: false })
+        .limit(10000),
+      (supabase as any)
+        .from("v_production_report")
+        .select("*")
+        .gte("produced_at", start)
+        .lt("produced_at", endExclusive)
+        .order("produced_at", { ascending: false })
+        .limit(10000),
+    ]);
 
-    const error = locationError ?? dispatchResult.error ?? movementResult.error;
+    const error =
+      locationError ??
+      productError ??
+      dispatchResult.error ??
+      movementResult.error ??
+      productionResult.error;
     if (error) toast.error(`Unable to load reports: ${error.message}`);
     setLocations((locationRows as Location[]) ?? []);
+    setProducts((productRows as Product[]) ?? []);
     setDispatches((dispatchResult.data as DispatchRow[]) ?? []);
     setMovements((movementResult.data as MovementRow[]) ?? []);
+    setProductionRows((productionResult.data as ProductionRow[]) ?? []);
     setLoading(false);
   }
 
@@ -189,17 +258,67 @@ function ReportsPage() {
     () =>
       dispatches.filter(
         (row) =>
-          locationId === "all" ||
-          row.source_location_id === locationId ||
-          row.destination_location_id === locationId,
+          (locationId === "all" ||
+            row.source_location_id === locationId ||
+            row.destination_location_id === locationId) &&
+          (productId === "all" || row.item_id === productId),
       ),
-    [dispatches, locationId],
+    [dispatches, locationId, productId],
   );
 
   const filteredMovements = useMemo(
-    () => movements.filter((row) => locationId === "all" || row.location_id === locationId),
-    [movements, locationId],
+    () =>
+      movements.filter(
+        (row) =>
+          (locationId === "all" || row.location_id === locationId) &&
+          (productId === "all" || row.item_id === productId),
+      ),
+    [movements, locationId, productId],
   );
+
+  const filteredProductionRows = useMemo(
+    () =>
+      productionRows.filter(
+        (row) =>
+          (locationId === "all" || row.location_id === locationId) &&
+          (productId === "all" || row.product_item_id === productId),
+      ),
+    [productionRows, locationId, productId],
+  );
+
+  const productionBatches = useMemo(() => {
+    const map = new Map<string, ProductionBatch>();
+    for (const row of filteredProductionRows) {
+      const batch = map.get(row.batch_id) ?? {
+        batch_id: row.batch_id,
+        batch_number: row.batch_number,
+        produced_at: row.produced_at,
+        status: row.status,
+        qc_notes: row.qc_notes,
+        quantity_produced: Number(row.quantity_produced),
+        product_item_id: row.product_item_id,
+        product_sku: row.product_sku,
+        product_name: row.product_name,
+        product_unit: row.product_unit,
+        location_name: row.location_name,
+        staff_name: row.staff_name,
+        materials: [],
+      };
+      if (row.consumption_id && row.material_item_id && row.material_name) {
+        batch.materials.push({
+          id: row.consumption_id,
+          sku: row.material_sku ?? "",
+          name: row.material_name,
+          unit: row.material_unit ?? "",
+          quantity: Number(row.quantity_used ?? 0),
+        });
+      }
+      map.set(row.batch_id, batch);
+    }
+    return Array.from(map.values()).sort(
+      (a, b) => new Date(b.produced_at).getTime() - new Date(a.produced_at).getTime(),
+    );
+  }, [filteredProductionRows]);
 
   const periodMovements = useMemo(() => {
     const start = lagosBoundary(fromDate);
@@ -244,6 +363,14 @@ function ReportsPage() {
   );
   const movementOut = periodMovements.reduce(
     (sum, row) => sum + Math.max(0, -Number(row.signed_quantity)),
+    0,
+  );
+  const productionOutput = productionBatches.reduce(
+    (sum, batch) => sum + batch.quantity_produced,
+    0,
+  );
+  const productionMaterialLines = productionBatches.reduce(
+    (sum, batch) => sum + batch.materials.length,
     0,
   );
 
@@ -329,6 +456,55 @@ function ReportsPage() {
     );
   }
 
+  function exportProduction() {
+    const rows = productionBatches.flatMap((batch) => {
+      const materials = batch.materials.length ? batch.materials : [null];
+      return materials.map((material) => [
+        batch.produced_at,
+        batch.batch_number,
+        batch.product_sku,
+        batch.product_name,
+        batch.quantity_produced,
+        batch.product_unit,
+        batch.location_name,
+        batch.status,
+        batch.staff_name,
+        material?.sku,
+        material?.name,
+        material?.quantity,
+        material?.unit,
+        batch.qc_notes,
+      ]);
+    });
+    downloadCsv(
+      `production-report-${fromDate}-to-${toDate}.csv`,
+      [
+        "Produced at",
+        "Batch number",
+        "Output SKU",
+        "Output product",
+        "Output quantity",
+        "Output unit",
+        "Location",
+        "Status",
+        "Operator",
+        "Material SKU",
+        "Material",
+        "Quantity used",
+        "Material unit",
+        "QC notes",
+      ],
+      rows,
+    );
+  }
+
+  const exportCurrentReport =
+    tab === "dispatches"
+      ? exportDispatches
+      : tab === "movements"
+        ? exportMovements
+        : exportProduction;
+
   if (!canView) {
     return (
       <p className="text-sm text-muted-foreground">
@@ -343,20 +519,16 @@ function ReportsPage() {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Reports</h1>
           <p className="text-sm text-muted-foreground">
-            Daily dispatch and inventory movement records in Africa/Lagos time.
+            Dispatch, inventory movement and production records in Africa/Lagos time.
           </p>
         </div>
-        <Button
-          variant="outline"
-          onClick={tab === "dispatches" ? exportDispatches : exportMovements}
-          disabled={loading}
-        >
+        <Button variant="outline" onClick={exportCurrentReport} disabled={loading}>
           <Download className="mr-2 size-4" /> Export current report
         </Button>
       </div>
 
       <Card>
-        <CardContent className="grid gap-3 pt-6 sm:grid-cols-4 sm:items-end">
+        <CardContent className="grid gap-3 pt-6 sm:grid-cols-2 lg:grid-cols-5 lg:items-end">
           <div>
             <Label>From</Label>
             <Input
@@ -385,6 +557,22 @@ function ReportsPage() {
               </SelectContent>
             </Select>
           </div>
+          <div>
+            <Label>Product / item</Label>
+            <Select value={productId} onValueChange={setProductId}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All products and items</SelectItem>
+                {products.map((product) => (
+                  <SelectItem key={product.id} value={product.id}>
+                    {product.name} ({product.sku})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
           <Button
             onClick={load}
             disabled={loading}
@@ -396,9 +584,10 @@ function ReportsPage() {
       </Card>
 
       <Tabs value={tab} onValueChange={setTab}>
-        <TabsList>
+        <TabsList className="h-auto flex-wrap">
           <TabsTrigger value="dispatches">Products dispatched</TabsTrigger>
           <TabsTrigger value="movements">Inventory movements</TabsTrigger>
+          <TabsTrigger value="production">Production</TabsTrigger>
         </TabsList>
 
         <TabsContent value="dispatches" className="space-y-4">
@@ -587,6 +776,77 @@ function ReportsPage() {
                       </td>
                       <td className="px-3 py-2 text-xs text-muted-foreground">
                         {row.performed_by_name ?? "System"}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="production" className="space-y-4">
+          <div className="grid gap-3 sm:grid-cols-3">
+            <SummaryCard label="Batches" value={productionBatches.length} />
+            <SummaryCard label="Total output" value={productionOutput} />
+            <SummaryCard label="Material lines" value={productionMaterialLines} />
+          </div>
+
+          <div className="overflow-x-auto rounded-lg border bg-card">
+            <table className="w-full min-w-[1050px] text-sm">
+              <thead className="bg-muted/50 text-xs uppercase text-muted-foreground">
+                <tr>
+                  <th className="px-3 py-2 text-left">Time</th>
+                  <th className="px-3 py-2 text-left">Batch</th>
+                  <th className="px-3 py-2 text-left">Output product</th>
+                  <th className="px-3 py-2 text-right">Output</th>
+                  <th className="px-3 py-2 text-left">Materials used</th>
+                  <th className="px-3 py-2 text-left">Status</th>
+                  <th className="px-3 py-2 text-left">Operator</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y">
+                {productionBatches.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="px-4 py-12 text-center text-muted-foreground">
+                      No production batches in this period.
+                    </td>
+                  </tr>
+                ) : (
+                  productionBatches.map((batch) => (
+                    <tr key={batch.batch_id}>
+                      <td className="px-3 py-2 whitespace-nowrap">
+                        {formatLagosDateTime(batch.produced_at)}
+                      </td>
+                      <td className="px-3 py-2 font-mono text-xs">{batch.batch_number}</td>
+                      <td className="px-3 py-2">
+                        <p>{batch.product_name}</p>
+                        <p className="font-mono text-[11px] text-muted-foreground">
+                          {batch.product_sku}
+                        </p>
+                      </td>
+                      <td className="px-3 py-2 text-right font-mono">
+                        {batch.quantity_produced.toLocaleString()} {batch.product_unit}
+                      </td>
+                      <td className="px-3 py-2">
+                        {batch.materials.length === 0 ? (
+                          <span className="text-muted-foreground">None recorded</span>
+                        ) : (
+                          <div className="space-y-1">
+                            {batch.materials.map((material) => (
+                              <p key={material.id} className="text-xs">
+                                {material.name}: {material.quantity.toLocaleString()}{" "}
+                                {material.unit}
+                              </p>
+                            ))}
+                          </div>
+                        )}
+                      </td>
+                      <td className="px-3 py-2">
+                        <Badge variant="outline">{batch.status}</Badge>
+                      </td>
+                      <td className="px-3 py-2 text-xs text-muted-foreground">
+                        {batch.staff_name ?? "System"}
                       </td>
                     </tr>
                   ))

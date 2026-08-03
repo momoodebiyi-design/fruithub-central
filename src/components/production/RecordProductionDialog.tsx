@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -52,15 +53,25 @@ export function RecordProductionDialog({
 
   useEffect(() => {
     (async () => {
-      const { data } = await (supabase as any)
-        .from("v_item_stock")
+      const { data, error } = await (supabase as any)
+        .from("v_central_item_stock")
         .select("item_id, sku, name, unit, category, on_hand")
         .eq("status", "active")
         .order("name");
-      setItems(((data ?? []) as any[]).map((r) => ({
-        id: r.item_id, sku: r.sku, name: r.name, unit: r.unit,
-        category: r.category, quantity: Number(r.on_hand ?? 0),
-      })));
+      if (error) {
+        toast.error(`Unable to load Main Store stock: ${error.message}`);
+        return;
+      }
+      setItems(
+        ((data ?? []) as any[]).map((r) => ({
+          id: r.item_id,
+          sku: r.sku,
+          name: r.name,
+          unit: r.unit,
+          category: r.category,
+          quantity: Number(r.on_hand ?? 0),
+        })),
+      );
     })();
 
     const d = new Date();
@@ -73,13 +84,18 @@ export function RecordProductionDialog({
   const inputItems = items.filter((i) => i.category !== "finished_good");
 
   async function submit() {
+    if (!batchNumber.trim()) return toast.error("Enter a batch number");
     if (!outputItemId) return toast.error("Pick an output product");
     const outQ = Number(outputQty);
     if (!outQ || outQ <= 0) return toast.error("Enter output quantity");
     const consumption = rows
       .filter((r) => r.item_id && r.quantity)
       .map((r) => ({ item_id: r.item_id, quantity: Number(r.quantity) }));
-    if (consumption.some((c) => !c.quantity || c.quantity <= 0)) return toast.error("Invalid consumption quantity");
+    if (consumption.some((c) => !c.quantity || c.quantity <= 0))
+      return toast.error("Invalid consumption quantity");
+    if (new Set(consumption.map((row) => row.item_id)).size !== consumption.length) {
+      return toast.error("Each consumed material can only be added once");
+    }
 
     setSaving(true);
     const { error } = await supabase.rpc("record_production", {
@@ -99,34 +115,58 @@ export function RecordProductionDialog({
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader><DialogTitle>Record production batch</DialogTitle></DialogHeader>
+        <DialogHeader>
+          <DialogTitle>Record production batch</DialogTitle>
+        </DialogHeader>
         <div className="space-y-4">
           <div>
             <Label>Batch number</Label>
-            <Input value={batchNumber} onChange={(e) => setBatchNumber(e.target.value)} className="font-mono" />
+            <Input
+              value={batchNumber}
+              onChange={(e) => setBatchNumber(e.target.value)}
+              className="font-mono"
+            />
           </div>
 
           <div className="border rounded-md p-4 space-y-3">
-            <p className="text-xs uppercase tracking-wider text-muted-foreground font-medium">Output</p>
+            <p className="text-xs uppercase tracking-wider text-muted-foreground font-medium">
+              Output
+            </p>
             <div className="grid grid-cols-[1fr_140px] gap-3">
               <Select value={outputItemId} onValueChange={setOutputItemId}>
-                <SelectTrigger><SelectValue placeholder="Finished product" /></SelectTrigger>
+                <SelectTrigger>
+                  <SelectValue placeholder="Finished product" />
+                </SelectTrigger>
                 <SelectContent>
                   {outputItems.map((i) => (
                     <SelectItem key={i.id} value={i.id}>
-                      {i.name} <span className="text-muted-foreground text-xs ml-1 font-mono">{i.sku}</span>
+                      {i.name}{" "}
+                      <span className="text-muted-foreground text-xs ml-1 font-mono">{i.sku}</span>
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
-              <Input type="number" step="0.01" min="0" placeholder="Quantity" value={outputQty} onChange={(e) => setOutputQty(e.target.value)} />
+              <Input
+                type="number"
+                step="0.01"
+                min="0"
+                placeholder="Quantity"
+                value={outputQty}
+                onChange={(e) => setOutputQty(e.target.value)}
+              />
             </div>
           </div>
 
           <div className="border rounded-md p-4 space-y-3">
             <div className="flex items-center justify-between">
-              <p className="text-xs uppercase tracking-wider text-muted-foreground font-medium">Consumed materials</p>
-              <Button variant="ghost" size="sm" onClick={() => setRows([...rows, { item_id: "", quantity: "" }])}>
+              <p className="text-xs uppercase tracking-wider text-muted-foreground font-medium">
+                Consumed materials
+              </p>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setRows([...rows, { item_id: "", quantity: "" }])}
+              >
                 <Plus className="size-3.5 mr-1" /> Add
               </Button>
             </div>
@@ -134,18 +174,45 @@ export function RecordProductionDialog({
               const it = items.find((x) => x.id === r.item_id);
               return (
                 <div key={i} className="grid grid-cols-[1fr_140px_auto] gap-2 items-center">
-                  <Select value={r.item_id} onValueChange={(v) => setRows(rows.map((row, idx) => idx === i ? { ...row, item_id: v } : row))}>
-                    <SelectTrigger><SelectValue placeholder="Material" /></SelectTrigger>
+                  <Select
+                    value={r.item_id}
+                    onValueChange={(v) =>
+                      setRows(rows.map((row, idx) => (idx === i ? { ...row, item_id: v } : row)))
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Material" />
+                    </SelectTrigger>
                     <SelectContent>
                       {inputItems.map((x) => (
                         <SelectItem key={x.id} value={x.id}>
-                          {x.name} <span className="text-muted-foreground text-xs ml-1">({Number(x.quantity).toLocaleString()} {x.unit})</span>
+                          {x.name}{" "}
+                          <span className="text-muted-foreground text-xs ml-1">
+                            ({Number(x.quantity).toLocaleString()} {x.unit})
+                          </span>
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
-                  <Input type="number" step="0.01" min="0" placeholder={it ? `qty (${it.unit})` : "qty"} value={r.quantity} onChange={(e) => setRows(rows.map((row, idx) => idx === i ? { ...row, quantity: e.target.value } : row))} />
-                  <Button variant="ghost" size="icon" onClick={() => setRows(rows.filter((_, idx) => idx !== i))}>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    placeholder={it ? `qty (${it.unit})` : "qty"}
+                    value={r.quantity}
+                    onChange={(e) =>
+                      setRows(
+                        rows.map((row, idx) =>
+                          idx === i ? { ...row, quantity: e.target.value } : row,
+                        ),
+                      )
+                    }
+                  />
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => setRows(rows.filter((_, idx) => idx !== i))}
+                  >
                     <Trash2 className="size-4 text-muted-foreground" />
                   </Button>
                 </div>
@@ -159,8 +226,14 @@ export function RecordProductionDialog({
           </div>
         </div>
         <DialogFooter>
-          <Button variant="ghost" onClick={onClose}>Cancel</Button>
-          <Button onClick={submit} disabled={saving} className="bg-brand-orange text-white hover:bg-brand-orange/90">
+          <Button variant="ghost" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button
+            onClick={submit}
+            disabled={saving}
+            className="bg-brand-orange text-white hover:bg-brand-orange/90"
+          >
             {saving ? "Recording…" : "Record batch"}
           </Button>
         </DialogFooter>
