@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -16,6 +17,7 @@ import { useSession } from "@/hooks/useSession";
 import { CAN_RECORD_PRODUCTION, hasAny } from "@/lib/permissions";
 import { RecordProductionDialog } from "@/components/production/RecordProductionDialog";
 import { formatDistanceToNow } from "date-fns";
+import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/production")({
   component: ProductionPage,
@@ -32,21 +34,61 @@ interface Batch {
   staff: { full_name: string | null } | null;
 }
 
+interface ProductionReportRow {
+  batch_id: string;
+  batch_number: string;
+  quantity_produced: number;
+  produced_at: string;
+  status: string;
+  qc_notes: string | null;
+  product_name: string;
+  product_sku: string;
+  product_unit: string;
+  staff_name: string | null;
+}
+
 function ProductionPage() {
   const session = useSession();
   const canRecord = hasAny(session.roles, CAN_RECORD_PRODUCTION);
   const [batches, setBatches] = useState<Batch[]>([]);
+  const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
 
   async function load() {
-    const { data } = await supabase
-      .from("production_batches")
-      .select(
-        "id, batch_number, quantity_produced, produced_at, status, qc_notes, product:inventory_items!production_batches_product_item_id_fkey(name, sku, unit), staff:profiles!production_batches_staff_id_fkey(full_name)",
-      )
+    setLoading(true);
+    const { data, error } = await (supabase as any)
+      .from("v_production_report")
+      .select("*")
       .order("produced_at", { ascending: false })
-      .limit(50);
-    setBatches((data ?? []) as unknown as Batch[]);
+      .limit(500);
+
+    if (error) {
+      toast.error(`Unable to load production batches: ${error.message}`);
+      setBatches([]);
+      setLoading(false);
+      return;
+    }
+
+    const unique = new Map<string, Batch>();
+    for (const row of (data ?? []) as ProductionReportRow[]) {
+      if (unique.has(row.batch_id)) continue;
+      unique.set(row.batch_id, {
+        id: row.batch_id,
+        batch_number: row.batch_number,
+        quantity_produced: Number(row.quantity_produced),
+        produced_at: row.produced_at,
+        status: row.status,
+        qc_notes: row.qc_notes,
+        product: {
+          name: row.product_name,
+          sku: row.product_sku,
+          unit: row.product_unit,
+        },
+        staff: row.staff_name ? { full_name: row.staff_name } : null,
+      });
+    }
+    setBatches(Array.from(unique.values()).slice(0, 100));
+    setLoading(false);
   }
 
   useEffect(() => {
@@ -55,7 +97,9 @@ function ProductionPage() {
       .channel("prod-list")
       .on("postgres_changes", { event: "*", schema: "public", table: "production_batches" }, load)
       .subscribe();
-    return () => { supabase.removeChannel(ch); };
+    return () => {
+      supabase.removeChannel(ch);
+    };
   }, []);
 
   return (
@@ -63,10 +107,15 @@ function ProductionPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Production</h1>
-          <p className="text-sm text-muted-foreground mt-1">Batches consume raw materials and yield finished goods atomically.</p>
+          <p className="text-sm text-muted-foreground mt-1">
+            Batches consume raw materials and yield finished goods atomically.
+          </p>
         </div>
         {canRecord && (
-          <Button onClick={() => setOpen(true)} className="bg-brand-orange text-white hover:bg-brand-orange/90">
+          <Button
+            onClick={() => setOpen(true)}
+            className="bg-brand-orange text-white hover:bg-brand-orange/90"
+          >
             <Plus className="size-4 mr-2" /> Record batch
           </Button>
         )}
@@ -90,14 +139,20 @@ function ProductionPage() {
                 <TableCell className="font-mono text-xs">{b.batch_number}</TableCell>
                 <TableCell className="font-medium">
                   {b.product?.name ?? "—"}
-                  {b.product && <span className="ml-2 text-[11px] text-muted-foreground font-mono">{b.product.sku}</span>}
+                  {b.product && (
+                    <span className="ml-2 text-[11px] text-muted-foreground font-mono">
+                      {b.product.sku}
+                    </span>
+                  )}
                 </TableCell>
                 <TableCell className="text-right font-mono">
                   {Number(b.quantity_produced).toLocaleString()}{" "}
                   <span className="text-xs text-muted-foreground">{b.product?.unit}</span>
                 </TableCell>
                 <TableCell>
-                  <Badge variant="outline" className="text-[10px] uppercase tracking-wider">{b.status}</Badge>
+                  <Badge variant="outline" className="text-[10px] uppercase tracking-wider">
+                    {b.status}
+                  </Badge>
                 </TableCell>
                 <TableCell className="text-xs">{b.staff?.full_name ?? "—"}</TableCell>
                 <TableCell className="text-xs text-muted-foreground">
@@ -105,8 +160,19 @@ function ProductionPage() {
                 </TableCell>
               </TableRow>
             ))}
-            {batches.length === 0 && (
-              <TableRow><TableCell colSpan={6} className="text-center text-sm text-muted-foreground py-8">No batches recorded yet</TableCell></TableRow>
+            {!loading && batches.length === 0 && (
+              <TableRow>
+                <TableCell colSpan={6} className="text-center text-sm text-muted-foreground py-8">
+                  No batches recorded yet
+                </TableCell>
+              </TableRow>
+            )}
+            {loading && (
+              <TableRow>
+                <TableCell colSpan={6} className="text-center text-sm text-muted-foreground py-8">
+                  Loading production batches…
+                </TableCell>
+              </TableRow>
             )}
           </TableBody>
         </Table>
