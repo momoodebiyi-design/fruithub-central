@@ -19,6 +19,7 @@ import {
   ShieldCheck,
   Lock,
   ChartNoAxesCombined,
+  ScanLine,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useSession } from "@/hooks/useSession";
@@ -62,30 +63,20 @@ type DisabledItem = {
 const FULL_NAV: NavItem[] = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { to: "/inventory", label: "Central Stock", icon: Boxes },
-  { to: "/recipes", label: "Recipes / BOM", icon: FlaskConical, roles: CAN_MANAGE_RECIPES },
+  { to: "/recipes", label: "Packaging Setup", icon: FlaskConical, roles: CAN_MANAGE_RECIPES },
   { to: "/production", label: "Production", icon: FlaskConical, roles: CAN_RECORD_PRODUCTION },
+  { to: "/stocktakes", label: "Central Stocktake", icon: ScanLine, roles: CAN_WRITE_INVENTORY },
   { to: "/dispatches", label: "Transfers / Dispatches", icon: Send, roles: CAN_DISPATCH },
   { to: "/shops", label: "Shops", icon: Store, roles: CAN_MANAGE_SHOPS },
-  {
-    to: "/shop-counts",
-    label: "Daily counts",
-    icon: ClipboardCheck,
-    roles: [...CAN_MANAGE_SHOPS, "shop_supervisor"],
-  },
-  { to: "/replenishment", label: "Replenishment", icon: ClipboardList },
   { to: "/purchasing", label: "Purchasing", icon: ShoppingCart, roles: CAN_VIEW_PURCHASING },
   { to: "/reports", label: "Reports", icon: ChartNoAxesCombined, roles: CAN_VIEW_REPORTS },
 ];
 
-const SUPERVISOR_NAV: NavItem[] = [
-  { to: "/dashboard", label: "Today", icon: LayoutDashboard },
-  { to: "/shop-counts", label: "Daily counts", icon: ClipboardCheck },
-  { to: "/replenishment", label: "Replenishment", icon: ClipboardList },
-];
+const SUPERVISOR_NAV: NavItem[] = [{ to: "/dashboard", label: "Today", icon: LayoutDashboard }];
 
 const SUPERVISOR_UPCOMING: DisabledItem[] = [
-  { label: "Sales", icon: Send, hint: "Coming in Shop 1 sales slice" },
-  { label: "Closing", icon: Lock, hint: "Coming in Shop 1 closing slice" },
+  { label: "Shop stock tools", icon: Lock, hint: "Paused until POS rollout" },
+  { label: "Sales / POS", icon: Send, hint: "Planned for a later release" },
 ];
 
 export function AppShell({ children }: { children: ReactNode }) {
@@ -160,7 +151,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
           {supervisorOnly && (
             <p className="px-3 pt-1 pb-2 text-[10px] uppercase tracking-wider text-muted-foreground/70">
-              Shop 1 pilot
+              Shop operations paused
             </p>
           )}
           {items.map((item) => {

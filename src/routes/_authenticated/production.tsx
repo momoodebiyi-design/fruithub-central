@@ -32,6 +32,7 @@ interface Batch {
   qc_notes: string | null;
   product: { name: string; sku: string; unit: string } | null;
   staff: { full_name: string | null } | null;
+  packaging_setup_missing: boolean;
 }
 
 interface ProductionReportRow {
@@ -45,6 +46,7 @@ interface ProductionReportRow {
   product_sku: string;
   product_unit: string;
   staff_name: string | null;
+  packaging_setup_missing: boolean;
 }
 
 function ProductionPage() {
@@ -85,6 +87,7 @@ function ProductionPage() {
           unit: row.product_unit,
         },
         staff: row.staff_name ? { full_name: row.staff_name } : null,
+        packaging_setup_missing: Boolean(row.packaging_setup_missing),
       });
     }
     setBatches(Array.from(unique.values()).slice(0, 100));
@@ -108,7 +111,7 @@ function ProductionPage() {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Production</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Batches consume raw materials and yield finished goods atomically.
+            Record finished output and the packaging and consumables used for each batch.
           </p>
         </div>
         {canRecord && (
@@ -129,6 +132,7 @@ function ProductionPage() {
               <TableHead>Product</TableHead>
               <TableHead className="text-right">Output</TableHead>
               <TableHead>Status</TableHead>
+              <TableHead>Packaging</TableHead>
               <TableHead>Operator</TableHead>
               <TableHead>When</TableHead>
             </TableRow>
@@ -154,6 +158,18 @@ function ProductionPage() {
                     {b.status}
                   </Badge>
                 </TableCell>
+                <TableCell>
+                  <Badge
+                    variant="outline"
+                    className={
+                      b.packaging_setup_missing
+                        ? "text-amber-700 border-amber-300"
+                        : "text-emerald-700 border-emerald-300"
+                    }
+                  >
+                    {b.packaging_setup_missing ? "Manual exception" : "Setup applied"}
+                  </Badge>
+                </TableCell>
                 <TableCell className="text-xs">{b.staff?.full_name ?? "—"}</TableCell>
                 <TableCell className="text-xs text-muted-foreground">
                   {formatDistanceToNow(new Date(b.produced_at), { addSuffix: true })}
@@ -162,14 +178,14 @@ function ProductionPage() {
             ))}
             {!loading && batches.length === 0 && (
               <TableRow>
-                <TableCell colSpan={6} className="text-center text-sm text-muted-foreground py-8">
+                <TableCell colSpan={7} className="text-center text-sm text-muted-foreground py-8">
                   No batches recorded yet
                 </TableCell>
               </TableRow>
             )}
             {loading && (
               <TableRow>
-                <TableCell colSpan={6} className="text-center text-sm text-muted-foreground py-8">
+                <TableCell colSpan={7} className="text-center text-sm text-muted-foreground py-8">
                   Loading production batches…
                 </TableCell>
               </TableRow>

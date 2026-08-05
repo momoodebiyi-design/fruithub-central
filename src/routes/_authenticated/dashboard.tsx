@@ -5,6 +5,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Boxes, FlaskConical, AlertTriangle, TrendingUp, ShoppingCart } from "lucide-react";
+import { useSession } from "@/hooks/useSession";
+import { isShopSupervisorOnly } from "@/lib/permissions";
+import { ShopOperationsPaused } from "@/components/ShopOperationsPaused";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
   component: DashboardPage,
@@ -18,16 +21,8 @@ interface Stats {
   approvals: number;
 }
 
-interface PendingClosing {
-  shop_id: string;
-  shop_name: string;
-  count_date: string;
-  opening_id: string;
-  closing_id: string | null;
-}
-
 function DashboardPage() {
-  const [pendingClosings, setPendingClosings] = useState<PendingClosing[]>([]);
+  const session = useSession();
   const [stats, setStats] = useState<Stats>({
     totalItems: 0,
     lowStock: 0,
@@ -67,7 +62,6 @@ function DashboardPage() {
         { count: itemsCount },
         { data: routedNeeds },
         { data: batches },
-        { data: pend },
         { count: approvals },
       ] = await Promise.all([
         supabase
@@ -88,28 +82,24 @@ function DashboardPage() {
           )
           .gte("produced_at", iso)
           .order("produced_at", { ascending: false }),
-        supabase
-          .from("v_shop_pending_closings" as any)
-          .select("*")
-          .order("count_date", { ascending: false })
-          .limit(20),
         (supabase as any)
           .from("purchase_orders")
           .select("id", { count: "exact", head: true })
           .eq("workflow_status", "awaiting_approval"),
       ]);
-      setPendingClosings((pend as unknown as PendingClosing[]) ?? []);
-      const activeNeeds = ((routedNeeds ?? []) as any[]).map((need) => ({
-        id: need.id,
-        needNumber: need.need_number,
-        name: need.inventory_items?.name ?? "—",
-        unit: need.inventory_items?.unit ?? "",
-        available: Number(need.available_stock_snapshot ?? 0),
-        suggested: Number(need.suggested_quantity ?? 0),
-        priority: need.priority,
-        sourceType: need.source_type,
-        location: need.locations?.name ?? "—",
-      }));
+      const activeNeeds = ((routedNeeds ?? []) as any[])
+        .filter((need) => need.source_type !== "replenishment")
+        .map((need) => ({
+          id: need.id,
+          needNumber: need.need_number,
+          name: need.inventory_items?.name ?? "—",
+          unit: need.inventory_items?.unit ?? "",
+          available: Number(need.available_stock_snapshot ?? 0),
+          suggested: Number(need.suggested_quantity ?? 0),
+          priority: need.priority,
+          sourceType: need.source_type,
+          location: need.locations?.name ?? "—",
+        }));
       setLowStockItems(activeNeeds.slice(0, 6));
 
       const outputToday = ((batches ?? []) as any[]).reduce(
@@ -138,6 +128,8 @@ function DashboardPage() {
     load();
   }, []);
 
+  if (isShopSupervisorOnly(session.roles)) return <ShopOperationsPaused />;
+
   return (
     <div className="space-y-6">
       <div>
@@ -147,7 +139,7 @@ function DashboardPage() {
         </p>
       </div>
 
-      <div className="grid grid-cols-2 lg:grid-cols-6 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
         <KpiCard label="SKUs tracked" value={stats.totalItems} icon={Boxes} />
         <KpiCard
           label="Low stock alerts"
@@ -168,45 +160,7 @@ function DashboardPage() {
           suffix="units"
           icon={TrendingUp}
         />
-        <KpiCard
-          label="Closings pending"
-          value={pendingClosings.length}
-          icon={AlertTriangle}
-          accent={pendingClosings.length > 0 ? "warn" : undefined}
-        />
       </div>
-
-      {pendingClosings.length > 0 && (
-        <Card className="border-brand-orange/40">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base flex items-center gap-2 text-brand-orange">
-              <AlertTriangle className="size-4" />
-              Shops pending closing count
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-            {pendingClosings.map((p) => (
-              <Link
-                key={p.opening_id}
-                to={p.closing_id ? "/shop-counts/$countId" : "/shop-counts"}
-                params={p.closing_id ? { countId: p.closing_id } : (undefined as any)}
-                className="flex items-center justify-between border rounded-md px-3 py-2 hover:bg-muted/40 text-sm"
-              >
-                <div>
-                  <p className="font-medium">{p.shop_name}</p>
-                  <p className="text-[11px] text-muted-foreground font-mono">{p.count_date}</p>
-                </div>
-                <Badge
-                  variant="outline"
-                  className="text-brand-orange border-brand-orange/40 text-[10px]"
-                >
-                  {p.closing_id ? "Complete" : "Awaiting"}
-                </Badge>
-              </Link>
-            ))}
-          </CardContent>
-        </Card>
-      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <Card>
@@ -222,13 +176,7 @@ function DashboardPage() {
             {lowStockItems.map((it) => (
               <Link
                 key={it.id}
-                to={
-                  it.sourceType === "purchasing"
-                    ? "/purchasing"
-                    : it.sourceType === "replenishment"
-                      ? "/replenishment"
-                      : "/production"
-                }
+                to={it.sourceType === "purchasing" ? "/purchasing" : "/production"}
                 className="block border-b last:border-0 pb-3 last:pb-0 hover:bg-muted/40 -mx-2 px-2 rounded-md"
               >
                 <div className="flex items-start justify-between gap-3">

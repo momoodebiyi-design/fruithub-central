@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -51,13 +52,6 @@ export function RecipeDialog({
   const [items, setItems] = useState<Item[]>([]);
   const [productId, setProductId] = useState(recipe?.product_item_id ?? "");
   const [version, setVersion] = useState<string>(String(recipe?.version ?? 1));
-  const [yieldQty, setYieldQty] = useState<string>(
-    recipe?.yield_quantity != null ? String(recipe.yield_quantity) : ""
-  );
-  const [yieldUnit, setYieldUnit] = useState<string>(recipe?.yield_unit ?? "");
-  const [wastePct, setWastePct] = useState<string>(
-    recipe?.waste_pct != null ? String(recipe.waste_pct) : ""
-  );
   const [notes, setNotes] = useState(recipe?.notes ?? "");
   const [saving, setSaving] = useState(false);
 
@@ -67,18 +61,11 @@ export function RecipeDialog({
         .from("inventory_items")
         .select("id, sku, name, unit, category")
         .eq("is_active", true)
-        .in("category", ["finished_good", "semi_finished"] as any)
+        .eq("category", "finished_good" as any)
         .order("name");
       setItems((data ?? []) as unknown as Item[]);
     })();
   }, []);
-
-  useEffect(() => {
-    if (!yieldUnit && productId) {
-      const it = items.find((i) => i.id === productId);
-      if (it) setYieldUnit(it.unit);
-    }
-  }, [productId, items]);
 
   async function submit() {
     if (!productId) return toast.error("Pick a product");
@@ -88,9 +75,9 @@ export function RecipeDialog({
     const payload = {
       product_item_id: productId,
       version: v,
-      yield_quantity: yieldQty ? Number(yieldQty) : null,
-      yield_unit: yieldUnit || null,
-      waste_pct: wastePct ? Number(wastePct) : null,
+      yield_quantity: 1,
+      yield_unit: items.find((item) => item.id === productId)?.unit ?? "unit",
+      waste_pct: 0,
       notes: notes || null,
     };
 
@@ -108,7 +95,7 @@ export function RecipeDialog({
     }
     setSaving(false);
     if (error) return toast.error(error.message);
-    toast.success(isEdit ? "Recipe updated" : "Recipe created");
+    toast.success(isEdit ? "Packaging setup updated" : "Packaging setup created");
     onSaved();
   }
 
@@ -116,14 +103,14 @@ export function RecipeDialog({
     <Dialog open onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
-          <DialogTitle>{isEdit ? "Edit recipe" : "New recipe"}</DialogTitle>
+          <DialogTitle>{isEdit ? "Edit packaging setup" : "New packaging setup"}</DialogTitle>
         </DialogHeader>
         <div className="space-y-4">
           <div>
             <Label>Product</Label>
             <Select value={productId} onValueChange={setProductId} disabled={isEdit}>
               <SelectTrigger>
-                <SelectValue placeholder="Finished good or semi-finished" />
+                <SelectValue placeholder="Finished product" />
               </SelectTrigger>
               <SelectContent>
                 {items.map((i) => (
@@ -136,7 +123,7 @@ export function RecipeDialog({
             </Select>
           </div>
 
-          <div className="grid grid-cols-3 gap-3">
+          <div className="max-w-32">
             <div>
               <Label>Version</Label>
               <Input
@@ -148,39 +135,6 @@ export function RecipeDialog({
                 className="font-mono"
               />
             </div>
-            <div>
-              <Label>Yield qty</Label>
-              <Input
-                type="number"
-                step="0.001"
-                min="0"
-                value={yieldQty}
-                onChange={(e) => setYieldQty(e.target.value)}
-                className="font-mono"
-                placeholder="blank ok"
-              />
-            </div>
-            <div>
-              <Label>Yield unit</Label>
-              <Input
-                value={yieldUnit}
-                onChange={(e) => setYieldUnit(e.target.value)}
-                placeholder="L, kg, unit"
-              />
-            </div>
-          </div>
-
-          <div>
-            <Label>Overall waste %</Label>
-            <Input
-              type="number"
-              step="0.01"
-              min="0"
-              value={wastePct}
-              onChange={(e) => setWastePct(e.target.value)}
-              className="font-mono"
-              placeholder="0"
-            />
           </div>
 
           <div>
@@ -197,7 +151,7 @@ export function RecipeDialog({
             disabled={saving}
             className="bg-brand-orange text-white hover:bg-brand-orange/90"
           >
-            {saving ? "Saving…" : isEdit ? "Save" : "Create recipe"}
+            {saving ? "Saving…" : isEdit ? "Save" : "Create setup"}
           </Button>
         </DialogFooter>
       </DialogContent>

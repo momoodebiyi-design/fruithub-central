@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -47,7 +48,7 @@ function RecipesPage() {
     const { data, error } = await supabase
       .from("recipes")
       .select(
-        "id, product_item_id, version, yield_quantity, yield_unit, waste_pct, status, notes, updated_at, product:inventory_items!recipes_product_item_id_fkey(name, sku, unit, category), recipe_ingredients(count)"
+        "id, product_item_id, version, yield_quantity, yield_unit, waste_pct, status, notes, updated_at, product:inventory_items!recipes_product_item_id_fkey(name, sku, unit, category), recipe_ingredients(count)",
       )
       .order("updated_at", { ascending: false });
     if (error) {
@@ -91,18 +92,16 @@ function RecipesPage() {
   async function approve(id: string) {
     const { error } = await supabase.rpc("approve_recipe", { _recipe_id: id });
     if (error) return toast.error(error.message);
-    toast.success("Recipe approved");
+    toast.success("Packaging setup approved");
     load();
   }
 
   async function retire(id: string) {
-    if (!confirm("Retire this recipe? It can no longer drive production deductions.")) return;
-    const { error } = await supabase
-      .from("recipes")
-      .update({ status: "retired" })
-      .eq("id", id);
+    if (!confirm("Retire this packaging setup? It can no longer drive production deductions."))
+      return;
+    const { error } = await supabase.from("recipes").update({ status: "retired" }).eq("id", id);
     if (error) return toast.error(error.message);
-    toast.success("Recipe retired");
+    toast.success("Packaging setup retired");
     load();
   }
 
@@ -110,10 +109,10 @@ function RecipesPage() {
     <div className="space-y-4">
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Recipes / BOM</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">Packaging Setup</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Define the bill of materials for each product. Only approved recipes drive stock
-            deductions during production.
+            Define only the bottles, caps, labels, nylons, spoons, serviettes and other consumables
+            used for each finished product.
           </p>
         </div>
         {canManage && (
@@ -121,7 +120,7 @@ function RecipesPage() {
             onClick={() => setCreating(true)}
             className="bg-brand-orange text-white hover:bg-brand-orange/90"
           >
-            <Plus className="size-4 mr-1" /> New recipe
+            <Plus className="size-4 mr-1" /> New packaging setup
           </Button>
         )}
       </div>
@@ -159,9 +158,7 @@ function RecipesPage() {
             <tr className="text-left text-xs uppercase tracking-wider text-muted-foreground border-b">
               <th className="p-3 font-medium">Product</th>
               <th className="p-3 font-medium">Version</th>
-              <th className="p-3 font-medium">Yield</th>
-              <th className="p-3 font-medium">Waste %</th>
-              <th className="p-3 font-medium">Ingredients</th>
+              <th className="p-3 font-medium">Packaging items</th>
               <th className="p-3 font-medium">Status</th>
               <th className="p-3 font-medium text-right">Actions</th>
             </tr>
@@ -169,14 +166,14 @@ function RecipesPage() {
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan={7} className="p-8 text-center text-muted-foreground">
+                <td colSpan={5} className="p-8 text-center text-muted-foreground">
                   Loading…
                 </td>
               </tr>
             ) : filtered.length === 0 ? (
               <tr>
-                <td colSpan={7} className="p-8 text-center text-muted-foreground">
-                  No recipes yet.
+                <td colSpan={5} className="p-8 text-center text-muted-foreground">
+                  No packaging setups yet.
                 </td>
               </tr>
             ) : (
@@ -184,38 +181,20 @@ function RecipesPage() {
                 <tr key={r.id} className="border-b last:border-b-0 hover:bg-muted/40">
                   <td className="p-3">
                     <div className="font-medium">{r.product?.name ?? "—"}</div>
-                    <div className="text-xs text-muted-foreground font-mono">
-                      {r.product?.sku}
-                    </div>
+                    <div className="text-xs text-muted-foreground font-mono">{r.product?.sku}</div>
                   </td>
                   <td className="p-3 font-mono">v{r.version}</td>
-                  <td className="p-3 font-mono">
-                    {r.yield_quantity != null
-                      ? `${Number(r.yield_quantity).toLocaleString()} ${r.yield_unit ?? r.product?.unit ?? ""}`
-                      : "—"}
-                  </td>
-                  <td className="p-3 font-mono">
-                    {r.waste_pct != null ? `${Number(r.waste_pct)}%` : "—"}
-                  </td>
                   <td className="p-3 font-mono">{r.ingredient_count}</td>
                   <td className="p-3">
                     <StatusBadge status={r.status} />
                   </td>
                   <td className="p-3">
                     <div className="flex justify-end gap-1 flex-wrap">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setIngredientsFor(r)}
-                      >
-                        Ingredients
+                      <Button variant="ghost" size="sm" onClick={() => setIngredientsFor(r)}>
+                        Packaging items
                       </Button>
                       {canManage && r.status !== "retired" && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => setEditing(r)}
-                        >
+                        <Button variant="ghost" size="sm" onClick={() => setEditing(r)}>
                           <Pencil className="size-3.5" />
                         </Button>
                       )}
@@ -282,7 +261,9 @@ function RecipesPage() {
       {ingredientsFor && (
         <IngredientsDialog
           recipe={ingredientsFor}
-          canEdit={canManage && ingredientsFor.status !== "retired" && ingredientsFor.status !== "approved"}
+          canEdit={
+            canManage && ingredientsFor.status !== "retired" && ingredientsFor.status !== "approved"
+          }
           onClose={() => setIngredientsFor(null)}
           onSaved={() => {
             load();
@@ -304,7 +285,10 @@ function StatusBadge({ status }: { status: RecipeRow["status"] }) {
       label: "Approved",
       className: "bg-emerald-100 text-emerald-900 dark:bg-emerald-950 dark:text-emerald-200",
     },
-    retired: { label: "Retired", className: "bg-zinc-200 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300" },
+    retired: {
+      label: "Retired",
+      className: "bg-zinc-200 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300",
+    },
   };
   const c = map[status];
   return <Badge className={`${c.className} border-0 font-normal`}>{c.label}</Badge>;

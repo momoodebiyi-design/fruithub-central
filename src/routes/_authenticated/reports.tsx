@@ -112,6 +112,36 @@ type ProductionRow = {
   material_name: string | null;
   material_unit: string | null;
   quantity_used: number | null;
+  packaging_setup_missing: boolean;
+  packaging_exception_reason: string | null;
+  material_category: string | null;
+  expected_quantity: number | null;
+  waste_quantity: number | null;
+  packaging_variance: number | null;
+  variance_reason: string | null;
+};
+
+type ReturnRow = {
+  return_id: string;
+  return_number: string;
+  recorded_at: string;
+  reason: string;
+  condition_notes: string | null;
+  dispatch_id: string;
+  dispatch_reference: string;
+  shop_id: string;
+  shop_name: string;
+  source_location_id: string | null;
+  source_location: string | null;
+  return_line_id: string;
+  item_id: string;
+  sku: string;
+  item_name: string;
+  unit: string;
+  quantity_returned: number;
+  quantity_accepted: number;
+  quantity_rejected: number;
+  recorded_by_name: string | null;
 };
 
 type ProductionBatch = {
@@ -127,12 +157,18 @@ type ProductionBatch = {
   product_unit: string;
   location_name: string | null;
   staff_name: string | null;
+  packaging_setup_missing: boolean;
+  packaging_exception_reason: string | null;
   materials: Array<{
     id: string;
     sku: string;
     name: string;
     unit: string;
     quantity: number;
+    expected: number | null;
+    waste: number;
+    variance: number;
+    reason: string | null;
   }>;
 };
 
@@ -189,6 +225,7 @@ function ReportsPage() {
   const [dispatches, setDispatches] = useState<DispatchRow[]>([]);
   const [movements, setMovements] = useState<MovementRow[]>([]);
   const [productionRows, setProductionRows] = useState<ProductionRow[]>([]);
+  const [returns, setReturns] = useState<ReturnRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState("dispatches");
 
@@ -208,6 +245,7 @@ function ReportsPage() {
       dispatchResult,
       movementResult,
       productionResult,
+      returnResult,
     ] = await Promise.all([
       supabase.from("locations").select("id, name").eq("status", "active").order("name"),
       supabase.from("inventory_items").select("id, name, sku").eq("status", "active").order("name"),
@@ -231,6 +269,13 @@ function ReportsPage() {
         .lt("produced_at", endExclusive)
         .order("produced_at", { ascending: false })
         .limit(10000),
+      (supabase as any)
+        .from("v_dispatch_return_report")
+        .select("*")
+        .gte("recorded_at", start)
+        .lt("recorded_at", endExclusive)
+        .order("recorded_at", { ascending: false })
+        .limit(10000),
     ]);
 
     const error =
@@ -238,13 +283,15 @@ function ReportsPage() {
       productError ??
       dispatchResult.error ??
       movementResult.error ??
-      productionResult.error;
+      productionResult.error ??
+      returnResult.error;
     if (error) toast.error(`Unable to load reports: ${error.message}`);
     setLocations((locationRows as Location[]) ?? []);
     setProducts((productRows as Product[]) ?? []);
     setDispatches((dispatchResult.data as DispatchRow[]) ?? []);
     setMovements((movementResult.data as MovementRow[]) ?? []);
     setProductionRows((productionResult.data as ProductionRow[]) ?? []);
+    setReturns((returnResult.data as ReturnRow[]) ?? []);
     setLoading(false);
   }
 
@@ -286,6 +333,16 @@ function ReportsPage() {
     [productionRows, locationId, productId],
   );
 
+  const filteredReturns = useMemo(
+    () =>
+      returns.filter(
+        (row) =>
+          (locationId === "all" || row.source_location_id === locationId) &&
+          (productId === "all" || row.item_id === productId),
+      ),
+    [returns, locationId, productId],
+  );
+
   const productionBatches = useMemo(() => {
     const map = new Map<string, ProductionBatch>();
     for (const row of filteredProductionRows) {
@@ -302,6 +359,8 @@ function ReportsPage() {
         product_unit: row.product_unit,
         location_name: row.location_name,
         staff_name: row.staff_name,
+        packaging_setup_missing: Boolean(row.packaging_setup_missing),
+        packaging_exception_reason: row.packaging_exception_reason,
         materials: [],
       };
       if (row.consumption_id && row.material_item_id && row.material_name) {
@@ -311,6 +370,10 @@ function ReportsPage() {
           name: row.material_name,
           unit: row.material_unit ?? "",
           quantity: Number(row.quantity_used ?? 0),
+          expected: row.expected_quantity == null ? null : Number(row.expected_quantity),
+          waste: Number(row.waste_quantity ?? 0),
+          variance: Number(row.packaging_variance ?? 0),
+          reason: row.variance_reason,
         });
       }
       map.set(row.batch_id, batch);
@@ -373,6 +436,41 @@ function ReportsPage() {
     (sum, batch) => sum + batch.materials.length,
     0,
   );
+  const uniqueDispatches = new Set(filteredDispatches.map((row) => row.dispatch_id)).size;
+  const returnEvents = new Set(filteredReturns.map((row) => row.return_id)).size;
+  const returnedTotal = filteredReturns.reduce(
+    (sum, row) => sum + Number(row.quantity_returned),
+    0,
+  );
+  const acceptedTotal = filteredReturns.reduce(
+    (sum, row) => sum + Number(row.quantity_accepted),
+    0,
+  );
+  const rejectedTotal = filteredReturns.reduce(
+    (sum, row) => sum + Number(row.quantity_rejected),
+    0,
+  );
+  const dispatchFrequency = useMemo(() => {
+    const map = new Map<
+      string,
+      { destination: string; dispatchIds: Set<string>; units: number; returned: number }
+    >();
+    for (const row of filteredDispatches) {
+      const current = map.get(row.destination_name) ?? {
+        destination: row.destination_name,
+        dispatchIds: new Set<string>(),
+        units: 0,
+        returned: 0,
+      };
+      current.dispatchIds.add(row.dispatch_id);
+      current.units += Number(row.quantity_dispatched);
+      current.returned += Number(row.quantity_returned);
+      map.set(row.destination_name, current);
+    }
+    return Array.from(map.values())
+      .map((row) => ({ ...row, frequency: row.dispatchIds.size }))
+      .sort((a, b) => b.frequency - a.frequency || b.units - a.units);
+  }, [filteredDispatches]);
 
   function exportDispatches() {
     downloadCsv(
@@ -472,7 +570,13 @@ function ReportsPage() {
         material?.sku,
         material?.name,
         material?.quantity,
+        material?.expected,
+        material?.variance,
+        material?.waste,
+        material?.reason,
         material?.unit,
+        batch.packaging_setup_missing ? "Yes" : "No",
+        batch.packaging_exception_reason,
         batch.qc_notes,
       ]);
     });
@@ -491,10 +595,52 @@ function ReportsPage() {
         "Material SKU",
         "Material",
         "Quantity used",
+        "Expected quantity",
+        "Variance",
+        "Waste",
+        "Variance reason",
         "Material unit",
+        "Packaging setup missing",
+        "Packaging exception reason",
         "QC notes",
       ],
       rows,
+    );
+  }
+
+  function exportReturns() {
+    downloadCsv(
+      `factory-return-report-${fromDate}-to-${toDate}.csv`,
+      [
+        "Recorded at",
+        "Return",
+        "Dispatch",
+        "Shop",
+        "SKU",
+        "Product",
+        "Returned",
+        "Accepted",
+        "Rejected",
+        "Unit",
+        "Reason",
+        "Condition notes",
+        "Recorded by",
+      ],
+      filteredReturns.map((row) => [
+        row.recorded_at,
+        row.return_number,
+        row.dispatch_reference,
+        row.shop_name,
+        row.sku,
+        row.item_name,
+        row.quantity_returned,
+        row.quantity_accepted,
+        row.quantity_rejected,
+        row.unit,
+        row.reason,
+        row.condition_notes,
+        row.recorded_by_name,
+      ]),
     );
   }
 
@@ -503,7 +649,9 @@ function ReportsPage() {
       ? exportDispatches
       : tab === "movements"
         ? exportMovements
-        : exportProduction;
+        : tab === "production"
+          ? exportProduction
+          : exportReturns;
 
   if (!canView) {
     return (
@@ -519,7 +667,8 @@ function ReportsPage() {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Reports</h1>
           <p className="text-sm text-muted-foreground">
-            Dispatch, inventory movement and production records in Africa/Lagos time.
+            Factory dispatch, return, inventory movement and production records in Africa/Lagos
+            time.
           </p>
         </div>
         <Button variant="outline" onClick={exportCurrentReport} disabled={loading}>
@@ -588,11 +737,12 @@ function ReportsPage() {
           <TabsTrigger value="dispatches">Products dispatched</TabsTrigger>
           <TabsTrigger value="movements">Inventory movements</TabsTrigger>
           <TabsTrigger value="production">Production</TabsTrigger>
+          <TabsTrigger value="returns">Factory returns</TabsTrigger>
         </TabsList>
 
         <TabsContent value="dispatches" className="space-y-4">
           <div className="grid gap-3 sm:grid-cols-3">
-            <SummaryCard label="Dispatch lines" value={filteredDispatches.length} />
+            <SummaryCard label="Dispatch events" value={uniqueDispatches} />
             <SummaryCard label="Units dispatched" value={dispatchTotal} />
             <SummaryCard
               label="Awaiting receipt"
@@ -605,6 +755,49 @@ function ReportsPage() {
               }
             />
           </div>
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Dispatch frequency by destination</CardTitle>
+            </CardHeader>
+            <CardContent className="overflow-x-auto p-0">
+              <table className="w-full text-sm">
+                <thead className="bg-muted/50 text-xs uppercase text-muted-foreground">
+                  <tr>
+                    <th className="px-3 py-2 text-left">Destination</th>
+                    <th className="px-3 py-2 text-right">Dispatches</th>
+                    <th className="px-3 py-2 text-right">Units sent</th>
+                    <th className="px-3 py-2 text-right">Units returned</th>
+                    <th className="px-3 py-2 text-right">Return rate</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y">
+                  {dispatchFrequency.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} className="p-8 text-center text-muted-foreground">
+                        No dispatch frequency data in this period.
+                      </td>
+                    </tr>
+                  ) : (
+                    dispatchFrequency.map((row) => (
+                      <tr key={row.destination}>
+                        <td className="px-3 py-2 font-medium">{row.destination}</td>
+                        <td className="px-3 py-2 text-right font-mono">{row.frequency}</td>
+                        <td className="px-3 py-2 text-right font-mono">
+                          {row.units.toLocaleString()}
+                        </td>
+                        <td className="px-3 py-2 text-right font-mono">
+                          {row.returned.toLocaleString()}
+                        </td>
+                        <td className="px-3 py-2 text-right font-mono">
+                          {row.units ? `${((row.returned / row.units) * 100).toFixed(1)}%` : "0%"}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </CardContent>
+          </Card>
           <div className="overflow-x-auto rounded-lg border bg-card">
             <table className="w-full min-w-[1050px] text-sm">
               <thead className="bg-muted/50 text-xs uppercase text-muted-foreground">
@@ -789,7 +982,7 @@ function ReportsPage() {
           <div className="grid gap-3 sm:grid-cols-3">
             <SummaryCard label="Batches" value={productionBatches.length} />
             <SummaryCard label="Total output" value={productionOutput} />
-            <SummaryCard label="Material lines" value={productionMaterialLines} />
+            <SummaryCard label="Packaging lines" value={productionMaterialLines} />
           </div>
 
           <div className="overflow-x-auto rounded-lg border bg-card">
@@ -800,7 +993,7 @@ function ReportsPage() {
                   <th className="px-3 py-2 text-left">Batch</th>
                   <th className="px-3 py-2 text-left">Output product</th>
                   <th className="px-3 py-2 text-right">Output</th>
-                  <th className="px-3 py-2 text-left">Materials used</th>
+                  <th className="px-3 py-2 text-left">Packaging used</th>
                   <th className="px-3 py-2 text-left">Status</th>
                   <th className="px-3 py-2 text-left">Operator</th>
                 </tr>
@@ -837,6 +1030,16 @@ function ReportsPage() {
                               <p key={material.id} className="text-xs">
                                 {material.name}: {material.quantity.toLocaleString()}{" "}
                                 {material.unit}
+                                {material.expected != null && material.variance !== 0 && (
+                                  <span className="text-brand-orange">
+                                    {" "}
+                                    · variance {material.variance > 0 ? "+" : ""}
+                                    {material.variance}
+                                  </span>
+                                )}
+                                {material.waste > 0 && (
+                                  <span className="text-amber-700"> · waste {material.waste}</span>
+                                )}
                               </p>
                             ))}
                           </div>
@@ -844,9 +1047,84 @@ function ReportsPage() {
                       </td>
                       <td className="px-3 py-2">
                         <Badge variant="outline">{batch.status}</Badge>
+                        {batch.packaging_setup_missing && (
+                          <Badge variant="outline" className="ml-1 text-amber-700 border-amber-300">
+                            Manual setup
+                          </Badge>
+                        )}
                       </td>
                       <td className="px-3 py-2 text-xs text-muted-foreground">
                         {batch.staff_name ?? "System"}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="returns" className="space-y-4">
+          <div className="grid gap-3 sm:grid-cols-4">
+            <SummaryCard label="Return events" value={returnEvents} />
+            <SummaryCard label="Units returned" value={returnedTotal} />
+            <SummaryCard label="Accepted to Central" value={acceptedTotal} />
+            <SummaryCard label="Rejected" value={rejectedTotal} />
+          </div>
+          <div className="overflow-x-auto rounded-lg border bg-card">
+            <table className="w-full min-w-[1050px] text-sm">
+              <thead className="bg-muted/50 text-xs uppercase text-muted-foreground">
+                <tr>
+                  <th className="px-3 py-2 text-left">Time</th>
+                  <th className="px-3 py-2 text-left">Return / dispatch</th>
+                  <th className="px-3 py-2 text-left">Shop</th>
+                  <th className="px-3 py-2 text-left">Product</th>
+                  <th className="px-3 py-2 text-right">Returned</th>
+                  <th className="px-3 py-2 text-right">Accepted</th>
+                  <th className="px-3 py-2 text-right">Rejected</th>
+                  <th className="px-3 py-2 text-left">Reason</th>
+                  <th className="px-3 py-2 text-left">Recorded by</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y">
+                {filteredReturns.length === 0 ? (
+                  <tr>
+                    <td colSpan={9} className="px-4 py-12 text-center text-muted-foreground">
+                      No factory returns in this period.
+                    </td>
+                  </tr>
+                ) : (
+                  filteredReturns.map((row) => (
+                    <tr key={row.return_line_id}>
+                      <td className="px-3 py-2 whitespace-nowrap">
+                        {formatLagosDateTime(row.recorded_at)}
+                      </td>
+                      <td className="px-3 py-2">
+                        <p className="font-mono text-xs">{row.return_number}</p>
+                        <p className="text-[11px] text-muted-foreground font-mono">
+                          {row.dispatch_reference}
+                        </p>
+                      </td>
+                      <td className="px-3 py-2">{row.shop_name}</td>
+                      <td className="px-3 py-2">
+                        <p>{row.item_name}</p>
+                        <p className="font-mono text-[11px] text-muted-foreground">{row.sku}</p>
+                      </td>
+                      <td className="px-3 py-2 text-right font-mono">
+                        {Number(row.quantity_returned)} {row.unit}
+                      </td>
+                      <td className="px-3 py-2 text-right font-mono text-emerald-700">
+                        {Number(row.quantity_accepted)}
+                      </td>
+                      <td className="px-3 py-2 text-right font-mono text-brand-orange">
+                        {Number(row.quantity_rejected)}
+                      </td>
+                      <td className="px-3 py-2">
+                        <p>{row.reason}</p>
+                        <p className="text-[11px] text-muted-foreground">{row.condition_notes}</p>
+                      </td>
+                      <td className="px-3 py-2 text-xs text-muted-foreground">
+                        {row.recorded_by_name ?? "—"}
                       </td>
                     </tr>
                   ))
