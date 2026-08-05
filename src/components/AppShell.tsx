@@ -34,6 +34,7 @@ import {
   CAN_MANAGE_PURCHASES,
   CAN_VIEW_PURCHASING,
   CAN_VIEW_REPORTS,
+  CAN_WRITE_INVENTORY,
   hasAny,
   isShopSupervisorOnly,
   ROLE_LABELS,
