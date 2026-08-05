@@ -72,7 +72,7 @@ function DispatchesPage() {
       _client_reference_id: crypto.randomUUID(),
     });
     if (error) return toast.error(error.message);
-    toast.success("Full receipt confirmed and destination stock updated");
+    toast.success("Delivery confirmed. Shop balances remain paused until POS rollout.");
     load();
   }
 
@@ -82,8 +82,8 @@ function DispatchesPage() {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Dispatches</h1>
           <p className="text-sm text-muted-foreground">
-            Central stock moves out on dispatch; shop stock moves in only after receipt
-            confirmation.
+            Document factory dispatches, delivery confirmation and inspected returns. Shop balances
+            remain paused until POS rollout.
           </p>
         </div>
         {canDispatch && (
@@ -171,32 +171,32 @@ function DispatchesPage() {
                         </Badge>
                       </td>
                       <td className="px-4 py-3 text-right whitespace-nowrap">
-                        {canDispatch &&
-                          d.status === "dispatched" &&
-                          !d.replenishment_request_id && (
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                markReceived(d.id);
-                              }}
-                            >
-                              Confirm full receipt
-                            </Button>
-                          )}
-                        {canDispatch && (d.status === "dispatched" || d.status === "received") && (
+                        {canDispatch && d.status === "dispatched" && (
                           <Button
                             size="sm"
                             variant="ghost"
                             onClick={(e) => {
                               e.stopPropagation();
-                              setReturning({ id: d.id, reference: d.reference });
+                              markReceived(d.id);
                             }}
                           >
-                            <Undo2 className="size-3 mr-1" /> Return
+                            Confirm full receipt
                           </Button>
                         )}
+                        {canDispatch &&
+                          d.shops &&
+                          (d.status === "received" || d.status === "reconciled") && (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setReturning({ id: d.id, reference: d.reference });
+                              }}
+                            >
+                              <Undo2 className="size-3 mr-1" /> Return to factory
+                            </Button>
+                          )}
                       </td>
                     </tr>
                     {isExpanded && (

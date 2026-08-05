@@ -159,6 +159,12 @@ export const CAN_ADJUST_STOCK: AppRole[] = [
   "inventory_officer",
 ];
 
+export const CAN_APPROVE_STOCKTAKES: AppRole[] = [
+  "super_admin",
+  "management",
+  "operations_manager",
+];
+
 export function hasAny(userRoles: AppRole[], allowed: AppRole[]): boolean {
   return userRoles.some((r) => allowed.includes(r));
 }

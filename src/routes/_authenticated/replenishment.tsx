@@ -22,10 +22,16 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
+import { ShopOperationsPaused } from "@/components/ShopOperationsPaused";
+import { SHOP_STOCK_WORKFLOWS_ENABLED } from "@/lib/features";
 
 export const Route = createFileRoute("/_authenticated/replenishment")({
-  component: ReplenishmentPage,
+  component: ReplenishmentRoute,
 });
+
+function ReplenishmentRoute() {
+  return SHOP_STOCK_WORKFLOWS_ENABLED ? <ReplenishmentPage /> : <ShopOperationsPaused />;
+}
 
 type RequestRow = {
   id: string;

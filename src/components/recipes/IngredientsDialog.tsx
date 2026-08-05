@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -9,11 +10,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   Command,
   CommandEmpty,
@@ -59,10 +56,23 @@ interface RecipeRef {
 }
 
 const COMMON_UNITS = [
-  "g", "kg", "mg", "oz", "lb",
-  "ml", "l", "cl",
-  "pcs", "unit", "pack", "box", "bottle", "carton",
-  "tsp", "tbsp", "cup",
+  "g",
+  "kg",
+  "mg",
+  "oz",
+  "lb",
+  "ml",
+  "l",
+  "cl",
+  "pcs",
+  "unit",
+  "pack",
+  "box",
+  "bottle",
+  "carton",
+  "tsp",
+  "tbsp",
+  "cup",
 ];
 
 export function IngredientsDialog({
@@ -89,7 +99,7 @@ export function IngredientsDialog({
           .from("inventory_items")
           .select("id, sku, name, unit, category")
           .eq("is_active", true)
-          .in("category", ["raw_material", "packaging", "consumable", "semi_finished"] as any)
+          .in("category", ["packaging", "consumable"] as any)
           .order("name"),
         supabase
           .from("recipe_ingredients")
@@ -107,7 +117,7 @@ export function IngredientsDialog({
           waste_pct: r.waste_pct != null ? String(r.waste_pct) : "",
           notes: r.notes ?? "",
           sort_order: r.sort_order,
-        }))
+        })),
       );
       setLoading(false);
     })();
@@ -144,7 +154,7 @@ export function IngredientsDialog({
 
   async function save() {
     const valid = rows.filter((r) => r.ingredient_item_id);
-    if (valid.length === 0) return toast.error("Add at least one ingredient");
+    if (valid.length === 0) return toast.error("Add at least one packaging or consumable item");
     setSaving(true);
     const { error: delErr } = await supabase
       .from("recipe_ingredients")
@@ -159,14 +169,14 @@ export function IngredientsDialog({
       ingredient_item_id: r.ingredient_item_id,
       quantity: r.quantity ? Number(r.quantity) : null,
       unit: r.unit || null,
-      waste_pct: r.waste_pct ? Number(r.waste_pct) : null,
+      waste_pct: 0,
       notes: r.notes || null,
       sort_order: i,
     }));
     const { error } = await supabase.from("recipe_ingredients").insert(payload);
     setSaving(false);
     if (error) return toast.error(error.message);
-    toast.success("Ingredients saved");
+    toast.success("Packaging setup saved");
     onSaved();
     onClose();
   }
@@ -176,7 +186,7 @@ export function IngredientsDialog({
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>
-            Ingredients — {recipe.product?.name ?? "Recipe"}
+            Packaging items — {recipe.product?.name ?? "Product"}
             <span className="text-muted-foreground font-normal ml-2 font-mono text-sm">
               v{recipe.version}
             </span>
@@ -186,8 +196,8 @@ export function IngredientsDialog({
         {!canEdit && (
           <div className="rounded-md border bg-muted/40 p-3 text-xs text-muted-foreground">
             {recipe.status === "approved"
-              ? "This recipe is approved and locked. Create a new version to make changes."
-              : "You don't have permission to edit this recipe."}
+              ? "This setup is approved and locked. Create a new version to make changes."
+              : "You don't have permission to edit this setup."}
           </div>
         )}
 
@@ -195,17 +205,16 @@ export function IngredientsDialog({
           <div className="p-8 text-center text-muted-foreground text-sm">Loading…</div>
         ) : (
           <div className="space-y-2">
-            <div className="grid grid-cols-[1fr_110px_120px_90px_1fr_auto] gap-2 text-xs uppercase tracking-wider text-muted-foreground font-medium px-1">
-              <div>Ingredient</div>
-              <div>Quantity</div>
+            <div className="grid grid-cols-[1fr_130px_120px_1fr_auto] gap-2 text-xs uppercase tracking-wider text-muted-foreground font-medium px-1">
+              <div>Packaging / consumable</div>
+              <div>Per finished unit</div>
               <div>Unit</div>
-              <div>Waste %</div>
               <div>Notes</div>
               <div />
             </div>
             {rows.length === 0 && (
               <div className="rounded-md border border-dashed p-6 text-center text-sm text-muted-foreground">
-                No ingredients yet.
+                No packaging items yet.
               </div>
             )}
             {rows.map((r, i) => {
@@ -213,12 +222,9 @@ export function IngredientsDialog({
               return (
                 <div
                   key={i}
-                  className="grid grid-cols-[1fr_110px_120px_90px_1fr_auto] gap-2 items-center"
+                  className="grid grid-cols-[1fr_130px_120px_1fr_auto] gap-2 items-center"
                 >
-                  <Popover
-                    open={openIdx === i}
-                    onOpenChange={(o) => setOpenIdx(o ? i : null)}
-                  >
+                  <Popover open={openIdx === i} onOpenChange={(o) => setOpenIdx(o ? i : null)}>
                     <PopoverTrigger asChild>
                       <Button
                         variant="outline"
@@ -235,7 +241,7 @@ export function IngredientsDialog({
                               </span>
                             </>
                           ) : (
-                            <span className="text-muted-foreground">Pick ingredient…</span>
+                            <span className="text-muted-foreground">Pick packaging…</span>
                           )}
                         </span>
                         <ChevronsUpDown className="size-3.5 opacity-50 shrink-0 ml-2" />
@@ -247,9 +253,9 @@ export function IngredientsDialog({
                           value.toLowerCase().includes(search.toLowerCase()) ? 1 : 0
                         }
                       >
-                        <CommandInput placeholder="Search ingredient…" />
+                        <CommandInput placeholder="Search packaging…" />
                         <CommandList>
-                          <CommandEmpty>No ingredient found.</CommandEmpty>
+                          <CommandEmpty>No packaging item found.</CommandEmpty>
                           <CommandGroup>
                             {items.map((x) => (
                               <CommandItem
@@ -313,16 +319,6 @@ export function IngredientsDialog({
                   </Select>
 
                   <Input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value={r.waste_pct}
-                    onChange={(e) => updateRow(i, { waste_pct: e.target.value })}
-                    className="font-mono"
-                    placeholder="0"
-                    disabled={!canEdit}
-                  />
-                  <Input
                     value={r.notes}
                     onChange={(e) => updateRow(i, { notes: e.target.value })}
                     placeholder="Optional"
@@ -342,7 +338,7 @@ export function IngredientsDialog({
 
             {canEdit && (
               <Button variant="ghost" size="sm" onClick={addRow} className="mt-2">
-                <Plus className="size-3.5 mr-1" /> Add ingredient
+                <Plus className="size-3.5 mr-1" /> Add packaging item
               </Button>
             )}
           </div>
@@ -358,7 +354,7 @@ export function IngredientsDialog({
               disabled={saving}
               className="bg-brand-orange text-white hover:bg-brand-orange/90"
             >
-              {saving ? "Saving…" : "Save ingredients"}
+              {saving ? "Saving…" : "Save packaging setup"}
             </Button>
           )}
         </DialogFooter>
