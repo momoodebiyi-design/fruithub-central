@@ -73,9 +73,17 @@ type Order = {
   workflow_status: string;
   quoted_total: number;
   quotation_reference: string | null;
+  quotation_evidence_path: string | null;
   payment_reference: string | null;
+  payment_evidence_path: string | null;
   created_at: string;
+  created_by: string | null;
   submitted_by: string | null;
+  submitted_at: string | null;
+  approved_by: string | null;
+  approved_at: string | null;
+  payment_recorded_at: string | null;
+  delivered_at: string | null;
   suppliers: { name: string } | null;
 };
 
@@ -86,19 +94,25 @@ type OrderLine = {
   quantity_ordered: number;
   quantity_delivered: number;
   quantity_accepted: number;
+  quantity_rejected: number;
+  quantity_received: number;
   unit_cost: number;
   inventory_items: { name: string; unit: string } | null;
+  locations: { name: string } | null;
 };
 type Receipt = {
   id: string;
   receipt_number: string;
   status: string;
+  delivery_evidence_path: string;
   purchase_receipt_lines: Array<{
     id: string;
     quantity_delivered: number;
     purchase_order_items: { inventory_items: { name: string; unit: string } | null } | null;
   }>;
 };
+
+type OrderAction = "details" | "submit" | "approve" | "reject" | "payment" | "delivery" | "receive";
 
 const ORDER_COLORS: Record<string, string> = {
   awaiting_approval: "border-amber-200 bg-amber-50 text-amber-700",
@@ -110,22 +124,72 @@ const ORDER_COLORS: Record<string, string> = {
   rejected: "border-red-200 bg-red-50 text-red-700",
 };
 
+const ORDER_STATUS: Record<string, { label: string; owner: string; next: string }> = {
+  draft: {
+    label: "Quoted draft",
+    owner: "Procurement",
+    next: "Submit for MD approval",
+  },
+  awaiting_approval: {
+    label: "Awaiting approval",
+    owner: "MD / authorised approver",
+    next: "Review supplier, quantities and cost",
+  },
+  approved: {
+    label: "Approved",
+    owner: "Procurement",
+    next: "Place order and record payment",
+  },
+  being_purchased: {
+    label: "Ordered / awaiting delivery",
+    owner: "Procurement",
+    next: "Record the supplier delivery",
+  },
+  delivered: {
+    label: "Awaiting inspection",
+    owner: "Inventory",
+    next: "Inspect and accept or reject delivery",
+  },
+  partially_received: {
+    label: "Partially received",
+    owner: "Procurement",
+    next: "Follow up and record the outstanding delivery",
+  },
+  received: {
+    label: "Received",
+    owner: "Complete",
+    next: "Accepted quantities are in Central Inventory",
+  },
+  rejected: {
+    label: "Rejected",
+    owner: "Procurement",
+    next: "Needs have returned to the sourcing queue",
+  },
+  cancelled: {
+    label: "Cancelled",
+    owner: "Complete",
+    next: "No further action",
+  },
+};
+
 function PurchasingPage() {
   const session = useSession();
   const canReviewNeeds = hasAny(session.roles, CAN_REVIEW_PURCHASE_NEEDS);
   const canSource = hasAny(session.roles, CAN_MANAGE_PURCHASES);
-  const canApprove = hasAny(session.roles, CAN_APPROVE_PURCHASES);
+  const canApprove =
+    hasAny(session.roles, CAN_APPROVE_PURCHASES) && !session.roles.includes("procurement");
   const canReceive = hasAny(session.roles, CAN_RECEIVE_PURCHASES);
   const [needs, setNeeds] = useState<Need[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [procurementConfigured, setProcurementConfigured] = useState(true);
   const [loading, setLoading] = useState(true);
   const [reviewNeed, setReviewNeed] = useState<Need | null>(null);
   const [manualNeed, setManualNeed] = useState(false);
   const [newOrder, setNewOrder] = useState(false);
   const [orderAction, setOrderAction] = useState<{
     order: Order;
-    action: "submit" | "approve" | "reject" | "payment" | "delivery" | "receive";
+    action: OrderAction;
   } | null>(null);
 
   async function load() {
@@ -134,6 +198,7 @@ function PurchasingPage() {
       { data: needRows, error: needError },
       { data: orderRows, error: orderError },
       { data: supplierRows },
+      { data: procurementRows },
     ] = await Promise.all([
       (supabase as any)
         .from("purchase_needs")
@@ -146,17 +211,19 @@ function PurchasingPage() {
       (supabase as any)
         .from("purchase_orders")
         .select(
-          "id, po_number, supplier_id, expected_date, workflow_status, quoted_total, quotation_reference, payment_reference, created_at, submitted_by, suppliers(name)",
+          "id, po_number, supplier_id, expected_date, workflow_status, quoted_total, quotation_reference, quotation_evidence_path, payment_reference, payment_evidence_path, created_at, created_by, submitted_by, submitted_at, approved_by, approved_at, payment_recorded_at, delivered_at, suppliers(name)",
         )
         .order("created_at", { ascending: false })
         .limit(150),
       supabase.from("suppliers").select("id, name").order("name"),
+      supabase.from("user_roles").select("user_id").eq("role", "procurement").limit(1),
     ]);
     if (needError) toast.error(needError.message);
     if (orderError) toast.error(orderError.message);
     setNeeds((needRows as Need[]) ?? []);
     setOrders((orderRows as Order[]) ?? []);
     setSuppliers((supplierRows as Supplier[]) ?? []);
+    setProcurementConfigured(Boolean(procurementRows?.length));
     setLoading(false);
   }
 
@@ -201,6 +268,14 @@ function PurchasingPage() {
         </div>
       )}
 
+      {!procurementConfigured && (
+        <div className="rounded-md border border-amber-300 bg-amber-50 p-4 text-sm text-amber-800">
+          <AlertTriangle className="mr-2 inline size-4" />
+          No Procurement user is assigned. Give the Logistics or Procurement staff member the
+          Procurement role in Users so one person can submit and another can approve.
+        </div>
+      )}
+
       <Tabs defaultValue="needs">
         <TabsList>
           <TabsTrigger value="needs">Needs ({needs.length})</TabsTrigger>
@@ -221,6 +296,7 @@ function PurchasingPage() {
             canSource={canSource}
             canApprove={canApprove}
             canReceive={canReceive}
+            currentUserId={session.user?.id ?? null}
             onAction={(order, action) => setOrderAction({ order, action })}
           />
         </TabsContent>
@@ -493,6 +569,7 @@ function OrdersTable({
   canSource,
   canApprove,
   canReceive,
+  currentUserId,
   onAction,
 }: {
   orders: Order[];
@@ -500,10 +577,8 @@ function OrdersTable({
   canSource: boolean;
   canApprove: boolean;
   canReceive: boolean;
-  onAction: (
-    order: Order,
-    action: "submit" | "approve" | "reject" | "payment" | "delivery" | "receive",
-  ) => void;
+  currentUserId: string | null;
+  onAction: (order: Order, action: OrderAction) => void;
 }) {
   return (
     <div className="mt-4 overflow-x-auto rounded-lg border bg-card">
@@ -515,81 +590,115 @@ function OrdersTable({
             <th className="px-4 py-2 text-left">Quote</th>
             <th className="px-4 py-2 text-right">Total</th>
             <th className="px-4 py-2 text-left">Status</th>
+            <th className="px-4 py-2 text-left">Next owner</th>
             <th />
           </tr>
         </thead>
         <tbody className="divide-y">
           {loading ? (
             <tr>
-              <td colSpan={6} className="px-4 py-10 text-center text-muted-foreground">
+              <td colSpan={7} className="px-4 py-10 text-center text-muted-foreground">
                 Loading…
               </td>
             </tr>
           ) : orders.length === 0 ? (
             <tr>
-              <td colSpan={6} className="px-4 py-12 text-center text-muted-foreground">
+              <td colSpan={7} className="px-4 py-12 text-center text-muted-foreground">
                 No purchase orders yet.
               </td>
             </tr>
           ) : (
-            orders.map((order) => (
-              <tr key={order.id} className="hover:bg-muted/30">
-                <td className="px-4 py-3">
-                  <p className="font-mono">{order.po_number}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {format(new Date(order.created_at), "d MMM yyyy")}
-                  </p>
-                </td>
-                <td className="px-4 py-3">{order.suppliers?.name ?? "—"}</td>
-                <td className="px-4 py-3">{order.quotation_reference ?? "—"}</td>
-                <td className="px-4 py-3 text-right font-mono">
-                  ₦{Number(order.quoted_total).toLocaleString()}
-                </td>
-                <td className="px-4 py-3">
-                  <Badge variant="outline" className={ORDER_COLORS[order.workflow_status] ?? ""}>
-                    {order.workflow_status.replaceAll("_", " ")}
-                  </Badge>
-                </td>
-                <td className="px-4 py-3 text-right whitespace-nowrap">
-                  {canSource && order.workflow_status === "draft" && (
-                    <Button size="sm" onClick={() => onAction(order, "submit")}>
-                      Submit for approval
+            orders.map((order) => {
+              const status = ORDER_STATUS[order.workflow_status] ?? {
+                label: order.workflow_status.replaceAll("_", " "),
+                owner: "—",
+                next: "—",
+              };
+              const submittedByCurrentUser =
+                Boolean(currentUserId) && order.submitted_by === currentUserId;
+              return (
+                <tr key={order.id} className="hover:bg-muted/30">
+                  <td className="px-4 py-3">
+                    <p className="font-mono">{order.po_number}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {format(new Date(order.created_at), "d MMM yyyy")}
+                    </p>
+                  </td>
+                  <td className="px-4 py-3">{order.suppliers?.name ?? "—"}</td>
+                  <td className="px-4 py-3">{order.quotation_reference ?? "—"}</td>
+                  <td className="px-4 py-3 text-right font-mono">
+                    ₦{Number(order.quoted_total).toLocaleString()}
+                  </td>
+                  <td className="px-4 py-3">
+                    <Badge variant="outline" className={ORDER_COLORS[order.workflow_status] ?? ""}>
+                      {status.label}
+                    </Badge>
+                  </td>
+                  <td className="max-w-[220px] px-4 py-3">
+                    <p className="text-sm font-medium">{status.owner}</p>
+                    <p className="text-xs text-muted-foreground">{status.next}</p>
+                  </td>
+                  <td className="px-4 py-3 text-right whitespace-nowrap">
+                    <Button size="sm" variant="ghost" onClick={() => onAction(order, "details")}>
+                      View
                     </Button>
-                  )}
-                  {canApprove && order.workflow_status === "awaiting_approval" && (
-                    <>
-                      <Button size="sm" variant="ghost" onClick={() => onAction(order, "approve")}>
-                        <Check className="mr-1 size-3 text-emerald-600" />
-                        Approve
-                      </Button>
-                      <Button size="sm" variant="ghost" onClick={() => onAction(order, "reject")}>
-                        <X className="mr-1 size-3 text-red-600" />
-                        Reject
-                      </Button>
-                    </>
-                  )}
-                  {canSource && order.workflow_status === "approved" && (
-                    <Button size="sm" onClick={() => onAction(order, "payment")}>
-                      <FileText className="mr-1 size-3" />
-                      Record payment
-                    </Button>
-                  )}
-                  {canSource &&
-                    ["being_purchased", "partially_received"].includes(order.workflow_status) && (
-                      <Button size="sm" onClick={() => onAction(order, "delivery")}>
-                        <ShoppingCart className="mr-1 size-3" />
-                        Record delivery
+                    {canSource && order.workflow_status === "draft" && (
+                      <Button size="sm" onClick={() => onAction(order, "submit")}>
+                        Submit for approval
                       </Button>
                     )}
-                  {canReceive && order.workflow_status === "delivered" && (
-                    <Button size="sm" onClick={() => onAction(order, "receive")}>
-                      <PackageCheck className="mr-1 size-3" />
-                      Inspect & receive
-                    </Button>
-                  )}
-                </td>
-              </tr>
-            ))
+                    {canApprove &&
+                      order.workflow_status === "awaiting_approval" &&
+                      !submittedByCurrentUser && (
+                        <>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => onAction(order, "approve")}
+                          >
+                            <Check className="mr-1 size-3 text-emerald-600" />
+                            Approve
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => onAction(order, "reject")}
+                          >
+                            <X className="mr-1 size-3 text-red-600" />
+                            Reject
+                          </Button>
+                        </>
+                      )}
+                    {canApprove &&
+                      order.workflow_status === "awaiting_approval" &&
+                      submittedByCurrentUser && (
+                        <p className="mt-1 text-xs text-amber-700">
+                          You submitted this order. Another approver must decide it.
+                        </p>
+                      )}
+                    {canSource && order.workflow_status === "approved" && (
+                      <Button size="sm" onClick={() => onAction(order, "payment")}>
+                        <FileText className="mr-1 size-3" />
+                        Place order
+                      </Button>
+                    )}
+                    {canSource &&
+                      ["being_purchased", "partially_received"].includes(order.workflow_status) && (
+                        <Button size="sm" onClick={() => onAction(order, "delivery")}>
+                          <ShoppingCart className="mr-1 size-3" />
+                          Record delivery
+                        </Button>
+                      )}
+                    {canReceive && order.workflow_status === "delivered" && (
+                      <Button size="sm" onClick={() => onAction(order, "receive")}>
+                        <PackageCheck className="mr-1 size-3" />
+                        Inspect & receive
+                      </Button>
+                    )}
+                  </td>
+                </tr>
+              );
+            })
           )}
         </tbody>
       </table>
@@ -693,6 +802,17 @@ async function uploadEvidence(file: File | null, folder: string) {
     .upload(path, file, { upsert: false });
   if (error) throw error;
   return path;
+}
+
+async function openEvidence(path: string) {
+  const { data, error } = await supabase.storage
+    .from("purchase-evidence")
+    .createSignedUrl(path, 60);
+  if (error || !data?.signedUrl) {
+    toast.error(error?.message ?? "Could not open evidence");
+    return;
+  }
+  window.open(data.signedUrl, "_blank", "noopener,noreferrer");
 }
 
 function QuotedOrderDialog({
@@ -885,7 +1005,7 @@ function OrderActionDialog({
   onDone,
 }: {
   order: Order;
-  action: "submit" | "approve" | "reject" | "payment" | "delivery" | "receive";
+  action: OrderAction;
   onClose: () => void;
   onDone: () => Promise<void>;
 }) {
@@ -899,53 +1019,67 @@ function OrderActionDialog({
   >({});
   const [saving, setSaving] = useState(false);
   useEffect(() => {
-    if (action === "delivery" || action === "receive")
-      (async () => {
-        const { data } = await (supabase as any)
-          .from("purchase_order_items")
+    (async () => {
+      const { data } = await (supabase as any)
+        .from("purchase_order_items")
+        .select(
+          "id, item_id, quantity_ordered, quantity_delivered, quantity_accepted, quantity_rejected, quantity_received, unit_cost, inventory_items(name, unit), locations(name)",
+        )
+        .eq("purchase_order_id", order.id);
+      const orderLines = (data as OrderLine[]) ?? [];
+      setLines(orderLines);
+      if (action === "delivery")
+        setQuantities(
+          Object.fromEntries(
+            orderLines.map((line) => [
+              line.id,
+              {
+                delivered: String(
+                  Math.max(0, Number(line.quantity_ordered) - Number(line.quantity_delivered)),
+                ),
+              },
+            ]),
+          ),
+        );
+      if (action === "receive") {
+        const { data: receipts } = await (supabase as any)
+          .from("purchase_receipts")
           .select(
-            "id, item_id, quantity_ordered, quantity_delivered, quantity_accepted, unit_cost, inventory_items(name, unit)",
+            "id, receipt_number, status, delivery_evidence_path, purchase_receipt_lines(id, quantity_delivered, purchase_order_items(inventory_items(name, unit)))",
           )
-          .eq("purchase_order_id", order.id);
-        setLines((data as OrderLine[]) ?? []);
-        if (action === "delivery")
+          .eq("purchase_order_id", order.id)
+          .eq("status", "awaiting_inspection")
+          .order("recorded_at", { ascending: false })
+          .limit(1);
+        const current = (receipts as Receipt[] | null)?.[0] ?? null;
+        setReceipt(current);
+        if (current)
           setQuantities(
             Object.fromEntries(
-              ((data as OrderLine[]) ?? []).map((line) => [
+              current.purchase_receipt_lines.map((line) => [
                 line.id,
-                {
-                  delivered: String(
-                    Math.max(0, Number(line.quantity_ordered) - Number(line.quantity_delivered)),
-                  ),
-                },
+                { accepted: String(line.quantity_delivered), rejected: "0", notes: "" },
               ]),
             ),
           );
-        else {
-          const { data: receipts } = await (supabase as any)
-            .from("purchase_receipts")
-            .select(
-              "id, receipt_number, status, purchase_receipt_lines(id, quantity_delivered, purchase_order_items(inventory_items(name, unit)))",
-            )
-            .eq("purchase_order_id", order.id)
-            .eq("status", "awaiting_inspection")
-            .order("recorded_at", { ascending: false })
-            .limit(1);
-          const current = (receipts as Receipt[] | null)?.[0] ?? null;
-          setReceipt(current);
-          if (current)
-            setQuantities(
-              Object.fromEntries(
-                current.purchase_receipt_lines.map((line) => [
-                  line.id,
-                  { accepted: String(line.quantity_delivered), rejected: "0", notes: "" },
-                ]),
-              ),
-            );
-        }
-      })();
+      }
+    })();
   }, [action, order.id]);
+  const deliveredNowTotal = lines.reduce(
+    (total, line) => total + Number(quantities[line.id]?.delivered ?? 0),
+    0,
+  );
+  const receiptQuantitiesValid =
+    !receipt ||
+    receipt.purchase_receipt_lines.every((line) => {
+      const accepted = Number(quantities[line.id]?.accepted ?? 0);
+      const rejected = Number(quantities[line.id]?.rejected ?? 0);
+      return (
+        accepted >= 0 && rejected >= 0 && accepted + rejected === Number(line.quantity_delivered)
+      );
+    });
   async function submit() {
+    if (action === "details") return;
     setSaving(true);
     try {
       let error: { message: string } | null = null;
@@ -999,14 +1133,19 @@ function OrderActionDialog({
         action === "submit"
           ? "Submitted for MD approval"
           : action === "approve"
-            ? "Purchase approved"
+            ? "Purchase approved; Procurement may now place the order"
             : action === "reject"
               ? "Purchase rejected"
               : action === "payment"
-                ? "Payment and evidence recorded"
+                ? "Order placed; outstanding quantities now appear as Incoming"
                 : action === "delivery"
                   ? "Delivery recorded; Inventory must inspect it"
-                  : "Inspection complete; only accepted stock was added",
+                  : `Inspection complete; ${
+                      receipt?.purchase_receipt_lines.reduce(
+                        (total, line) => total + Number(quantities[line.id]?.accepted ?? 0),
+                        0,
+                      ) ?? 0
+                    } accepted units were added to Central Inventory`,
       );
       await onDone();
       onClose();
@@ -1017,10 +1156,11 @@ function OrderActionDialog({
     }
   }
   const title = {
+    details: "Purchase order details",
     submit: "Submit quoted order",
     approve: "Approve purchase",
     reject: "Reject purchase",
-    payment: "Record payment",
+    payment: "Place order and record payment",
     delivery: "Record supplier delivery",
     receive: "Inspect and receive",
   }[action];
@@ -1037,6 +1177,43 @@ function OrderActionDialog({
               {order.suppliers?.name} · ₦{Number(order.quoted_total).toLocaleString()}
             </p>
           </div>
+          <OrderJourney status={order.workflow_status} />
+          {!["delivery", "receive"].includes(action) && <OrderLinesSummary lines={lines} />}
+          <div className="flex flex-wrap gap-2 text-xs">
+            <Badge variant="outline">Quote: {order.quotation_reference ?? "—"}</Badge>
+            {order.expected_date && (
+              <Badge variant="outline">
+                Expected {format(new Date(`${order.expected_date}T00:00:00`), "d MMM yyyy")}
+              </Badge>
+            )}
+            {order.quotation_evidence_path && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => openEvidence(order.quotation_evidence_path!)}
+              >
+                <FileText className="mr-1 size-3" /> View quotation evidence
+              </Button>
+            )}
+            {order.payment_evidence_path && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => openEvidence(order.payment_evidence_path!)}
+              >
+                <FileText className="mr-1 size-3" /> View payment evidence
+              </Button>
+            )}
+          </div>
+          {action === "details" && (
+            <div className="grid gap-2 rounded-md border p-3 text-sm sm:grid-cols-2">
+              <TimelineRow label="Created" value={order.created_at} />
+              <TimelineRow label="Submitted" value={order.submitted_at} />
+              <TimelineRow label="Approved" value={order.approved_at} />
+              <TimelineRow label="Order placed" value={order.payment_recorded_at} />
+              <TimelineRow label="Delivery recorded" value={order.delivered_at} />
+            </div>
+          )}
           {action === "submit" && (
             <p className="text-sm text-muted-foreground">
               Every order requires MD approval while the monetary threshold is unset.
@@ -1113,59 +1290,76 @@ function OrderActionDialog({
               {!receipt ? (
                 <p className="text-sm text-muted-foreground">Loading delivery…</p>
               ) : (
-                receipt.purchase_receipt_lines.map((line) => (
-                  <div key={line.id} className="rounded-md border p-3">
-                    <p className="text-sm font-medium">
-                      {line.purchase_order_items?.inventory_items?.name}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      Delivered {line.quantity_delivered}{" "}
-                      {line.purchase_order_items?.inventory_items?.unit}
-                    </p>
-                    <div className="mt-3 grid grid-cols-2 gap-3">
-                      <div>
-                        <Label>Accepted</Label>
-                        <Input
-                          type="number"
-                          min="0"
-                          value={quantities[line.id]?.accepted ?? ""}
-                          onChange={(event) =>
-                            setQuantities((current) => ({
-                              ...current,
-                              [line.id]: { ...current[line.id], accepted: event.target.value },
-                            }))
-                          }
-                        />
-                      </div>
-                      <div>
-                        <Label>Rejected</Label>
-                        <Input
-                          type="number"
-                          min="0"
-                          value={quantities[line.id]?.rejected ?? ""}
-                          onChange={(event) =>
-                            setQuantities((current) => ({
-                              ...current,
-                              [line.id]: { ...current[line.id], rejected: event.target.value },
-                            }))
-                          }
-                        />
-                      </div>
+                <>
+                  <div className="flex items-center justify-between rounded-md border bg-muted/30 p-3">
+                    <div>
+                      <p className="text-sm font-medium">{receipt.receipt_number}</p>
+                      <p className="text-xs text-muted-foreground">
+                        Delivery evidence must be checked before acceptance.
+                      </p>
                     </div>
-                    <div className="mt-3">
-                      <Label>Quality notes</Label>
-                      <Input
-                        value={quantities[line.id]?.notes ?? ""}
-                        onChange={(event) =>
-                          setQuantities((current) => ({
-                            ...current,
-                            [line.id]: { ...current[line.id], notes: event.target.value },
-                          }))
-                        }
-                      />
-                    </div>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => openEvidence(receipt.delivery_evidence_path)}
+                    >
+                      <FileText className="mr-1 size-3" /> View delivery evidence
+                    </Button>
                   </div>
-                ))
+                  {receipt.purchase_receipt_lines.map((line) => (
+                    <div key={line.id} className="rounded-md border p-3">
+                      <p className="text-sm font-medium">
+                        {line.purchase_order_items?.inventory_items?.name}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        Delivered {line.quantity_delivered}{" "}
+                        {line.purchase_order_items?.inventory_items?.unit}
+                      </p>
+                      <div className="mt-3 grid grid-cols-2 gap-3">
+                        <div>
+                          <Label>Accepted</Label>
+                          <Input
+                            type="number"
+                            min="0"
+                            value={quantities[line.id]?.accepted ?? ""}
+                            onChange={(event) =>
+                              setQuantities((current) => ({
+                                ...current,
+                                [line.id]: { ...current[line.id], accepted: event.target.value },
+                              }))
+                            }
+                          />
+                        </div>
+                        <div>
+                          <Label>Rejected</Label>
+                          <Input
+                            type="number"
+                            min="0"
+                            value={quantities[line.id]?.rejected ?? ""}
+                            onChange={(event) =>
+                              setQuantities((current) => ({
+                                ...current,
+                                [line.id]: { ...current[line.id], rejected: event.target.value },
+                              }))
+                            }
+                          />
+                        </div>
+                      </div>
+                      <div className="mt-3">
+                        <Label>Quality notes</Label>
+                        <Input
+                          value={quantities[line.id]?.notes ?? ""}
+                          onChange={(event) =>
+                            setQuantities((current) => ({
+                              ...current,
+                              [line.id]: { ...current[line.id], notes: event.target.value },
+                            }))
+                          }
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </>
               )}
               <div>
                 <Label>Overall quality notes</Label>
@@ -1175,18 +1369,134 @@ function OrderActionDialog({
           )}
         </div>
         <DialogFooter>
-          <Button variant="ghost" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button
-            onClick={submit}
-            disabled={saving || (action === "receive" && !receipt)}
-            className={action === "reject" ? "bg-red-600 text-white hover:bg-red-700" : ""}
-          >
-            {saving ? "Saving…" : title}
-          </Button>
+          {action === "details" ? (
+            <Button onClick={onClose}>Close</Button>
+          ) : (
+            <>
+              <Button variant="ghost" onClick={onClose}>
+                Cancel
+              </Button>
+              <Button
+                onClick={submit}
+                disabled={
+                  saving ||
+                  (action === "reject" && !notes.trim()) ||
+                  (action === "payment" && (!reference.trim() || !file)) ||
+                  (action === "delivery" && (!file || deliveredNowTotal <= 0)) ||
+                  (action === "receive" && (!receipt || !receiptQuantitiesValid))
+                }
+                className={action === "reject" ? "bg-red-600 text-white hover:bg-red-700" : ""}
+              >
+                {saving ? "Saving…" : title}
+              </Button>
+            </>
+          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  );
+}
+
+function OrderJourney({ status }: { status: string }) {
+  const steps = [
+    ["draft", "Quoted"],
+    ["awaiting_approval", "Approval"],
+    ["approved", "Approved"],
+    ["being_purchased", "Ordered"],
+    ["delivered", "Delivered"],
+    ["received", "Received"],
+  ];
+  const rank: Record<string, number> = {
+    draft: 0,
+    awaiting_approval: 1,
+    approved: 2,
+    being_purchased: 3,
+    delivered: 4,
+    partially_received: 4,
+    received: 5,
+  };
+  const current = rank[status] ?? -1;
+  return (
+    <div>
+      <div className="mb-2 flex items-center justify-between gap-1 text-[10px] text-muted-foreground">
+        {steps.map(([key, label], index) => (
+          <div key={key} className="flex min-w-0 flex-1 items-center last:flex-none">
+            <span
+              className={`flex size-5 shrink-0 items-center justify-center rounded-full border text-[10px] ${
+                index <= current
+                  ? "border-brand-green bg-brand-green text-white"
+                  : "border-muted-foreground/30 bg-background"
+              }`}
+            >
+              {index < current ? "✓" : index + 1}
+            </span>
+            {index < steps.length - 1 && (
+              <span
+                className={`mx-1 h-px flex-1 ${index < current ? "bg-brand-green" : "bg-border"}`}
+              />
+            )}
+          </div>
+        ))}
+      </div>
+      <div className="grid grid-cols-6 text-center text-[10px] text-muted-foreground">
+        {steps.map(([key, label]) => (
+          <span key={key}>{label}</span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function OrderLinesSummary({ lines }: { lines: OrderLine[] }) {
+  if (lines.length === 0)
+    return <p className="text-sm text-muted-foreground">Loading order items…</p>;
+  return (
+    <div className="overflow-x-auto rounded-md border">
+      <table className="w-full min-w-[560px] text-sm">
+        <thead className="bg-muted/50 text-xs text-muted-foreground">
+          <tr>
+            <th className="px-3 py-2 text-left">Item</th>
+            <th className="px-3 py-2 text-right">Ordered</th>
+            <th className="px-3 py-2 text-right">Unit cost</th>
+            <th className="px-3 py-2 text-right">Accepted</th>
+            <th className="px-3 py-2 text-right">Outstanding</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y">
+          {lines.map((line) => (
+            <tr key={line.id}>
+              <td className="px-3 py-2">
+                <p>{line.inventory_items?.name ?? "—"}</p>
+                <p className="text-xs text-muted-foreground">{line.locations?.name ?? "—"}</p>
+              </td>
+              <td className="px-3 py-2 text-right font-mono">
+                {Number(line.quantity_ordered).toLocaleString()} {line.inventory_items?.unit}
+              </td>
+              <td className="px-3 py-2 text-right font-mono">
+                ₦{Number(line.unit_cost).toLocaleString()}
+              </td>
+              <td className="px-3 py-2 text-right font-mono">
+                {Number(line.quantity_accepted).toLocaleString()}
+              </td>
+              <td className="px-3 py-2 text-right font-mono text-blue-700">
+                {Math.max(
+                  0,
+                  Number(line.quantity_ordered) - Number(line.quantity_accepted),
+                ).toLocaleString()}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function TimelineRow({ label, value }: { label: string; value: string | null }) {
+  return (
+    <div>
+      <p className="text-xs text-muted-foreground">{label}</p>
+      <p>{value ? format(new Date(value), "d MMM yyyy, HH:mm") : "Not reached"}</p>
+    </div>
   );
 }

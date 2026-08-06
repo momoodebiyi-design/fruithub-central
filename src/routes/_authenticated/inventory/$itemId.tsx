@@ -69,6 +69,7 @@ function ItemDetail() {
 
   const [item, setItem] = useState<Item | null>(null);
   const [onHand, setOnHand] = useState<number>(0);
+  const [incoming, setIncoming] = useState<number>(0);
   const [movements, setMovements] = useState<Movement[]>([]);
   const [supplier, setSupplier] = useState<{ name: string } | null>(null);
   const [showMove, setShowMove] = useState(false);
@@ -82,7 +83,7 @@ function ItemDetail() {
       supabase.from("inventory_items").select("*").eq("id", itemId).maybeSingle(),
       (supabase as any)
         .from("v_central_item_stock")
-        .select("on_hand, location_id")
+        .select("on_hand, incoming_quantity, location_id")
         .eq("item_id", itemId)
         .maybeSingle(),
       (supabase as any)
@@ -96,6 +97,7 @@ function ItemDetail() {
     // Overwrite it with the ledger-derived on_hand so nothing downstream sees stale data.
     const fresh = Number((stockRow as any)?.on_hand ?? 0);
     setOnHand(fresh);
+    setIncoming(Number((stockRow as any)?.incoming_quantity ?? 0));
     setItem({ ...(it as Item), quantity: fresh });
     setPolicyCount(policies ?? 0);
 
@@ -224,11 +226,16 @@ function ItemDetail() {
         </div>
       )}
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
         <StatCard
           label="On hand"
           value={`${onHand.toLocaleString()} ${item.unit}`}
           accent={low ? "warn" : undefined}
+        />
+        <StatCard
+          label="Incoming"
+          value={incoming > 0 ? `+${incoming.toLocaleString()} ${item.unit}` : `0 ${item.unit}`}
+          hint="placed orders, not on hand"
         />
         <StatCard
           label="Min / reorder"
@@ -262,6 +269,18 @@ function ItemDetail() {
                 to cover the next 30 days.
               </>
             )}
+          </p>
+        </div>
+      )}
+
+      {incoming > 0 && (
+        <div className="rounded-md border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900">
+          <p className="font-medium">
+            {incoming.toLocaleString()} {item.unit} incoming
+          </p>
+          <p className="mt-1 text-blue-800/80">
+            Projected stock is {(onHand + incoming).toLocaleString()} {item.unit}. Incoming stock
+            remains unavailable until Inventory inspects and accepts the delivery.
           </p>
         </div>
       )}
