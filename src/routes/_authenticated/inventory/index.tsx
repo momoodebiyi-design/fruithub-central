@@ -43,6 +43,8 @@ export interface Item {
   subcategory: string | null;
   unit: string;
   quantity: number;
+  incomingQuantity: number;
+  projectedQuantity: number;
   reorder_level: number | null;
   min_level: number | null;
   status: string;
@@ -73,7 +75,7 @@ function InventoryList() {
     const { data, error } = await (supabase as any)
       .from("v_central_item_stock")
       .select(
-        "item_id, item_code, sku, name, category, subcategory, unit, min_level, reorder_level, status, on_hand",
+        "item_id, item_code, sku, name, category, subcategory, unit, min_level, reorder_level, status, on_hand, incoming_quantity, projected_quantity",
       )
       .order("item_code", { nullsFirst: false });
     if (error) {
@@ -90,6 +92,8 @@ function InventoryList() {
         subcategory: r.subcategory,
         unit: r.unit,
         quantity: Number(r.on_hand ?? 0),
+        incomingQuantity: Number(r.incoming_quantity ?? 0),
+        projectedQuantity: Number(r.projected_quantity ?? r.on_hand ?? 0),
         reorder_level: r.reorder_level,
         min_level: r.min_level,
         status: r.status,
@@ -170,6 +174,8 @@ function InventoryList() {
               <TableHead>Name</TableHead>
               <TableHead>Category</TableHead>
               <TableHead className="text-right">On hand</TableHead>
+              <TableHead className="text-right">Incoming</TableHead>
+              <TableHead className="text-right">Projected</TableHead>
               <TableHead>Unit</TableHead>
               <TableHead>Status</TableHead>
               <TableHead className="text-right">Actions</TableHead>
@@ -192,6 +198,12 @@ function InventoryList() {
                   </TableCell>
                   <TableCell className="text-right font-mono tabular-nums">
                     {Number(it.quantity).toLocaleString()}
+                  </TableCell>
+                  <TableCell className="text-right font-mono tabular-nums text-blue-700">
+                    {it.incomingQuantity > 0 ? `+${it.incomingQuantity.toLocaleString()}` : "—"}
+                  </TableCell>
+                  <TableCell className="text-right font-mono tabular-nums">
+                    {it.projectedQuantity.toLocaleString()}
                   </TableCell>
                   <TableCell className="text-xs">{it.unit}</TableCell>
                   <TableCell>
@@ -237,7 +249,7 @@ function InventoryList() {
             })}
             {filtered.length === 0 && (
               <TableRow>
-                <TableCell colSpan={7} className="text-center text-sm text-muted-foreground py-8">
+                <TableCell colSpan={9} className="text-center text-sm text-muted-foreground py-8">
                   No items
                 </TableCell>
               </TableRow>

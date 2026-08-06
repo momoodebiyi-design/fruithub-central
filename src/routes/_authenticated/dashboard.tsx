@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Boxes, FlaskConical, AlertTriangle, TrendingUp, ShoppingCart } from "lucide-react";
 import { useSession } from "@/hooks/useSession";
-import { isShopSupervisorOnly } from "@/lib/permissions";
+import { CAN_APPROVE_PURCHASES, hasAny, isShopSupervisorOnly } from "@/lib/permissions";
 import { ShopOperationsPaused } from "@/components/ShopOperationsPaused";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
@@ -23,6 +23,8 @@ interface Stats {
 
 function DashboardPage() {
   const session = useSession();
+  const canApprovePurchases =
+    hasAny(session.roles, CAN_APPROVE_PURCHASES) && !session.roles.includes("procurement");
   const [stats, setStats] = useState<Stats>({
     totalItems: 0,
     lowStock: 0,
@@ -62,7 +64,7 @@ function DashboardPage() {
         { count: itemsCount },
         { data: routedNeeds },
         { data: batches },
-        { count: approvals },
+        { data: approvalRows },
       ] = await Promise.all([
         supabase
           .from("inventory_items")
@@ -84,7 +86,7 @@ function DashboardPage() {
           .order("produced_at", { ascending: false }),
         (supabase as any)
           .from("purchase_orders")
-          .select("id", { count: "exact", head: true })
+          .select("id, submitted_by")
           .eq("workflow_status", "awaiting_approval"),
       ]);
       const activeNeeds = ((routedNeeds ?? []) as any[])
@@ -112,7 +114,11 @@ function DashboardPage() {
         lowStock: activeNeeds.length,
         batchesToday: batches?.length ?? 0,
         outputToday,
-        approvals: approvals ?? 0,
+        approvals: canApprovePurchases
+          ? ((approvalRows ?? []) as Array<{ submitted_by: string | null }>).filter(
+              (order) => order.submitted_by !== session.user?.id,
+            ).length
+          : 0,
       });
 
       setRecentBatches(
@@ -126,7 +132,7 @@ function DashboardPage() {
       );
     }
     load();
-  }, []);
+  }, [canApprovePurchases, session.user?.id]);
 
   if (isShopSupervisorOnly(session.roles)) return <ShopOperationsPaused />;
 
@@ -148,7 +154,7 @@ function DashboardPage() {
           accent={stats.lowStock > 0 ? "warn" : undefined}
         />
         <KpiCard
-          label="Purchase approvals"
+          label="Your purchase approvals"
           value={stats.approvals}
           icon={ShoppingCart}
           accent={stats.approvals > 0 ? "warn" : undefined}
