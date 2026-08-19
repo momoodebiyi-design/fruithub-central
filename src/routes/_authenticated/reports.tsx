@@ -25,8 +25,40 @@ export const Route = createFileRoute("/_authenticated/reports")({
   component: ReportsPage,
 });
 
-type Location = { id: string; name: string };
-type Product = { id: string; name: string; sku: string };
+type Location = { id: string; name: string; is_default: boolean };
+type Product = { id: string; name: string; sku: string; unit: string; category: string };
+
+type StocktakeLineRow = {
+  stocktake_id: string;
+  item_id: string;
+  expected_quantity: number;
+  counted_quantity: number | null;
+  difference: number | null;
+  variance_reason: string | null;
+  central_stocktakes: {
+    count_number: string;
+    scope: string;
+    status: string;
+    location_id: string;
+    created_at: string;
+  } | null;
+};
+
+type StocktakeCoverageRow = {
+  itemId: string;
+  sku: string;
+  item: string;
+  category: string;
+  unit: string;
+  countStatus: "counted" | "not_counted";
+  countNumber: string | null;
+  stocktakeStatus: string | null;
+  countedAt: string | null;
+  expected: number | null;
+  counted: number | null;
+  difference: number | null;
+  varianceReason: string | null;
+};
 
 type DispatchRow = {
   dispatch_id: string;
@@ -226,6 +258,9 @@ function ReportsPage() {
   const [movements, setMovements] = useState<MovementRow[]>([]);
   const [productionRows, setProductionRows] = useState<ProductionRow[]>([]);
   const [returns, setReturns] = useState<ReturnRow[]>([]);
+  const [stocktakeLines, setStocktakeLines] = useState<StocktakeLineRow[]>([]);
+  const [stocktakeCategory, setStocktakeCategory] = useState("all");
+  const [stocktakeCountStatus, setStocktakeCountStatus] = useState("all");
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState("dispatches");
 
@@ -246,9 +281,18 @@ function ReportsPage() {
       movementResult,
       productionResult,
       returnResult,
+      stocktakeResult,
     ] = await Promise.all([
-      supabase.from("locations").select("id, name").eq("status", "active").order("name"),
-      supabase.from("inventory_items").select("id, name, sku").eq("status", "active").order("name"),
+      supabase
+        .from("locations")
+        .select("id, name, is_default")
+        .eq("status", "active")
+        .order("name"),
+      supabase
+        .from("inventory_items")
+        .select("id, name, sku, unit, category")
+        .eq("status", "active")
+        .order("name"),
       (supabase as any)
         .from("v_daily_dispatch_report")
         .select("*")
@@ -276,6 +320,15 @@ function ReportsPage() {
         .lt("recorded_at", endExclusive)
         .order("recorded_at", { ascending: false })
         .limit(10000),
+      (supabase as any)
+        .from("central_stocktake_lines")
+        .select(
+          "stocktake_id, item_id, expected_quantity, counted_quantity, difference, variance_reason, central_stocktakes!inner(count_number, scope, status, location_id, created_at)",
+        )
+        .gte("central_stocktakes.created_at", start)
+        .lt("central_stocktakes.created_at", endExclusive)
+        .order("created_at", { referencedTable: "central_stocktakes", ascending: false })
+        .limit(10000),
     ]);
 
     const error =
@@ -284,7 +337,8 @@ function ReportsPage() {
       dispatchResult.error ??
       movementResult.error ??
       productionResult.error ??
-      returnResult.error;
+      returnResult.error ??
+      stocktakeResult.error;
     if (error) toast.error(`Unable to load reports: ${error.message}`);
     setLocations((locationRows as Location[]) ?? []);
     setProducts((productRows as Product[]) ?? []);
@@ -292,6 +346,7 @@ function ReportsPage() {
     setMovements((movementResult.data as MovementRow[]) ?? []);
     setProductionRows((productionResult.data as ProductionRow[]) ?? []);
     setReturns((returnResult.data as ReturnRow[]) ?? []);
+    setStocktakeLines((stocktakeResult.data as StocktakeLineRow[]) ?? []);
     setLoading(false);
   }
 
@@ -342,6 +397,77 @@ function ReportsPage() {
       ),
     [returns, locationId, productId],
   );
+
+  const stocktakeCategories = useMemo(
+    () =>
+      Array.from(new Set(products.map((product) => product.category))).sort((a, b) =>
+        a.localeCompare(b),
+      ),
+    [products],
+  );
+
+  const stocktakeCoverage = useMemo(() => {
+    const centralLocation = locations.find(
+      (location) => location.is_default || location.name.toLowerCase() === "main store",
+    );
+    if (locationId !== "all" && (!centralLocation || locationId !== centralLocation.id)) {
+      return [];
+    }
+
+    const latestByItem = new Map<string, StocktakeLineRow>();
+    const orderedLines = [...stocktakeLines].sort(
+      (a, b) =>
+        new Date(b.central_stocktakes?.created_at ?? 0).getTime() -
+        new Date(a.central_stocktakes?.created_at ?? 0).getTime(),
+    );
+
+    for (const line of orderedLines) {
+      if (!line.central_stocktakes) continue;
+      if (locationId !== "all" && line.central_stocktakes.location_id !== locationId) continue;
+      if (!latestByItem.has(line.item_id)) latestByItem.set(line.item_id, line);
+    }
+
+    return products
+      .filter((product) => productId === "all" || product.id === productId)
+      .map<StocktakeCoverageRow>((product) => {
+        const line = latestByItem.get(product.id);
+        const counted = line?.counted_quantity == null ? null : Number(line.counted_quantity);
+        return {
+          itemId: product.id,
+          sku: product.sku,
+          item: product.name,
+          category: product.category,
+          unit: product.unit,
+          countStatus: counted == null ? "not_counted" : "counted",
+          countNumber: line?.central_stocktakes?.count_number ?? null,
+          stocktakeStatus: line?.central_stocktakes?.status ?? null,
+          countedAt: line?.central_stocktakes?.created_at ?? null,
+          expected: line ? Number(line.expected_quantity) : null,
+          counted,
+          difference: line?.difference == null ? null : Number(line.difference),
+          varianceReason: line?.variance_reason ?? null,
+        };
+      })
+      .filter(
+        (row) =>
+          (stocktakeCategory === "all" || row.category === stocktakeCategory) &&
+          (stocktakeCountStatus === "all" || row.countStatus === stocktakeCountStatus),
+      )
+      .sort((a, b) => a.category.localeCompare(b.category) || a.item.localeCompare(b.item));
+  }, [
+    locationId,
+    locations,
+    productId,
+    products,
+    stocktakeCategory,
+    stocktakeCountStatus,
+    stocktakeLines,
+  ]);
+
+  const stocktakeCounted = stocktakeCoverage.filter((row) => row.countStatus === "counted").length;
+  const stocktakeNotCounted = stocktakeCoverage.filter(
+    (row) => row.countStatus === "not_counted",
+  ).length;
 
   const productionBatches = useMemo(() => {
     const map = new Map<string, ProductionBatch>();
@@ -644,6 +770,40 @@ function ReportsPage() {
     );
   }
 
+  function exportStocktakeCoverage() {
+    downloadCsv(
+      `central-stocktake-coverage-${fromDate}-to-${toDate}.csv`,
+      [
+        "SKU",
+        "Product",
+        "Category",
+        "Count status",
+        "Stocktake",
+        "Stocktake workflow status",
+        "Stocktake started at",
+        "Expected quantity",
+        "Counted quantity",
+        "Difference",
+        "Unit",
+        "Variance reason",
+      ],
+      stocktakeCoverage.map((row) => [
+        row.sku,
+        row.item,
+        row.category.replaceAll("_", " "),
+        row.countStatus === "counted" ? "Counted" : "Not counted",
+        row.countNumber,
+        row.stocktakeStatus,
+        row.countedAt,
+        row.expected,
+        row.counted,
+        row.difference,
+        row.unit,
+        row.varianceReason,
+      ]),
+    );
+  }
+
   const exportCurrentReport =
     tab === "dispatches"
       ? exportDispatches
@@ -651,7 +811,9 @@ function ReportsPage() {
         ? exportMovements
         : tab === "production"
           ? exportProduction
-          : exportReturns;
+          : tab === "returns"
+            ? exportReturns
+            : exportStocktakeCoverage;
 
   if (!canView) {
     return (
@@ -667,8 +829,8 @@ function ReportsPage() {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Reports</h1>
           <p className="text-sm text-muted-foreground">
-            Factory dispatch, return, inventory movement and production records in Africa/Lagos
-            time.
+            Factory dispatch, return, inventory movement, stocktake coverage and production records
+            in Africa/Lagos time.
           </p>
         </div>
         <Button variant="outline" onClick={exportCurrentReport} disabled={loading}>
@@ -736,6 +898,7 @@ function ReportsPage() {
         <TabsList className="h-auto flex-wrap">
           <TabsTrigger value="dispatches">Products dispatched</TabsTrigger>
           <TabsTrigger value="movements">Inventory movements</TabsTrigger>
+          <TabsTrigger value="stocktakes">Stocktake coverage</TabsTrigger>
           <TabsTrigger value="production">Production</TabsTrigger>
           <TabsTrigger value="returns">Factory returns</TabsTrigger>
         </TabsList>
@@ -969,6 +1132,132 @@ function ReportsPage() {
                       </td>
                       <td className="px-3 py-2 text-xs text-muted-foreground">
                         {row.performed_by_name ?? "System"}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="stocktakes" className="space-y-4">
+          <div className="rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900 dark:bg-amber-950 dark:text-amber-200">
+            Every active product is listed. A blank or omitted count remains “Not counted” and is
+            never silently treated as zero. Where multiple stocktakes fall in the selected dates,
+            the latest count for each product is shown.
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-3">
+            <SummaryCard label="Products shown" value={stocktakeCoverage.length} />
+            <SummaryCard label="Counted" value={stocktakeCounted} />
+            <SummaryCard label="Not counted" value={stocktakeNotCounted} />
+          </div>
+
+          <Card>
+            <CardContent className="grid gap-3 pt-6 sm:grid-cols-2">
+              <div>
+                <Label>Category</Label>
+                <Select value={stocktakeCategory} onValueChange={setStocktakeCategory}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All categories</SelectItem>
+                    {stocktakeCategories.map((category) => (
+                      <SelectItem key={category} value={category}>
+                        {category.replaceAll("_", " ")}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Count status</Label>
+                <Select value={stocktakeCountStatus} onValueChange={setStocktakeCountStatus}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Counted and not counted</SelectItem>
+                    <SelectItem value="not_counted">Not counted</SelectItem>
+                    <SelectItem value="counted">Counted</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </CardContent>
+          </Card>
+
+          <div className="overflow-x-auto rounded-lg border bg-card">
+            <table className="w-full min-w-[1050px] text-sm">
+              <thead className="bg-muted/50 text-xs uppercase text-muted-foreground">
+                <tr>
+                  <th className="px-3 py-2 text-left">Product</th>
+                  <th className="px-3 py-2 text-left">Category</th>
+                  <th className="px-3 py-2 text-left">Count status</th>
+                  <th className="px-3 py-2 text-left">Stocktake</th>
+                  <th className="px-3 py-2 text-right">Expected</th>
+                  <th className="px-3 py-2 text-right">Counted</th>
+                  <th className="px-3 py-2 text-right">Difference</th>
+                  <th className="px-3 py-2 text-left">Variance reason</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y">
+                {stocktakeCoverage.length === 0 ? (
+                  <tr>
+                    <td colSpan={8} className="px-4 py-12 text-center text-muted-foreground">
+                      No products match the selected filters.
+                    </td>
+                  </tr>
+                ) : (
+                  stocktakeCoverage.map((row) => (
+                    <tr key={row.itemId}>
+                      <td className="px-3 py-2">
+                        <p className="font-medium">{row.item}</p>
+                        <p className="font-mono text-[11px] text-muted-foreground">{row.sku}</p>
+                      </td>
+                      <td className="px-3 py-2 capitalize">{row.category.replaceAll("_", " ")}</td>
+                      <td className="px-3 py-2">
+                        <Badge
+                          variant="outline"
+                          className={
+                            row.countStatus === "counted"
+                              ? "border-emerald-300 bg-emerald-50 text-emerald-800"
+                              : "border-amber-300 bg-amber-50 text-amber-800"
+                          }
+                        >
+                          {row.countStatus === "counted" ? "Counted" : "Not counted"}
+                        </Badge>
+                      </td>
+                      <td className="px-3 py-2">
+                        {row.countNumber ? (
+                          <>
+                            <p className="font-mono text-xs">{row.countNumber}</p>
+                            <p className="text-[11px] capitalize text-muted-foreground">
+                              {row.stocktakeStatus} · {formatLagosDateTime(row.countedAt!)}
+                            </p>
+                          </>
+                        ) : (
+                          <span className="text-muted-foreground">No count in period</span>
+                        )}
+                      </td>
+                      <td className="px-3 py-2 text-right font-mono">
+                        {row.expected == null ? "—" : row.expected.toLocaleString()}
+                      </td>
+                      <td className="px-3 py-2 text-right font-mono">
+                        {row.counted == null ? "—" : row.counted.toLocaleString()}
+                      </td>
+                      <td
+                        className={`px-3 py-2 text-right font-mono ${row.difference ? "text-brand-orange" : ""}`}
+                      >
+                        {row.difference == null
+                          ? "—"
+                          : row.difference > 0
+                            ? `+${row.difference}`
+                            : row.difference}
+                      </td>
+                      <td className="px-3 py-2 text-xs text-muted-foreground">
+                        {row.varianceReason ?? "—"}
                       </td>
                     </tr>
                   ))
