@@ -251,6 +251,7 @@ function ReportsPage() {
   const [fromDate, setFromDate] = useState(today);
   const [toDate, setToDate] = useState(today);
   const [locationId, setLocationId] = useState("all");
+  const [category, setCategory] = useState("all");
   const [productId, setProductId] = useState("all");
   const [locations, setLocations] = useState<Location[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
@@ -259,7 +260,6 @@ function ReportsPage() {
   const [productionRows, setProductionRows] = useState<ProductionRow[]>([]);
   const [returns, setReturns] = useState<ReturnRow[]>([]);
   const [stocktakeLines, setStocktakeLines] = useState<StocktakeLineRow[]>([]);
-  const [stocktakeCategory, setStocktakeCategory] = useState("all");
   const [stocktakeCountStatus, setStocktakeCountStatus] = useState("all");
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState("dispatches");
@@ -356,6 +356,29 @@ function ReportsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [canView]);
 
+  const reportCategories = useMemo(
+    () =>
+      Array.from(new Set(products.map((product) => product.category))).sort((a, b) =>
+        a.localeCompare(b),
+      ),
+    [products],
+  );
+
+  const categoryItemIds = useMemo(
+    () =>
+      new Set(
+        products
+          .filter((product) => category === "all" || product.category === category)
+          .map((product) => product.id),
+      ),
+    [category, products],
+  );
+
+  const categoryProducts = useMemo(
+    () => products.filter((product) => categoryItemIds.has(product.id)),
+    [categoryItemIds, products],
+  );
+
   const filteredDispatches = useMemo(
     () =>
       dispatches.filter(
@@ -363,9 +386,10 @@ function ReportsPage() {
           (locationId === "all" ||
             row.source_location_id === locationId ||
             row.destination_location_id === locationId) &&
+          categoryItemIds.has(row.item_id) &&
           (productId === "all" || row.item_id === productId),
       ),
-    [dispatches, locationId, productId],
+    [categoryItemIds, dispatches, locationId, productId],
   );
 
   const filteredMovements = useMemo(
@@ -373,9 +397,10 @@ function ReportsPage() {
       movements.filter(
         (row) =>
           (locationId === "all" || row.location_id === locationId) &&
+          categoryItemIds.has(row.item_id) &&
           (productId === "all" || row.item_id === productId),
       ),
-    [movements, locationId, productId],
+    [categoryItemIds, movements, locationId, productId],
   );
 
   const filteredProductionRows = useMemo(
@@ -383,9 +408,10 @@ function ReportsPage() {
       productionRows.filter(
         (row) =>
           (locationId === "all" || row.location_id === locationId) &&
+          categoryItemIds.has(row.product_item_id) &&
           (productId === "all" || row.product_item_id === productId),
       ),
-    [productionRows, locationId, productId],
+    [categoryItemIds, locationId, productId, productionRows],
   );
 
   const filteredReturns = useMemo(
@@ -393,17 +419,10 @@ function ReportsPage() {
       returns.filter(
         (row) =>
           (locationId === "all" || row.source_location_id === locationId) &&
+          categoryItemIds.has(row.item_id) &&
           (productId === "all" || row.item_id === productId),
       ),
-    [returns, locationId, productId],
-  );
-
-  const stocktakeCategories = useMemo(
-    () =>
-      Array.from(new Set(products.map((product) => product.category))).sort((a, b) =>
-        a.localeCompare(b),
-      ),
-    [products],
+    [categoryItemIds, locationId, productId, returns],
   );
 
   const stocktakeCoverage = useMemo(() => {
@@ -428,7 +447,10 @@ function ReportsPage() {
     }
 
     return products
-      .filter((product) => productId === "all" || product.id === productId)
+      .filter(
+        (product) =>
+          categoryItemIds.has(product.id) && (productId === "all" || product.id === productId),
+      )
       .map<StocktakeCoverageRow>((product) => {
         const line = latestByItem.get(product.id);
         const counted = line?.counted_quantity == null ? null : Number(line.counted_quantity);
@@ -448,18 +470,14 @@ function ReportsPage() {
           varianceReason: line?.variance_reason ?? null,
         };
       })
-      .filter(
-        (row) =>
-          (stocktakeCategory === "all" || row.category === stocktakeCategory) &&
-          (stocktakeCountStatus === "all" || row.countStatus === stocktakeCountStatus),
-      )
+      .filter((row) => stocktakeCountStatus === "all" || row.countStatus === stocktakeCountStatus)
       .sort((a, b) => a.category.localeCompare(b.category) || a.item.localeCompare(b.item));
   }, [
     locationId,
     locations,
     productId,
     products,
-    stocktakeCategory,
+    categoryItemIds,
     stocktakeCountStatus,
     stocktakeLines,
   ]);
@@ -839,7 +857,7 @@ function ReportsPage() {
       </div>
 
       <Card>
-        <CardContent className="grid gap-3 pt-6 sm:grid-cols-2 lg:grid-cols-5 lg:items-end">
+        <CardContent className="grid gap-3 pt-6 sm:grid-cols-2 lg:grid-cols-6 lg:items-end">
           <div>
             <Label>From</Label>
             <Input
@@ -869,6 +887,31 @@ function ReportsPage() {
             </Select>
           </div>
           <div>
+            <Label>Category</Label>
+            <Select
+              value={category}
+              onValueChange={(value) => {
+                setCategory(value);
+                const selectedProduct = products.find((product) => product.id === productId);
+                if (selectedProduct && value !== "all" && selectedProduct.category !== value) {
+                  setProductId("all");
+                }
+              }}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All categories</SelectItem>
+                {reportCategories.map((productCategory) => (
+                  <SelectItem key={productCategory} value={productCategory}>
+                    {productCategory.replaceAll("_", " ")}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
             <Label>Product / item</Label>
             <Select value={productId} onValueChange={setProductId}>
               <SelectTrigger>
@@ -876,7 +919,7 @@ function ReportsPage() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All products and items</SelectItem>
-                {products.map((product) => (
+                {categoryProducts.map((product) => (
                   <SelectItem key={product.id} value={product.id}>
                     {product.name} ({product.sku})
                   </SelectItem>
@@ -1155,23 +1198,7 @@ function ReportsPage() {
           </div>
 
           <Card>
-            <CardContent className="grid gap-3 pt-6 sm:grid-cols-2">
-              <div>
-                <Label>Category</Label>
-                <Select value={stocktakeCategory} onValueChange={setStocktakeCategory}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All categories</SelectItem>
-                    {stocktakeCategories.map((category) => (
-                      <SelectItem key={category} value={category}>
-                        {category.replaceAll("_", " ")}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+            <CardContent className="pt-6 sm:max-w-sm">
               <div>
                 <Label>Count status</Label>
                 <Select value={stocktakeCountStatus} onValueChange={setStocktakeCountStatus}>
