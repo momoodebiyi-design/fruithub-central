@@ -56,6 +56,8 @@ function StocktakesPage() {
   const [selected, setSelected] = useState<Stocktake | null>(null);
   const [lines, setLines] = useState<Line[]>([]);
   const [query, setQuery] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState("all");
+  const [countStatusFilter, setCountStatusFilter] = useState("all");
   const [creating, setCreating] = useState(false);
   const [scope, setScope] = useState("all");
   const [notes, setNotes] = useState("");
@@ -101,20 +103,36 @@ function StocktakesPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   useEffect(() => {
+    setQuery("");
+    setCategoryFilter("all");
+    setCountStatusFilter("all");
     if (selected) loadLines(selected.id);
     else setLines([]);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selected?.id]);
 
+  const categories = useMemo(
+    () =>
+      Array.from(
+        new Set(lines.map((line) => line.inventory_items?.category).filter(Boolean) as string[]),
+      ).sort((a, b) => a.localeCompare(b)),
+    [lines],
+  );
+
   const visibleLines = useMemo(() => {
     const needle = query.toLowerCase();
     return lines.filter(
       (line) =>
-        !needle ||
-        line.inventory_items?.name.toLowerCase().includes(needle) ||
-        line.inventory_items?.sku.toLowerCase().includes(needle),
+        (!needle ||
+          line.inventory_items?.name.toLowerCase().includes(needle) ||
+          line.inventory_items?.sku.toLowerCase().includes(needle)) &&
+        (categoryFilter === "all" || line.inventory_items?.category === categoryFilter) &&
+        (countStatusFilter === "all" ||
+          (countStatusFilter === "counted"
+            ? line.counted_quantity != null
+            : line.counted_quantity == null)),
     );
-  }, [lines, query]);
+  }, [lines, query, categoryFilter, countStatusFilter]);
 
   function updateLine(id: string, patch: Partial<Line>) {
     setLines((current) => current.map((line) => (line.id === id ? { ...line, ...patch } : line)));
@@ -297,21 +315,53 @@ function StocktakesPage() {
               </div>
             )}
             {selected && (
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
-                <Input
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                  placeholder="Search product or SKU"
-                  className="pl-9"
-                />
+              <div className="grid gap-2 md:grid-cols-[minmax(220px,1fr)_190px_170px]">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+                  <Input
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                    placeholder="Search product or SKU"
+                    className="pl-9"
+                  />
+                </div>
+                <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="All categories" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All categories</SelectItem>
+                    {categories.map((category) => (
+                      <SelectItem key={category} value={category}>
+                        {category.replaceAll("_", " ")}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Select value={countStatusFilter} onValueChange={setCountStatusFilter}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="All count statuses" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All count statuses</SelectItem>
+                    <SelectItem value="not_counted">Not counted</SelectItem>
+                    <SelectItem value="counted">Counted</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
+            )}
+            {selected && (
+              <p className="text-xs text-muted-foreground">
+                Showing {visibleLines.length} of {lines.length} items. Filtering only changes what
+                is visible; the full stocktake remains intact.
+              </p>
             )}
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b text-xs uppercase tracking-wider text-muted-foreground">
                     <th className="text-left p-2">Item</th>
+                    <th className="text-left p-2">Status</th>
                     <th className="text-right p-2">Expected</th>
                     <th className="text-right p-2 w-32">Counted</th>
                     <th className="text-right p-2">Difference</th>
@@ -319,6 +369,13 @@ function StocktakesPage() {
                   </tr>
                 </thead>
                 <tbody>
+                  {visibleLines.length === 0 && (
+                    <tr>
+                      <td colSpan={6} className="p-8 text-center text-muted-foreground">
+                        No stocktake items match the selected filters.
+                      </td>
+                    </tr>
+                  )}
                   {visibleLines.map((line) => {
                     const diff =
                       line.counted_quantity == null
@@ -331,6 +388,18 @@ function StocktakesPage() {
                           <p className="text-[11px] text-muted-foreground font-mono">
                             {line.inventory_items?.sku} · {line.inventory_items?.unit}
                           </p>
+                        </td>
+                        <td className="p-2">
+                          <Badge
+                            variant="outline"
+                            className={
+                              line.counted_quantity == null
+                                ? "border-amber-300 bg-amber-50 text-amber-800"
+                                : "border-emerald-300 bg-emerald-50 text-emerald-800"
+                            }
+                          >
+                            {line.counted_quantity == null ? "Not counted" : "Counted"}
+                          </Badge>
                         </td>
                         <td className="p-2 text-right font-mono">
                           {line.expected_quantity.toLocaleString()}
