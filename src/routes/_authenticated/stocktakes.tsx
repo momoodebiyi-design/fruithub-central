@@ -1,11 +1,11 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { CheckCircle2, ClipboardCheck, Plus, Search, Send, XCircle } from "lucide-react";
+import { ClipboardCheck, Plus, Search, Send } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useSession } from "@/hooks/useSession";
-import { CAN_APPROVE_STOCKTAKES, CAN_WRITE_INVENTORY, hasAny } from "@/lib/permissions";
+import { CAN_WRITE_INVENTORY, hasAny } from "@/lib/permissions";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -33,7 +33,7 @@ type Stocktake = {
   id: string;
   count_number: string;
   scope: string;
-  status: "draft" | "submitted" | "approved" | "rejected";
+  status: "draft" | "submitted" | "posted" | "approved" | "rejected";
   notes: string | null;
   rejection_reason: string | null;
   created_at: string;
@@ -51,7 +51,6 @@ type Line = {
 function StocktakesPage() {
   const { roles } = useSession();
   const canCount = hasAny(roles, CAN_WRITE_INVENTORY);
-  const canApprove = hasAny(roles, CAN_APPROVE_STOCKTAKES);
   const [stocktakes, setStocktakes] = useState<Stocktake[]>([]);
   const [selected, setSelected] = useState<Stocktake | null>(null);
   const [lines, setLines] = useState<Line[]>([]);
@@ -180,37 +179,40 @@ function StocktakesPage() {
     await loadLines(selected.id);
   }
 
-  async function runAction(action: "submit" | "approve" | "reject") {
+  async function submitAndPost() {
     if (!selected) return;
-    if (action === "submit" && lines.some((line) => line.counted_quantity == null)) {
+    if (lines.some((line) => line.counted_quantity == null)) {
       return toast.error("Every item must be counted. Blank is not treated as zero.");
     }
-    let reason = "";
-    if (action === "reject") {
-      reason = window.prompt("Why is this stocktake being rejected?")?.trim() ?? "";
-      if (!reason) return;
+    for (const line of lines) {
+      const difference = Number(line.counted_quantity) - line.expected_quantity;
+      if (difference !== 0 && !line.variance_reason?.trim()) {
+        return toast.error(
+          `Explain the variance for ${line.inventory_items?.name ?? "each changed item"}`,
+        );
+      }
     }
+
     setBusy(true);
-    const fn =
-      action === "submit"
-        ? "submit_central_stocktake"
-        : action === "approve"
-          ? "approve_central_stocktake"
-          : "reject_central_stocktake";
-    const args =
-      action === "reject"
-        ? { _stocktake_id: selected.id, _reason: reason }
-        : { _stocktake_id: selected.id };
-    const { error } = await (supabase as any).rpc(fn, args);
+    const { error: saveError } = await (supabase as any).rpc("save_central_stocktake_lines", {
+      _stocktake_id: selected.id,
+      _lines: lines.map((line) => ({
+        line_id: line.id,
+        counted_quantity: line.counted_quantity,
+        variance_reason: line.variance_reason?.trim() || null,
+      })),
+    });
+    if (saveError) {
+      setBusy(false);
+      return toast.error(saveError.message);
+    }
+
+    const { error } = await (supabase as any).rpc("submit_central_stocktake", {
+      _stocktake_id: selected.id,
+    });
     setBusy(false);
     if (error) return toast.error(error.message);
-    toast.success(
-      action === "approve"
-        ? "Stocktake approved — Central stock updated"
-        : action === "submit"
-          ? "Stocktake submitted for approval"
-          : "Stocktake rejected",
-    );
+    toast.success("Stocktake posted — Central stock updated");
     await loadStocktakes(selected.id);
   }
 
@@ -226,7 +228,8 @@ function StocktakesPage() {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Central Stocktake</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Count factory stock, explain differences, then approve auditable adjustments.
+            Count factory stock, explain differences and post auditable adjustments to Central
+            Inventory.
           </p>
         </div>
         {canCount && (
@@ -285,22 +288,8 @@ function StocktakesPage() {
                     <Button variant="outline" onClick={save} disabled={busy}>
                       Save
                     </Button>
-                    <Button onClick={() => runAction("submit")} disabled={busy}>
-                      <Send className="size-4 mr-1" /> Submit
-                    </Button>
-                  </>
-                )}
-                {selected?.status === "submitted" && canApprove && (
-                  <>
-                    <Button variant="outline" onClick={() => runAction("reject")} disabled={busy}>
-                      <XCircle className="size-4 mr-1" /> Reject
-                    </Button>
-                    <Button
-                      onClick={() => runAction("approve")}
-                      disabled={busy}
-                      className="bg-emerald-600 text-white hover:bg-emerald-700"
-                    >
-                      <CheckCircle2 className="size-4 mr-1" /> Approve
+                    <Button onClick={submitAndPost} disabled={busy}>
+                      <Send className="size-4 mr-1" /> Save &amp; post count
                     </Button>
                   </>
                 )}
@@ -311,7 +300,8 @@ function StocktakesPage() {
             {selected && (
               <div className="rounded-md border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900 dark:bg-amber-950 dark:text-amber-200">
                 Enter an actual count for every item. A blank count is intentionally not converted
-                to zero.
+                to zero. Posting updates Central Inventory immediately and the count cannot be
+                edited afterward.
               </div>
             )}
             {selected && (
@@ -495,9 +485,10 @@ function StocktakesPage() {
 }
 
 function Status({ status }: { status: Stocktake["status"] }) {
+  const label = status === "approved" || status === "posted" ? "Posted" : status;
   return (
     <Badge variant="outline" className="text-[10px] capitalize">
-      {status}
+      {label}
     </Badge>
   );
 }
