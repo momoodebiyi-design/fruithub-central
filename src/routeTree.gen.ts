@@ -14,6 +14,8 @@ import { Route as McpRouteImport } from './routes/mcp'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ApiWhatsappWebhookRouteImport } from './routes/api/whatsapp-webhook'
+import { Route as ApiPurchaseNotificationsRouteImport } from './routes/api/purchase-notifications'
 import { Route as ApiInvitesRouteImport } from './routes/api/invites'
 import { Route as AuthenticatedUsersRouteImport } from './routes/_authenticated/users'
 import { Route as AuthenticatedSuppliersRouteImport } from './routes/_authenticated/suppliers'
@@ -66,6 +68,17 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiWhatsappWebhookRoute = ApiWhatsappWebhookRouteImport.update({
+  id: '/api/whatsapp-webhook',
+  path: '/api/whatsapp-webhook',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPurchaseNotificationsRoute =
+  ApiPurchaseNotificationsRouteImport.update({
+    id: '/api/purchase-notifications',
+    path: '/api/purchase-notifications',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiInvitesRoute = ApiInvitesRouteImport.update({
   id: '/api/invites',
   path: '/api/invites',
@@ -237,6 +250,8 @@ export interface FileRoutesByFullPath {
   '/suppliers': typeof AuthenticatedSuppliersRoute
   '/users': typeof AuthenticatedUsersRoute
   '/api/invites': typeof ApiInvitesRoute
+  '/api/purchase-notifications': typeof ApiPurchaseNotificationsRoute
+  '/api/whatsapp-webhook': typeof ApiWhatsappWebhookRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
   '/inventory/$itemId': typeof AuthenticatedInventoryItemIdRoute
@@ -268,6 +283,8 @@ export interface FileRoutesByTo {
   '/suppliers': typeof AuthenticatedSuppliersRoute
   '/users': typeof AuthenticatedUsersRoute
   '/api/invites': typeof ApiInvitesRoute
+  '/api/purchase-notifications': typeof ApiPurchaseNotificationsRoute
+  '/api/whatsapp-webhook': typeof ApiWhatsappWebhookRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
   '/inventory/$itemId': typeof AuthenticatedInventoryItemIdRoute
@@ -303,6 +320,8 @@ export interface FileRoutesById {
   '/_authenticated/suppliers': typeof AuthenticatedSuppliersRoute
   '/_authenticated/users': typeof AuthenticatedUsersRoute
   '/api/invites': typeof ApiInvitesRoute
+  '/api/purchase-notifications': typeof ApiPurchaseNotificationsRoute
+  '/api/whatsapp-webhook': typeof ApiWhatsappWebhookRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
   '/_authenticated/inventory/$itemId': typeof AuthenticatedInventoryItemIdRoute
@@ -338,6 +357,8 @@ export interface FileRouteTypes {
     | '/suppliers'
     | '/users'
     | '/api/invites'
+    | '/api/purchase-notifications'
+    | '/api/whatsapp-webhook'
     | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
     | '/inventory/$itemId'
@@ -369,6 +390,8 @@ export interface FileRouteTypes {
     | '/suppliers'
     | '/users'
     | '/api/invites'
+    | '/api/purchase-notifications'
+    | '/api/whatsapp-webhook'
     | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
     | '/inventory/$itemId'
@@ -403,6 +426,8 @@ export interface FileRouteTypes {
     | '/_authenticated/suppliers'
     | '/_authenticated/users'
     | '/api/invites'
+    | '/api/purchase-notifications'
+    | '/api/whatsapp-webhook'
     | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
     | '/_authenticated/inventory/$itemId'
@@ -421,6 +446,8 @@ export interface RootRouteChildren {
   Char91DotmcpChar93ListToolsRoute: typeof Char91DotmcpChar93ListToolsRoute
   Char91DotwellKnownChar93OauthProtectedResourceRoute: typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
   ApiInvitesRoute: typeof ApiInvitesRoute
+  ApiPurchaseNotificationsRoute: typeof ApiPurchaseNotificationsRoute
+  ApiWhatsappWebhookRoute: typeof ApiWhatsappWebhookRoute
   DotlovableOauthConsentRoute: typeof DotlovableOauthConsentRoute
   Char91DotmcpChar93InvokeToolToolRoute: typeof Char91DotmcpChar93InvokeToolToolRoute
 }
@@ -460,6 +487,20 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/whatsapp-webhook': {
+      id: '/api/whatsapp-webhook'
+      path: '/api/whatsapp-webhook'
+      fullPath: '/api/whatsapp-webhook'
+      preLoaderRoute: typeof ApiWhatsappWebhookRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/purchase-notifications': {
+      id: '/api/purchase-notifications'
+      path: '/api/purchase-notifications'
+      fullPath: '/api/purchase-notifications'
+      preLoaderRoute: typeof ApiPurchaseNotificationsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/invites': {
@@ -741,6 +782,8 @@ const rootRouteChildren: RootRouteChildren = {
   Char91DotwellKnownChar93OauthProtectedResourceRoute:
     Char91DotwellKnownChar93OauthProtectedResourceRoute,
   ApiInvitesRoute: ApiInvitesRoute,
+  ApiPurchaseNotificationsRoute: ApiPurchaseNotificationsRoute,
+  ApiWhatsappWebhookRoute: ApiWhatsappWebhookRoute,
   DotlovableOauthConsentRoute: DotlovableOauthConsentRoute,
   Char91DotmcpChar93InvokeToolToolRoute: Char91DotmcpChar93InvokeToolToolRoute,
 }
