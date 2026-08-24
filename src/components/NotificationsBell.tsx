@@ -27,18 +27,17 @@ export function NotificationsBell() {
       const { data } = await supabase
         .from("notifications")
         .select("id, title, body, level, link, read_at, created_at")
+        .is("resolved_at", null)
         .order("created_at", { ascending: false })
-        .limit(15);
+        .limit(30);
       if (mounted && data) setItems(data as Notification[]);
     }
     load();
 
     const channel = supabase
       .channel("notifications-bell")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "notifications" },
-        () => load(),
+      .on("postgres_changes", { event: "*", schema: "public", table: "notifications" }, () =>
+        load(),
       )
       .subscribe();
 
@@ -53,7 +52,10 @@ export function NotificationsBell() {
   async function markAllRead() {
     const ids = items.filter((n) => !n.read_at).map((n) => n.id);
     if (!ids.length) return;
-    await supabase.from("notifications").update({ read_at: new Date().toISOString() }).in("id", ids);
+    await supabase
+      .from("notifications")
+      .update({ read_at: new Date().toISOString() })
+      .in("id", ids);
   }
 
   return (
@@ -62,7 +64,9 @@ export function NotificationsBell() {
         <Button variant="ghost" size="icon" className="relative">
           <Bell className="size-4" />
           {unread > 0 && (
-            <span className="absolute top-1 right-1 size-2 rounded-full bg-brand-red ring-2 ring-background" />
+            <span className="absolute -top-1 -right-1 flex min-w-4 items-center justify-center rounded-full bg-brand-red px-1 text-[9px] font-semibold leading-4 text-white ring-2 ring-background">
+              {unread > 9 ? "9+" : unread}
+            </span>
           )}
         </Button>
       </PopoverTrigger>
@@ -112,7 +116,7 @@ function NotificationRow({ n }: { n: Notification }) {
         .eq("id", n.id);
     }
     if (n.link) {
-      navigate({ to: n.link as any });
+      navigate({ to: n.link as never });
     }
   }
 
@@ -134,9 +138,7 @@ function NotificationRow({ n }: { n: Notification }) {
           <p className="text-[10px] text-muted-foreground uppercase tracking-wider">
             {formatDistanceToNow(new Date(n.created_at), { addSuffix: true })}
           </p>
-          {n.link && (
-            <span className="text-[10px] text-brand-orange font-medium">Open →</span>
-          )}
+          {n.link && <span className="text-[10px] text-brand-orange font-medium">Open →</span>}
         </div>
       </div>
     </button>

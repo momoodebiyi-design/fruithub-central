@@ -7,6 +7,7 @@ import {
   Check,
   ClipboardCheck,
   FileText,
+  MessageCircle,
   PackageCheck,
   Plus,
   ShoppingCart,
@@ -44,7 +45,12 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 
-export const Route = createFileRoute("/_authenticated/purchasing")({ component: PurchasingPage });
+export const Route = createFileRoute("/_authenticated/purchasing")({
+  validateSearch: (search: Record<string, unknown>) => ({
+    order: typeof search.order === "string" ? search.order : undefined,
+  }),
+  component: PurchasingPage,
+});
 
 type Need = {
   id: string;
@@ -85,6 +91,11 @@ type Order = {
   payment_recorded_at: string | null;
   delivered_at: string | null;
   suppliers: { name: string } | null;
+  purchase_notification_deliveries?: Array<{
+    status: "pending" | "sending" | "sent" | "delivered" | "read" | "failed" | "skipped";
+    last_error: string | null;
+    sent_at: string | null;
+  }>;
 };
 
 type Supplier = { id: string; name: string };
@@ -113,6 +124,36 @@ type Receipt = {
 };
 
 type OrderAction = "details" | "submit" | "approve" | "reject" | "payment" | "delivery" | "receive";
+
+type WhatsAppDispatchResult = {
+  status: "complete" | "attention_required" | "setup_required";
+  sent?: number;
+  failed?: number;
+  skipped?: number;
+  already_sent?: number;
+  message?: string;
+};
+
+async function dispatchPurchaseWhatsApp(
+  purchaseOrderId: string,
+  action: "dispatch" | "retry" = "dispatch",
+) {
+  const { data } = await supabase.auth.getSession();
+  const accessToken = data.session?.access_token;
+  if (!accessToken) throw new Error("Your session has expired");
+
+  const response = await fetch("/api/purchase-notifications", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ action, purchase_order_id: purchaseOrderId }),
+  });
+  const result = (await response.json()) as WhatsAppDispatchResult & { error?: string };
+  if (!response.ok) throw new Error(result.error || "WhatsApp delivery could not be started");
+  return result;
+}
 
 const ORDER_COLORS: Record<string, string> = {
   awaiting_approval: "border-amber-200 bg-amber-50 text-amber-700",
@@ -173,6 +214,7 @@ const ORDER_STATUS: Record<string, { label: string; owner: string; next: string 
 };
 
 function PurchasingPage() {
+  const search = Route.useSearch();
   const session = useSession();
   const canReviewNeeds = hasAny(session.roles, CAN_REVIEW_PURCHASE_NEEDS);
   const canSource = hasAny(session.roles, CAN_MANAGE_PURCHASES);
@@ -191,6 +233,7 @@ function PurchasingPage() {
     order: Order;
     action: OrderAction;
   } | null>(null);
+  const [openedLinkedOrder, setOpenedLinkedOrder] = useState<string | null>(null);
 
   async function load() {
     setLoading(true);
@@ -211,7 +254,7 @@ function PurchasingPage() {
       (supabase as any)
         .from("purchase_orders")
         .select(
-          "id, po_number, supplier_id, expected_date, workflow_status, quoted_total, quotation_reference, quotation_evidence_path, payment_reference, payment_evidence_path, created_at, created_by, submitted_by, submitted_at, approved_by, approved_at, payment_recorded_at, delivered_at, suppliers(name)",
+          "id, po_number, supplier_id, expected_date, workflow_status, quoted_total, quotation_reference, quotation_evidence_path, payment_reference, payment_evidence_path, created_at, created_by, submitted_by, submitted_at, approved_by, approved_at, payment_recorded_at, delivered_at, suppliers(name), purchase_notification_deliveries(status, last_error, sent_at)",
         )
         .order("created_at", { ascending: false })
         .limit(150),
@@ -230,6 +273,20 @@ function PurchasingPage() {
   useEffect(() => {
     load();
   }, []);
+  useEffect(() => {
+    if (!search.order || loading || openedLinkedOrder === search.order) return;
+    const linkedOrder = orders.find((order) => order.id === search.order);
+    if (!linkedOrder) return;
+    const mayApproveLinkedOrder =
+      canApprove &&
+      linkedOrder.workflow_status === "awaiting_approval" &&
+      linkedOrder.submitted_by !== session.user?.id;
+    setOrderAction({
+      order: linkedOrder,
+      action: mayApproveLinkedOrder ? "approve" : "details",
+    });
+    setOpenedLinkedOrder(search.order);
+  }, [canApprove, loading, openedLinkedOrder, orders, search.order, session.user?.id]);
   const readyNeeds = useMemo(() => needs.filter((need) => need.status === "ready"), [needs]);
 
   return (
@@ -318,6 +375,7 @@ function PurchasingPage() {
         <OrderActionDialog
           order={orderAction.order}
           action={orderAction.action}
+          canNotify={canSource || canApprove}
           onClose={() => setOrderAction(null)}
           onDone={load}
         />
@@ -1001,11 +1059,13 @@ function QuotedOrderDialog({
 function OrderActionDialog({
   order,
   action,
+  canNotify,
   onClose,
   onDone,
 }: {
   order: Order;
   action: OrderAction;
+  canNotify: boolean;
   onClose: () => void;
   onDone: () => Promise<void>;
 }) {
@@ -1018,6 +1078,7 @@ function OrderActionDialog({
     Record<string, { delivered?: string; accepted?: string; rejected?: string; notes?: string }>
   >({});
   const [saving, setSaving] = useState(false);
+  const [retryingWhatsApp, setRetryingWhatsApp] = useState(false);
   useEffect(() => {
     (async () => {
       const { data } = await (supabase as any)
@@ -1078,6 +1139,41 @@ function OrderActionDialog({
         accepted >= 0 && rejected >= 0 && accepted + rejected === Number(line.quantity_delivered)
       );
     });
+  const whatsAppDeliveries = order.purchase_notification_deliveries ?? [];
+  const whatsAppSent = whatsAppDeliveries.filter((delivery) =>
+    ["sent", "delivered", "read"].includes(delivery.status),
+  ).length;
+  const whatsAppAttention = whatsAppDeliveries.filter((delivery) =>
+    ["failed", "skipped"].includes(delivery.status),
+  ).length;
+
+  async function retryWhatsApp() {
+    setRetryingWhatsApp(true);
+    try {
+      const result = await dispatchPurchaseWhatsApp(order.id, "retry");
+      if (result.status === "setup_required") {
+        toast.warning(result.message || "WhatsApp setup is still required");
+      } else if ((result.failed ?? 0) > 0 || (result.skipped ?? 0) > 0) {
+        toast.warning(
+          `WhatsApp sent to ${result.sent ?? 0}; ${
+            (result.failed ?? 0) + (result.skipped ?? 0)
+          } recipient(s) still need attention`,
+        );
+      } else {
+        toast.success(
+          (result.sent ?? 0) > 0
+            ? `WhatsApp sent to ${result.sent} management recipient(s)`
+            : "Management WhatsApp alerts were already delivered",
+        );
+      }
+      await onDone();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "WhatsApp retry failed");
+    } finally {
+      setRetryingWhatsApp(false);
+    }
+  }
+
   async function submit() {
     if (action === "details") return;
     setSaving(true);
@@ -1129,6 +1225,18 @@ function OrderActionDialog({
         }));
       }
       if (error) throw new Error(error.message);
+      let whatsAppResult: WhatsAppDispatchResult | null = null;
+      if (action === "submit") {
+        try {
+          whatsAppResult = await dispatchPurchaseWhatsApp(order.id);
+        } catch (notificationError) {
+          toast.warning(
+            notificationError instanceof Error
+              ? `Order submitted. WhatsApp is queued: ${notificationError.message}`
+              : "Order submitted. WhatsApp delivery is queued for retry.",
+          );
+        }
+      }
       toast.success(
         action === "submit"
           ? "Submitted for MD approval"
@@ -1147,6 +1255,19 @@ function OrderActionDialog({
                       ) ?? 0
                     } accepted units were added to Central Inventory`,
       );
+      if (action === "submit" && whatsAppResult) {
+        if (whatsAppResult.status === "setup_required") {
+          toast.warning(whatsAppResult.message || "WhatsApp setup is required");
+        } else if ((whatsAppResult.failed ?? 0) > 0 || (whatsAppResult.skipped ?? 0) > 0) {
+          toast.warning(
+            `In-app approval sent. WhatsApp reached ${whatsAppResult.sent ?? 0}; ${
+              (whatsAppResult.failed ?? 0) + (whatsAppResult.skipped ?? 0)
+            } management profile(s) need attention.`,
+          );
+        } else if ((whatsAppResult.sent ?? 0) > 0) {
+          toast.success(`WhatsApp sent to ${whatsAppResult.sent} management recipient(s)`);
+        }
+      }
       await onDone();
       onClose();
     } catch (error) {
@@ -1206,13 +1327,42 @@ function OrderActionDialog({
             )}
           </div>
           {action === "details" && (
-            <div className="grid gap-2 rounded-md border p-3 text-sm sm:grid-cols-2">
-              <TimelineRow label="Created" value={order.created_at} />
-              <TimelineRow label="Submitted" value={order.submitted_at} />
-              <TimelineRow label="Approved" value={order.approved_at} />
-              <TimelineRow label="Order placed" value={order.payment_recorded_at} />
-              <TimelineRow label="Delivery recorded" value={order.delivered_at} />
-            </div>
+            <>
+              <div className="grid gap-2 rounded-md border p-3 text-sm sm:grid-cols-2">
+                <TimelineRow label="Created" value={order.created_at} />
+                <TimelineRow label="Submitted" value={order.submitted_at} />
+                <TimelineRow label="Approved" value={order.approved_at} />
+                <TimelineRow label="Order placed" value={order.payment_recorded_at} />
+                <TimelineRow label="Delivery recorded" value={order.delivered_at} />
+              </div>
+              {order.workflow_status === "awaiting_approval" && (
+                <div className="flex flex-col gap-3 rounded-md border p-3 text-sm sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <p className="flex items-center gap-2 font-medium">
+                      <MessageCircle className="size-4 text-emerald-600" />
+                      WhatsApp approval alert
+                    </p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {whatsAppSent > 0
+                        ? `Sent to ${whatsAppSent} management recipient(s).`
+                        : whatsAppAttention > 0
+                          ? `${whatsAppAttention} recipient(s) need a valid number or retry.`
+                          : "Queued for management. Approval remains inside this app."}
+                    </p>
+                  </div>
+                  {canNotify && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={retryWhatsApp}
+                      disabled={retryingWhatsApp}
+                    >
+                      {retryingWhatsApp ? "Sending…" : "Retry WhatsApp"}
+                    </Button>
+                  )}
+                </div>
+              )}
+            </>
           )}
           {action === "submit" && (
             <p className="text-sm text-muted-foreground">
