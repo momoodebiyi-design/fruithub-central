@@ -16,7 +16,7 @@ const PAGE_WIDTH = 210;
 const PAGE_HEIGHT = 297;
 const MARGIN_X = 12;
 const TABLE_BOTTOM = 272;
-const COLUMN_X = [12, 20, 93, 122, 145, 172, 198] as const;
+const COLUMN_X = [12, 20, 80, 126, 141, 168, 198] as const;
 
 function labelCategory(category: string) {
   return category === "all"
@@ -99,7 +99,20 @@ export async function createStocktakePdf(input: StocktakePdfInput) {
   let y = startPage();
   input.lines.forEach((line, index) => {
     const itemLines = doc.splitTextToSize(line.name, COLUMN_X[2] - COLUMN_X[1] - 3) as string[];
-    const rowHeight = Math.max(10, itemLines.length * 3.7 + 4);
+    const skuLines = doc.splitTextToSize(
+      line.sku || "-",
+      COLUMN_X[3] - COLUMN_X[2] - 3,
+    ) as string[];
+    const unitLines = doc.splitTextToSize(
+      line.unit || "-",
+      COLUMN_X[4] - COLUMN_X[3] - 3,
+    ) as string[];
+    const rowHeight = Math.max(
+      10,
+      itemLines.length * 3.7 + 4,
+      skuLines.length * 3.7 + 4,
+      unitLines.length * 3.7 + 4,
+    );
     if (y + rowHeight > TABLE_BOTTOM) y = startPage(true);
 
     doc.setFillColor(index % 2 === 0 ? 249 : 255, index % 2 === 0 ? 251 : 255, 249);
@@ -113,8 +126,8 @@ export async function createStocktakePdf(input: StocktakePdfInput) {
     doc.text(String(index + 1), COLUMN_X[0] + 1.5, y + 5.8);
     doc.text(itemLines, COLUMN_X[1] + 1.5, y + 4.8);
     doc.setFontSize(7);
-    doc.text(line.sku || "-", COLUMN_X[2] + 1.5, y + 5.8);
-    doc.text(line.unit || "-", COLUMN_X[3] + 1.5, y + 5.8);
+    doc.text(skuLines, COLUMN_X[2] + 1.5, y + 4.8);
+    doc.text(unitLines, COLUMN_X[3] + 1.5, y + 4.8);
     y += rowHeight;
   });
 
