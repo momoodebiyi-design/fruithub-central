@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { ClipboardCheck, Plus, Search, Send } from "lucide-react";
+import { ClipboardCheck, FileDown, Loader2, Plus, Search, Send } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useSession } from "@/hooks/useSession";
@@ -61,6 +61,7 @@ function StocktakesPage() {
   const [scope, setScope] = useState("all");
   const [notes, setNotes] = useState("");
   const [busy, setBusy] = useState(false);
+  const [exportingPdf, setExportingPdf] = useState(false);
 
   async function loadStocktakes(preselect?: string) {
     const { data, error } = await (supabase as any)
@@ -133,6 +134,14 @@ function StocktakesPage() {
     );
   }, [lines, query, categoryFilter, countStatusFilter]);
 
+  const printableLines = useMemo(
+    () =>
+      lines.filter(
+        (line) => categoryFilter === "all" || line.inventory_items?.category === categoryFilter,
+      ),
+    [lines, categoryFilter],
+  );
+
   function updateLine(id: string, patch: Partial<Line>) {
     setLines((current) => current.map((line) => (line.id === id ? { ...line, ...patch } : line)));
   }
@@ -151,6 +160,34 @@ function StocktakesPage() {
     setScope("all");
     toast.success("Central stocktake started");
     await loadStocktakes(data as string);
+  }
+
+  async function exportCountSheet() {
+    if (!selected) return;
+    if (printableLines.length === 0) {
+      return toast.error("There are no products in the selected category to print.");
+    }
+
+    setExportingPdf(true);
+    try {
+      const { downloadStocktakePdf } = await import("@/lib/stocktake-pdf");
+      const filename = await downloadStocktakePdf({
+        countNumber: selected.count_number,
+        category: categoryFilter,
+        preparedAt: new Date(),
+        notes: selected.notes,
+        lines: printableLines.map((line) => ({
+          name: line.inventory_items?.name ?? "Unnamed product",
+          sku: line.inventory_items?.sku ?? "",
+          unit: line.inventory_items?.unit ?? "",
+        })),
+      });
+      toast.success(`${filename} downloaded`);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not create the count sheet PDF");
+    } finally {
+      setExportingPdf(false);
+    }
   }
 
   async function save() {
@@ -283,6 +320,20 @@ function StocktakesPage() {
                 )}
               </div>
               <div className="flex gap-2">
+                {selected && canCount && (
+                  <Button
+                    variant="outline"
+                    onClick={exportCountSheet}
+                    disabled={exportingPdf || printableLines.length === 0}
+                  >
+                    {exportingPdf ? (
+                      <Loader2 className="size-4 mr-1 animate-spin" />
+                    ) : (
+                      <FileDown className="size-4 mr-1" />
+                    )}
+                    Download count sheet PDF
+                  </Button>
+                )}
                 {selected?.status === "draft" && canCount && (
                   <>
                     <Button variant="outline" onClick={save} disabled={busy}>
@@ -343,7 +394,9 @@ function StocktakesPage() {
             {selected && (
               <p className="text-xs text-muted-foreground">
                 Showing {visibleLines.length} of {lines.length} items. Filtering only changes what
-                is visible; the full stocktake remains intact.
+                is visible; the full stocktake remains intact. The PDF includes all{" "}
+                {printableLines.length} products in the selected category, regardless of search or
+                count status.
               </p>
             )}
             <div className="overflow-x-auto">
