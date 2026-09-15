@@ -371,6 +371,9 @@ export type Database = {
           category: Database["public"]["Enums"]["inventory_category"]
           created_at: string
           default_location_id: string | null
+          deleted_at: string | null
+          deleted_by: string | null
+          deletion_reason: string | null
           id: string
           import_notes: string | null
           is_active: boolean
@@ -395,6 +398,9 @@ export type Database = {
           category: Database["public"]["Enums"]["inventory_category"]
           created_at?: string
           default_location_id?: string | null
+          deleted_at?: string | null
+          deleted_by?: string | null
+          deletion_reason?: string | null
           id?: string
           import_notes?: string | null
           is_active?: boolean
@@ -419,6 +425,9 @@ export type Database = {
           category?: Database["public"]["Enums"]["inventory_category"]
           created_at?: string
           default_location_id?: string | null
+          deleted_at?: string | null
+          deleted_by?: string | null
+          deletion_reason?: string | null
           id?: string
           import_notes?: string | null
           is_active?: boolean
@@ -2482,6 +2491,10 @@ export type Database = {
           _reason?: string
         }
         Returns: string
+      }
+      delete_inventory_item: {
+        Args: { _item_id: string; _reason: string }
+        Returns: undefined
       }
       delete_shop_stock_count: {
         Args: { _count_id: string }

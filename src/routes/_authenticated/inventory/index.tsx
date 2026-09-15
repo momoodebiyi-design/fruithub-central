@@ -24,7 +24,7 @@ import {
 } from "@/components/ui/select";
 import { Plus, ArrowUpDown, ClipboardList, Upload } from "lucide-react";
 import { useSession } from "@/hooks/useSession";
-import { CAN_WRITE_INVENTORY, hasAny } from "@/lib/permissions";
+import { CAN_DELETE_INVENTORY_ITEMS, CAN_WRITE_INVENTORY, hasAny } from "@/lib/permissions";
 import { ItemDialog } from "@/components/inventory/ItemDialog";
 import { MovementDialog } from "@/components/inventory/MovementDialog";
 import { StockCountDialog } from "@/components/inventory/StockCountDialog";
@@ -63,6 +63,7 @@ function InventoryList() {
   const navigate = useNavigate();
   const session = useSession();
   const canEdit = hasAny(session.roles, CAN_WRITE_INVENTORY);
+  const canDelete = hasAny(session.roles, CAN_DELETE_INVENTORY_ITEMS);
   const [items, setItems] = useState<Item[]>([]);
   const [q, setQ] = useState("");
   const [cat, setCat] = useState<string>("all");
@@ -263,6 +264,7 @@ function InventoryList() {
           item={dialogItem as any}
           onClose={() => setDialogItem(undefined)}
           onSaved={load}
+          canDelete={canDelete}
         />
       )}
       {moveItem && (

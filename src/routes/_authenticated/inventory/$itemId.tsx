@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { createFileRoute, Link, useParams } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate, useParams } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, ArrowUpDown, ClipboardList, Pencil, SlidersHorizontal } from "lucide-react";
 import { useSession } from "@/hooks/useSession";
-import { CAN_WRITE_INVENTORY, hasAny } from "@/lib/permissions";
+import { CAN_DELETE_INVENTORY_ITEMS, CAN_WRITE_INVENTORY, hasAny } from "@/lib/permissions";
 import { MovementDialog } from "@/components/inventory/MovementDialog";
 import { StockCountDialog } from "@/components/inventory/StockCountDialog";
 import { ItemDialog } from "@/components/inventory/ItemDialog";
@@ -64,8 +64,10 @@ const POSITIVE_TYPES = new Set(["stock_in", "adjustment", "production_output"]);
 
 function ItemDetail() {
   const { itemId } = useParams({ from: "/_authenticated/inventory/$itemId" });
+  const navigate = useNavigate();
   const session = useSession();
   const canEdit = hasAny(session.roles, CAN_WRITE_INVENTORY);
+  const canDelete = hasAny(session.roles, CAN_DELETE_INVENTORY_ITEMS);
 
   const [item, setItem] = useState<Item | null>(null);
   const [onHand, setOnHand] = useState<number>(0);
@@ -366,7 +368,13 @@ function ItemDetail() {
         <StockCountDialog item={item as any} onClose={() => setShowCount(false)} onSaved={load} />
       )}
       {showEdit && (
-        <ItemDialog item={item as any} onClose={() => setShowEdit(false)} onSaved={load} />
+        <ItemDialog
+          item={item as any}
+          onClose={() => setShowEdit(false)}
+          onSaved={load}
+          canDelete={canDelete}
+          onDeleted={() => navigate({ to: "/inventory" })}
+        />
       )}
       {showPolicy && (
         <StockPolicyDialog
