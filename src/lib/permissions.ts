@@ -47,6 +47,8 @@ export const CAN_WRITE_INVENTORY: AppRole[] = [
   "inventory_officer",
 ];
 
+export const CAN_DELETE_INVENTORY_ITEMS: AppRole[] = ["super_admin", "admin", "management"];
+
 export const CAN_RECORD_PRODUCTION: AppRole[] = [
   "super_admin",
   "admin",
