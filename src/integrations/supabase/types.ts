@@ -161,29 +161,42 @@ export type Database = {
           dispatch_id: string
           id: string
           item_id: string
+          linked_stocktake_id: string | null
           notes: string | null
           quantity_dispatched: number
           quantity_returned: number
+          stock_effect: string
         }
         Insert: {
           created_at?: string
           dispatch_id: string
           id?: string
           item_id: string
+          linked_stocktake_id?: string | null
           notes?: string | null
           quantity_dispatched: number
           quantity_returned?: number
+          stock_effect?: string
         }
         Update: {
           created_at?: string
           dispatch_id?: string
           id?: string
           item_id?: string
+          linked_stocktake_id?: string | null
           notes?: string | null
           quantity_dispatched?: number
           quantity_returned?: number
+          stock_effect?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "dispatch_lines_linked_stocktake_id_fkey"
+            columns: ["linked_stocktake_id"]
+            isOneToOne: false
+            referencedRelation: "central_stocktakes"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "dispatch_lines_dispatch_id_fkey"
             columns: ["dispatch_id"]
@@ -218,6 +231,7 @@ export type Database = {
           id: string
           invoice_number: string | null
           invoice_url: string | null
+          late_entry_reason: string | null
           notes: string | null
           received_at: string | null
           received_by: string | null
@@ -226,6 +240,7 @@ export type Database = {
           shop_id: string | null
           source_location_id: string | null
           status: Database["public"]["Enums"]["dispatch_status"]
+          stocktake_treatment: string | null
           updated_at: string
           vehicle: string | null
         }
@@ -239,6 +254,7 @@ export type Database = {
           id?: string
           invoice_number?: string | null
           invoice_url?: string | null
+          late_entry_reason?: string | null
           notes?: string | null
           received_at?: string | null
           received_by?: string | null
@@ -247,6 +263,7 @@ export type Database = {
           shop_id?: string | null
           source_location_id?: string | null
           status?: Database["public"]["Enums"]["dispatch_status"]
+          stocktake_treatment?: string | null
           updated_at?: string
           vehicle?: string | null
         }
@@ -260,6 +277,7 @@ export type Database = {
           id?: string
           invoice_number?: string | null
           invoice_url?: string | null
+          late_entry_reason?: string | null
           notes?: string | null
           received_at?: string | null
           received_by?: string | null
@@ -268,6 +286,7 @@ export type Database = {
           shop_id?: string | null
           source_location_id?: string | null
           status?: Database["public"]["Enums"]["dispatch_status"]
+          stocktake_treatment?: string | null
           updated_at?: string
           vehicle?: string | null
         }
@@ -2460,6 +2479,22 @@ export type Database = {
         }
         Returns: string
       }
+      create_dispatch_with_date: {
+        Args: {
+          _shop_id: string | null
+          _client_id: string | null
+          _reference: string
+          _vehicle: string | null
+          _notes: string | null
+          _invoice_url: string | null
+          _invoice_number: string | null
+          _lines: Json
+          _dispatched_at: string
+          _late_entry_reason: string | null
+          _stocktake_treatment: string | null
+        }
+        Returns: string
+      }
       create_manual_purchase_need: {
         Args: {
           _client_reference_id: string
@@ -2547,6 +2582,15 @@ export type Database = {
       prepare_morning_replenishment: {
         Args: { _client_reference_id: string; _need_id: string }
         Returns: string
+      }
+      preview_backdated_dispatch_stocktakes: {
+        Args: { _dispatched_at: string; _item_ids: string[] }
+        Returns: {
+          item_id: string
+          stocktake_id: string
+          count_number: string
+          submitted_at: string | null
+        }[]
       }
       record_location_stock_count: {
         Args: {

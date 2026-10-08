@@ -64,6 +64,11 @@ type DispatchRow = {
   dispatch_id: string;
   reference: string;
   dispatched_at: string;
+  recorded_at: string;
+  entered_late: boolean;
+  late_entry_reason: string | null;
+  stock_effect: string;
+  linked_stocktake_number: string | null;
   received_at: string | null;
   status: string;
   destination_type: string;
@@ -89,6 +94,8 @@ type DispatchRow = {
 type MovementRow = {
   movement_id: string;
   created_at: string;
+  occurred_at: string;
+  entered_late: boolean;
   movement_date: string;
   type: string;
   signed_quantity: number;
@@ -303,8 +310,8 @@ function ReportsPage() {
       (supabase as any)
         .from("v_inventory_movement_report")
         .select("*")
-        .lt("created_at", endExclusive)
-        .order("created_at", { ascending: false })
+        .lt("occurred_at", endExclusive)
+        .order("occurred_at", { ascending: false })
         .limit(10000),
       (supabase as any)
         .from("v_production_report")
@@ -529,7 +536,7 @@ function ReportsPage() {
 
   const periodMovements = useMemo(() => {
     const start = lagosBoundary(fromDate);
-    return filteredMovements.filter((row) => row.created_at >= start);
+    return filteredMovements.filter((row) => row.occurred_at >= start);
   }, [filteredMovements, fromDate]);
 
   const movementSummary = useMemo(() => {
@@ -549,7 +556,7 @@ function ReportsPage() {
         closing: 0,
       };
       const signed = Number(row.signed_quantity);
-      if (row.created_at < start) summary.opening += signed;
+      if (row.occurred_at < start) summary.opening += signed;
       else if (signed >= 0) summary.stockIn += signed;
       else summary.stockOut += Math.abs(signed);
       map.set(key, summary);
@@ -621,6 +628,9 @@ function ReportsPage() {
       `dispatch-report-${fromDate}-to-${toDate}.csv`,
       [
         "Dispatched at",
+        "Recorded at",
+        "Entered late",
+        "Late entry reason",
         "Reference",
         "Destination type",
         "Destination",
@@ -634,11 +644,16 @@ function ReportsPage() {
         "Source",
         "Destination location",
         "Dispatched by",
+        "Central stock effect",
+        "Linked stocktake",
         "Received at",
         "Received by",
       ],
       filteredDispatches.map((row) => [
         row.dispatched_at,
+        row.recorded_at,
+        row.entered_late ? "Yes" : "No",
+        row.late_entry_reason,
         row.reference,
         row.destination_type,
         row.destination_name,
@@ -652,6 +667,8 @@ function ReportsPage() {
         row.source_location,
         row.destination_location,
         row.dispatched_by_name,
+        row.stock_effect,
+        row.linked_stocktake_number,
         row.received_at,
         row.received_by_name,
       ]),
@@ -662,7 +679,9 @@ function ReportsPage() {
     downloadCsv(
       `inventory-movement-report-${fromDate}-to-${toDate}.csv`,
       [
-        "Created at",
+        "Occurred at",
+        "Recorded at",
+        "Entered late",
         "Location",
         "SKU",
         "Product",
@@ -679,7 +698,9 @@ function ReportsPage() {
         "Performed by",
       ],
       periodMovements.map((row) => [
+        row.occurred_at,
         row.created_at,
+        row.entered_late ? "Yes" : "No",
         row.location_name,
         row.sku,
         row.item_name,
@@ -1009,6 +1030,7 @@ function ReportsPage() {
               <thead className="bg-muted/50 text-xs uppercase text-muted-foreground">
                 <tr>
                   <th className="px-3 py-2 text-left">Time</th>
+                  <th className="px-3 py-2 text-left">Recorded</th>
                   <th className="px-3 py-2 text-left">Reference</th>
                   <th className="px-3 py-2 text-left">Destination</th>
                   <th className="px-3 py-2 text-left">Product</th>
@@ -1016,13 +1038,14 @@ function ReportsPage() {
                   <th className="px-3 py-2 text-right">Returned</th>
                   <th className="px-3 py-2 text-right">Net</th>
                   <th className="px-3 py-2 text-left">Status</th>
+                  <th className="px-3 py-2 text-left">Central stock</th>
                   <th className="px-3 py-2 text-left">Handled by</th>
                 </tr>
               </thead>
               <tbody className="divide-y">
                 {filteredDispatches.length === 0 ? (
                   <tr>
-                    <td colSpan={9} className="px-4 py-12 text-center text-muted-foreground">
+                    <td colSpan={11} className="px-4 py-12 text-center text-muted-foreground">
                       No dispatches in this period.
                     </td>
                   </tr>
@@ -1031,6 +1054,9 @@ function ReportsPage() {
                     <tr key={row.dispatch_line_id}>
                       <td className="px-3 py-2 whitespace-nowrap">
                         {formatLagosDateTime(row.dispatched_at)}
+                      </td>
+                      <td className="px-3 py-2 whitespace-nowrap text-muted-foreground">
+                        {row.entered_late ? formatLagosDateTime(row.recorded_at) : "—"}
                       </td>
                       <td className="px-3 py-2 font-mono text-xs">{row.reference}</td>
                       <td className="px-3 py-2">
@@ -1054,6 +1080,11 @@ function ReportsPage() {
                         <Badge variant="outline" className={STATUS_COLORS[row.status] ?? ""}>
                           {row.status}
                         </Badge>
+                      </td>
+                      <td className="px-3 py-2 text-xs">
+                        {row.stock_effect === "already_counted"
+                          ? `Already in ${row.linked_stocktake_number ?? "stocktake"}`
+                          : "Deducted"}
                       </td>
                       <td className="px-3 py-2 text-xs text-muted-foreground">
                         {row.dispatched_by_name ?? "—"}
@@ -1129,6 +1160,7 @@ function ReportsPage() {
               <thead className="bg-muted/50 text-xs uppercase text-muted-foreground">
                 <tr>
                   <th className="px-3 py-2 text-left">Time</th>
+                  <th className="px-3 py-2 text-left">Recorded</th>
                   <th className="px-3 py-2 text-left">Location</th>
                   <th className="px-3 py-2 text-left">Product</th>
                   <th className="px-3 py-2 text-left">Movement</th>
@@ -1140,7 +1172,7 @@ function ReportsPage() {
               <tbody className="divide-y">
                 {periodMovements.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="px-4 py-12 text-center text-muted-foreground">
+                    <td colSpan={8} className="px-4 py-12 text-center text-muted-foreground">
                       No movements in this period.
                     </td>
                   </tr>
@@ -1148,7 +1180,10 @@ function ReportsPage() {
                   periodMovements.map((row) => (
                     <tr key={row.movement_id}>
                       <td className="px-3 py-2 whitespace-nowrap">
-                        {formatLagosDateTime(row.created_at)}
+                        {formatLagosDateTime(row.occurred_at)}
+                      </td>
+                      <td className="px-3 py-2 whitespace-nowrap text-muted-foreground">
+                        {row.entered_late ? formatLagosDateTime(row.created_at) : "—"}
                       </td>
                       <td className="px-3 py-2">{row.location_name ?? "Unassigned"}</td>
                       <td className="px-3 py-2">
