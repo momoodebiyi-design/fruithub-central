@@ -695,34 +695,46 @@ export type Database = {
           batch_number: string
           created_at: string
           id: string
+          late_entry_reason: string | null
+          output_linked_stocktake_id: string | null
+          output_stock_effect: string
           produced_at: string
           product_item_id: string
           qc_notes: string | null
           quantity_produced: number
           staff_id: string | null
           status: Database["public"]["Enums"]["batch_status"]
+          stocktake_treatment: string | null
         }
         Insert: {
           batch_number: string
           created_at?: string
           id?: string
+          late_entry_reason?: string | null
+          output_linked_stocktake_id?: string | null
+          output_stock_effect?: string
           produced_at?: string
           product_item_id: string
           qc_notes?: string | null
           quantity_produced: number
           staff_id?: string | null
           status?: Database["public"]["Enums"]["batch_status"]
+          stocktake_treatment?: string | null
         }
         Update: {
           batch_number?: string
           created_at?: string
           id?: string
+          late_entry_reason?: string | null
+          output_linked_stocktake_id?: string | null
+          output_stock_effect?: string
           produced_at?: string
           product_item_id?: string
           qc_notes?: string | null
           quantity_produced?: number
           staff_id?: string | null
           status?: Database["public"]["Enums"]["batch_status"]
+          stocktake_treatment?: string | null
         }
         Relationships: [
           {
@@ -739,26 +751,39 @@ export type Database = {
             referencedRelation: "v_item_stock"
             referencedColumns: ["item_id"]
           },
+          {
+            foreignKeyName: "production_batches_output_linked_stocktake_id_fkey"
+            columns: ["output_linked_stocktake_id"]
+            isOneToOne: false
+            referencedRelation: "central_stocktakes"
+            referencedColumns: ["id"]
+          },
         ]
       }
       production_consumption: {
         Row: {
           id: string
           item_id: string
+          linked_stocktake_id: string | null
           production_batch_id: string
           quantity_used: number
+          stock_effect: string
         }
         Insert: {
           id?: string
           item_id: string
+          linked_stocktake_id?: string | null
           production_batch_id: string
           quantity_used: number
+          stock_effect?: string
         }
         Update: {
           id?: string
           item_id?: string
+          linked_stocktake_id?: string | null
           production_batch_id?: string
           quantity_used?: number
+          stock_effect?: string
         }
         Relationships: [
           {
@@ -780,6 +805,13 @@ export type Database = {
             columns: ["production_batch_id"]
             isOneToOne: false
             referencedRelation: "production_batches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "production_consumption_linked_stocktake_id_fkey"
+            columns: ["linked_stocktake_id"]
+            isOneToOne: false
+            referencedRelation: "central_stocktakes"
             referencedColumns: ["id"]
           },
         ]
@@ -2592,6 +2624,15 @@ export type Database = {
           submitted_at: string | null
         }[]
       }
+      preview_backdated_production_stocktakes: {
+        Args: { _produced_at: string; _item_ids: string[] }
+        Returns: {
+          item_id: string
+          stocktake_id: string
+          count_number: string
+          submitted_at: string | null
+        }[]
+      }
       record_location_stock_count: {
         Args: {
           _item_id: string
@@ -2618,6 +2659,20 @@ export type Database = {
           _product_item_id: string
           _qc_notes?: string
           _quantity: number
+        }
+        Returns: string
+      }
+      record_packaged_production_with_date: {
+        Args: {
+          _product_item_id: string
+          _quantity: number
+          _batch_number: string
+          _consumption: Json
+          _packaging_exception_reason: string | null
+          _qc_notes: string | null
+          _produced_at: string
+          _late_entry_reason: string | null
+          _stocktake_treatment: string | null
         }
         Returns: string
       }

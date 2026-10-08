@@ -90,6 +90,7 @@ export const CAN_DISPATCH: AppRole[] = [
 ];
 
 export const CAN_BACKDATE_DISPATCHES: AppRole[] = ["super_admin", "admin", "management"];
+export const CAN_BACKDATE_PRODUCTION: AppRole[] = ["super_admin", "admin", "management"];
 
 export const CAN_APPROVE_REQUESTS: AppRole[] = [
   "super_admin",

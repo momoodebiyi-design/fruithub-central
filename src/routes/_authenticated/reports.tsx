@@ -134,6 +134,13 @@ type ProductionRow = {
   batch_id: string;
   batch_number: string;
   produced_at: string;
+  recorded_at: string;
+  entered_late: boolean;
+  late_entry_reason: string | null;
+  output_stock_effect: string;
+  output_linked_stocktake_number: string | null;
+  packaging_stock_effect: string | null;
+  packaging_linked_stocktake_number: string | null;
   status: string;
   qc_notes: string | null;
   quantity_produced: number;
@@ -187,6 +194,11 @@ type ProductionBatch = {
   batch_id: string;
   batch_number: string;
   produced_at: string;
+  recorded_at: string;
+  entered_late: boolean;
+  late_entry_reason: string | null;
+  output_stock_effect: string;
+  output_linked_stocktake_number: string | null;
   status: string;
   qc_notes: string | null;
   quantity_produced: number;
@@ -208,6 +220,8 @@ type ProductionBatch = {
     waste: number;
     variance: number;
     reason: string | null;
+    stockEffect: string | null;
+    linkedStocktakeNumber: string | null;
   }>;
 };
 
@@ -501,6 +515,11 @@ function ReportsPage() {
         batch_id: row.batch_id,
         batch_number: row.batch_number,
         produced_at: row.produced_at,
+        recorded_at: row.recorded_at,
+        entered_late: row.entered_late,
+        late_entry_reason: row.late_entry_reason,
+        output_stock_effect: row.output_stock_effect,
+        output_linked_stocktake_number: row.output_linked_stocktake_number,
         status: row.status,
         qc_notes: row.qc_notes,
         quantity_produced: Number(row.quantity_produced),
@@ -525,6 +544,8 @@ function ReportsPage() {
           waste: Number(row.waste_quantity ?? 0),
           variance: Number(row.packaging_variance ?? 0),
           reason: row.variance_reason,
+          stockEffect: row.packaging_stock_effect,
+          linkedStocktakeNumber: row.packaging_linked_stocktake_number,
         });
       }
       map.set(row.batch_id, batch);
@@ -724,6 +745,9 @@ function ReportsPage() {
       const materials = batch.materials.length ? batch.materials : [null];
       return materials.map((material) => [
         batch.produced_at,
+        batch.recorded_at,
+        batch.entered_late ? "Yes" : "No",
+        batch.late_entry_reason,
         batch.batch_number,
         batch.product_sku,
         batch.product_name,
@@ -740,6 +764,10 @@ function ReportsPage() {
         material?.waste,
         material?.reason,
         material?.unit,
+        batch.output_stock_effect,
+        batch.output_linked_stocktake_number,
+        material?.stockEffect,
+        material?.linkedStocktakeNumber,
         batch.packaging_setup_missing ? "Yes" : "No",
         batch.packaging_exception_reason,
         batch.qc_notes,
@@ -749,6 +777,9 @@ function ReportsPage() {
       `production-report-${fromDate}-to-${toDate}.csv`,
       [
         "Produced at",
+        "Recorded at",
+        "Entered late",
+        "Late-entry reason",
         "Batch number",
         "Output SKU",
         "Output product",
@@ -765,6 +796,10 @@ function ReportsPage() {
         "Waste",
         "Variance reason",
         "Material unit",
+        "Finished output stock effect",
+        "Output linked stocktake",
+        "Packaging stock effect",
+        "Packaging linked stocktake",
         "Packaging setup missing",
         "Packaging exception reason",
         "QC notes",
@@ -1026,7 +1061,7 @@ function ReportsPage() {
             </CardContent>
           </Card>
           <div className="overflow-x-auto rounded-lg border bg-card">
-            <table className="w-full min-w-[1050px] text-sm">
+            <table className="w-full min-w-[1250px] text-sm">
               <thead className="bg-muted/50 text-xs uppercase text-muted-foreground">
                 <tr>
                   <th className="px-3 py-2 text-left">Time</th>
@@ -1337,14 +1372,16 @@ function ReportsPage() {
           </div>
 
           <div className="overflow-x-auto rounded-lg border bg-card">
-            <table className="w-full min-w-[1050px] text-sm">
+            <table className="w-full min-w-[1250px] text-sm">
               <thead className="bg-muted/50 text-xs uppercase text-muted-foreground">
                 <tr>
                   <th className="px-3 py-2 text-left">Time</th>
+                  <th className="px-3 py-2 text-left">Recorded</th>
                   <th className="px-3 py-2 text-left">Batch</th>
                   <th className="px-3 py-2 text-left">Output product</th>
                   <th className="px-3 py-2 text-right">Output</th>
                   <th className="px-3 py-2 text-left">Packaging used</th>
+                  <th className="px-3 py-2 text-left">Central stock</th>
                   <th className="px-3 py-2 text-left">Status</th>
                   <th className="px-3 py-2 text-left">Operator</th>
                 </tr>
@@ -1352,7 +1389,7 @@ function ReportsPage() {
               <tbody className="divide-y">
                 {productionBatches.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="px-4 py-12 text-center text-muted-foreground">
+                    <td colSpan={9} className="px-4 py-12 text-center text-muted-foreground">
                       No production batches in this period.
                     </td>
                   </tr>
@@ -1361,6 +1398,14 @@ function ReportsPage() {
                     <tr key={batch.batch_id}>
                       <td className="px-3 py-2 whitespace-nowrap">
                         {formatLagosDateTime(batch.produced_at)}
+                      </td>
+                      <td className="px-3 py-2 whitespace-nowrap text-muted-foreground">
+                        {batch.entered_late ? formatLagosDateTime(batch.recorded_at) : "—"}
+                        {batch.late_entry_reason && (
+                          <p className="max-w-40 whitespace-normal text-[11px]">
+                            {batch.late_entry_reason}
+                          </p>
+                        )}
                       </td>
                       <td className="px-3 py-2 font-mono text-xs">{batch.batch_number}</td>
                       <td className="px-3 py-2">
@@ -1391,9 +1436,28 @@ function ReportsPage() {
                                 {material.waste > 0 && (
                                   <span className="text-amber-700"> · waste {material.waste}</span>
                                 )}
+                                {material.stockEffect === "already_counted" && (
+                                  <span className="text-muted-foreground">
+                                    {" "}
+                                    · already in {material.linkedStocktakeNumber ?? "stocktake"}
+                                  </span>
+                                )}
                               </p>
                             ))}
                           </div>
+                        )}
+                      </td>
+                      <td className="px-3 py-2 text-xs">
+                        <p>
+                          Output:{" "}
+                          {batch.output_stock_effect === "already_counted"
+                            ? `already in ${batch.output_linked_stocktake_number ?? "stocktake"}`
+                            : "posted"}
+                        </p>
+                        {batch.materials.some(
+                          (material) => material.stockEffect === "already_counted",
+                        ) && (
+                          <p className="text-muted-foreground">Some packaging already counted</p>
                         )}
                       </td>
                       <td className="px-3 py-2">

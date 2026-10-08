@@ -39,6 +39,38 @@ interface ConsumptionRow {
   variance_reason: string;
 }
 
+type CrossedStocktake = {
+  item_id: string;
+  stocktake_id: string;
+  count_number: string;
+};
+
+function lagosDateTimeInput() {
+  return new Intl.DateTimeFormat("sv-SE", {
+    timeZone: "Africa/Lagos",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  })
+    .format(new Date())
+    .replace(" ", "T");
+}
+
+function productionTimeUtc(value: string) {
+  if (!value) return null;
+  const parsed = new Date(`${value}:00+01:00`);
+  return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString();
+}
+
+function batchNumberForDate(value: string) {
+  const [date, time] = value.split("T");
+  if (!date || !time) return "";
+  return `B-${date.replaceAll("-", "")}-${time.replace(":", "")}`;
+}
+
 const emptyRow = (): ConsumptionRow => ({
   item_id: "",
   unit_quantity: null,
@@ -51,20 +83,34 @@ const emptyRow = (): ConsumptionRow => ({
 export function RecordProductionDialog({
   onClose,
   onSaved,
+  canBackdate,
 }: {
   onClose: () => void;
   onSaved: () => void;
+  canBackdate: boolean;
 }) {
   const [items, setItems] = useState<Item[]>([]);
   const [outputItemId, setOutputItemId] = useState("");
   const [outputQty, setOutputQty] = useState("");
-  const [batchNumber, setBatchNumber] = useState("");
+  const [producedLocal, setProducedLocal] = useState(lagosDateTimeInput);
+  const [batchNumber, setBatchNumber] = useState(() => batchNumberForDate(producedLocal));
+  const [lateEntryReason, setLateEntryReason] = useState("");
+  const [stocktakeTreatment, setStocktakeTreatment] = useState("");
+  const [crossedStocktakes, setCrossedStocktakes] = useState<CrossedStocktake[]>([]);
+  const [stocktakeCheck, setStocktakeCheck] = useState<"loading" | "ready" | "error">("ready");
   const [qcNotes, setQcNotes] = useState("");
   const [exceptionReason, setExceptionReason] = useState("");
   const [setupId, setSetupId] = useState<string | null>(null);
   const [loadingSetup, setLoadingSetup] = useState(false);
   const [rows, setRows] = useState<ConsumptionRow[]>([]);
   const [saving, setSaving] = useState(false);
+  const todayInLagos = lagosDateTimeInput().slice(0, 10);
+  const isBackdated = producedLocal.slice(0, 10) < todayInLagos;
+  const actualProducedAt = productionTimeUtc(producedLocal);
+  const selectedItemIds = [
+    ...new Set([outputItemId, ...rows.map((row) => row.item_id)].filter(Boolean)),
+  ];
+  const selectedItemKey = selectedItemIds.sort().join(",");
 
   useEffect(() => {
     (async () => {
@@ -85,11 +131,35 @@ export function RecordProductionDialog({
         })),
       );
     })();
-    const d = new Date();
-    setBatchNumber(
-      `B-${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, "0")}${String(d.getDate()).padStart(2, "0")}-${String(d.getHours()).padStart(2, "0")}${String(d.getMinutes()).padStart(2, "0")}`,
-    );
   }, []);
+
+  useEffect(() => {
+    if (!canBackdate || !actualProducedAt || !selectedItemKey) {
+      setCrossedStocktakes([]);
+      setStocktakeCheck("ready");
+      return;
+    }
+    let cancelled = false;
+    setStocktakeCheck("loading");
+    const timer = window.setTimeout(async () => {
+      const { data, error } = await supabase.rpc("preview_backdated_production_stocktakes", {
+        _produced_at: actualProducedAt,
+        _item_ids: selectedItemKey.split(","),
+      });
+      if (cancelled) return;
+      if (error) {
+        setCrossedStocktakes([]);
+        setStocktakeCheck("error");
+      } else {
+        setCrossedStocktakes((data as CrossedStocktake[]) ?? []);
+        setStocktakeCheck("ready");
+      }
+    }, 250);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [actualProducedAt, canBackdate, selectedItemKey]);
 
   useEffect(() => {
     if (!outputItemId) {
@@ -144,11 +214,27 @@ export function RecordProductionDialog({
   );
 
   function updateRow(index: number, patch: Partial<ConsumptionRow>) {
+    if (patch.item_id) setStocktakeTreatment("");
     setRows((current) => current.map((row, i) => (i === index ? { ...row, ...patch } : row)));
   }
 
   async function submit() {
     if (!batchNumber.trim()) return toast.error("Enter a batch number");
+    if (!actualProducedAt || new Date(actualProducedAt).getTime() > Date.now() + 5 * 60_000) {
+      return toast.error("Choose a production date and time that is not in the future");
+    }
+    if (isBackdated && !canBackdate) {
+      return toast.error("Only Management or Admin can record previous-day production");
+    }
+    if (isBackdated && lateEntryReason.trim().length < 5) {
+      return toast.error("Explain why this batch is being recorded late");
+    }
+    if (canBackdate && stocktakeCheck !== "ready") {
+      return toast.error("Wait for the Central stocktake check to complete");
+    }
+    if (crossedStocktakes.length > 0 && !stocktakeTreatment) {
+      return toast.error("Choose how the later Central stocktake affects stock");
+    }
     if (!outputItemId) return toast.error("Pick a finished product");
     const outQ = Number(outputQty);
     if (!outQ || outQ <= 0) return toast.error("Enter output quantity");
@@ -176,17 +262,20 @@ export function RecordProductionDialog({
     );
     if (invalidVariance) return toast.error("Explain every packaging variance or waste entry");
     setSaving(true);
-    const { error } = await (supabase as any).rpc("record_packaged_production", {
+    const { error } = await supabase.rpc("record_packaged_production_with_date", {
       _batch_number: batchNumber.trim(),
       _product_item_id: outputItemId,
       _quantity: outQ,
       _consumption: consumption,
       _packaging_exception_reason: exceptionReason.trim() || null,
       _qc_notes: qcNotes.trim() || null,
+      _produced_at: actualProducedAt,
+      _late_entry_reason: isBackdated ? lateEntryReason.trim() : null,
+      _stocktake_treatment: crossedStocktakes.length > 0 ? stocktakeTreatment : null,
     });
     setSaving(false);
     if (error) return toast.error(error.message);
-    toast.success("Batch recorded — finished stock and packaging updated");
+    toast.success("Batch recorded; Central stock treatment saved");
     onSaved();
     onClose();
   }
@@ -206,12 +295,52 @@ export function RecordProductionDialog({
               className="font-mono"
             />
           </div>
+          <div className="space-y-2">
+            <Label htmlFor="production-time">Date and time produced (Lagos time)</Label>
+            <Input
+              id="production-time"
+              type="datetime-local"
+              value={producedLocal}
+              max={lagosDateTimeInput()}
+              onChange={(event) => {
+                const next = event.target.value;
+                setBatchNumber((current) =>
+                  current === batchNumberForDate(producedLocal)
+                    ? batchNumberForDate(next)
+                    : current,
+                );
+                setProducedLocal(next);
+                setStocktakeTreatment("");
+              }}
+            />
+            <p className="text-xs text-muted-foreground">
+              The app separately records when you enter the batch.
+              {!canBackdate && " Previous-day dates require Management or Admin."}
+            </p>
+          </div>
+          {isBackdated && (
+            <div className="space-y-2">
+              <Label htmlFor="production-late-reason">Reason for recording late</Label>
+              <Input
+                id="production-late-reason"
+                value={lateEntryReason}
+                onChange={(event) => setLateEntryReason(event.target.value)}
+                placeholder="For example: yesterday's batch sheet was submitted today"
+              />
+            </div>
+          )}
           <div className="border rounded-md p-4 space-y-3">
             <p className="text-xs uppercase tracking-wider text-muted-foreground font-medium">
               Finished output
             </p>
             <div className="grid sm:grid-cols-[1fr_160px] gap-3">
-              <Select value={outputItemId} onValueChange={setOutputItemId}>
+              <Select
+                value={outputItemId}
+                onValueChange={(value) => {
+                  setOutputItemId(value);
+                  setStocktakeTreatment("");
+                }}
+              >
                 <SelectTrigger>
                   <SelectValue placeholder="Finished product" />
                 </SelectTrigger>
@@ -362,6 +491,47 @@ export function RecordProductionDialog({
               </div>
             )}
           </div>
+          {canBackdate && selectedItemIds.length > 0 && stocktakeCheck === "loading" && (
+            <p className="text-sm text-muted-foreground">Checking later Central stocktakes…</p>
+          )}
+          {canBackdate && stocktakeCheck === "error" && (
+            <p className="text-sm text-destructive">
+              Central stocktakes could not be checked. Change the production time to retry.
+            </p>
+          )}
+          {crossedStocktakes.length > 0 && (
+            <div className="space-y-3 rounded-md border border-brand-orange/30 bg-brand-orange/5 p-3">
+              <p className="text-sm font-medium">
+                A later Central stocktake covers this output or its packaging
+              </p>
+              <ul className="list-disc pl-5 text-xs text-muted-foreground">
+                {crossedStocktakes.map((row) => (
+                  <li key={row.item_id}>
+                    {items.find((item) => item.id === row.item_id)?.name ?? "Item"} ·{" "}
+                    {row.count_number}
+                  </li>
+                ))}
+              </ul>
+              <Label>How should these items affect Central stock?</Label>
+              <Select value={stocktakeTreatment} onValueChange={setStocktakeTreatment}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Choose after checking the stocktake" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="already_counted">
+                    Already counted — do not post them again
+                  </SelectItem>
+                  <SelectItem value="deduct_now">
+                    Not included in the count — post them now
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                This applies only to items covered by a later count. Other output and packaging
+                movements post normally; the choice is retained in the audit log.
+              </p>
+            </div>
+          )}
           <div>
             <Label>QC notes</Label>
             <Textarea
