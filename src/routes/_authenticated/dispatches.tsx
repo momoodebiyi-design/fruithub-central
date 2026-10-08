@@ -1,16 +1,15 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Plus, Send, Undo2, ChevronRight } from "lucide-react";
 import { useSession } from "@/hooks/useSession";
-import { CAN_DISPATCH, hasAny } from "@/lib/permissions";
+import { CAN_BACKDATE_DISPATCHES, CAN_DISPATCH, hasAny } from "@/lib/permissions";
 import { DispatchDialog } from "@/components/dispatches/DispatchDialog";
 import { ReturnDialog } from "@/components/dispatches/ReturnDialog";
 import { toast } from "sonner";
-import { format } from "date-fns";
 
 export const Route = createFileRoute("/_authenticated/dispatches")({
   component: DispatchesPage,
@@ -20,6 +19,9 @@ interface DispatchRow {
   id: string;
   reference: string;
   dispatched_at: string;
+  created_at: string;
+  late_entry_reason: string | null;
+  stocktake_treatment: string | null;
   vehicle: string | null;
   notes: string | null;
   status: string;
@@ -39,9 +41,23 @@ const STATUS_COLORS: Record<string, string> = {
   cancelled: "text-muted-foreground border-muted",
 };
 
+function formatLagosDateTime(value: string) {
+  return new Intl.DateTimeFormat("en-NG", {
+    timeZone: "Africa/Lagos",
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).format(new Date(value));
+}
+
 function DispatchesPage() {
   const session = useSession();
   const canDispatch = hasAny(session.roles, CAN_DISPATCH);
+  const canBackdate = hasAny(session.roles, CAN_BACKDATE_DISPATCHES);
+  const canCreateDispatch = canDispatch || canBackdate;
   const [rows, setRows] = useState<DispatchRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [openNew, setOpenNew] = useState(false);
@@ -53,7 +69,7 @@ function DispatchesPage() {
     const { data, error } = await supabase
       .from("dispatches")
       .select(
-        "id, reference, dispatched_at, vehicle, notes, status, invoice_number, invoice_url, replenishment_request_id, shops(name), clients(name), dispatch_lines(quantity_dispatched, quantity_returned)",
+        "id, reference, dispatched_at, created_at, late_entry_reason, stocktake_treatment, vehicle, notes, status, invoice_number, invoice_url, replenishment_request_id, shops(name), clients(name), dispatch_lines(quantity_dispatched, quantity_returned)",
       )
       .order("dispatched_at", { ascending: false })
       .limit(100);
@@ -86,7 +102,7 @@ function DispatchesPage() {
             remain paused until POS rollout.
           </p>
         </div>
-        {canDispatch && (
+        {canCreateDispatch && (
           <Button
             onClick={() => setOpenNew(true)}
             className="bg-brand-orange text-white hover:bg-brand-orange/90"
@@ -136,7 +152,7 @@ function DispatchesPage() {
                 );
                 const isExpanded = expanded === d.id;
                 return (
-                  <>
+                  <Fragment key={d.id}>
                     <tr
                       key={d.id}
                       className="hover:bg-muted/30 cursor-pointer"
@@ -157,7 +173,12 @@ function DispatchesPage() {
                         )}
                       </td>
                       <td className="px-4 py-3 text-muted-foreground">
-                        {format(new Date(d.dispatched_at), "d MMM yyyy · HH:mm")}
+                        {formatLagosDateTime(d.dispatched_at)}
+                        {d.late_entry_reason && (
+                          <div className="text-xs text-brand-orange">
+                            Entered late · recorded {formatLagosDateTime(d.created_at)}
+                          </div>
+                        )}
                       </td>
                       <td className="px-4 py-3 font-mono">
                         {d.dispatch_lines.length}
@@ -203,11 +224,16 @@ function DispatchesPage() {
                       <tr key={d.id + "-x"} className="bg-muted/20">
                         <td />
                         <td colSpan={6} className="px-4 py-3">
-                          <ExpandedLines dispatchId={d.id} vehicle={d.vehicle} notes={d.notes} />
+                          <ExpandedLines
+                            dispatchId={d.id}
+                            vehicle={d.vehicle}
+                            notes={d.notes}
+                            lateEntryReason={d.late_entry_reason}
+                          />
                         </td>
                       </tr>
                     )}
-                  </>
+                  </Fragment>
                 );
               })
             )}
@@ -215,7 +241,13 @@ function DispatchesPage() {
         </table>
       </div>
 
-      {openNew && <DispatchDialog onClose={() => setOpenNew(false)} onSaved={load} />}
+      {openNew && (
+        <DispatchDialog
+          onClose={() => setOpenNew(false)}
+          onSaved={load}
+          canBackdate={canBackdate}
+        />
+      )}
       {returning && (
         <ReturnDialog
           dispatchId={returning.id}
@@ -232,16 +264,20 @@ function ExpandedLines({
   dispatchId,
   vehicle,
   notes,
+  lateEntryReason,
 }: {
   dispatchId: string;
   vehicle: string | null;
   notes: string | null;
+  lateEntryReason: string | null;
 }) {
   const [lines, setLines] = useState<
     Array<{
       id: string;
       quantity_dispatched: number;
       quantity_returned: number;
+      stock_effect: string;
+      central_stocktakes: { count_number: string } | null;
       inventory_items: { name: string; unit: string } | null;
     }>
   >([]);
@@ -250,7 +286,9 @@ function ExpandedLines({
     (async () => {
       const { data } = await supabase
         .from("dispatch_lines")
-        .select("id, quantity_dispatched, quantity_returned, inventory_items(name, unit)")
+        .select(
+          "id, quantity_dispatched, quantity_returned, stock_effect, central_stocktakes(count_number), inventory_items(name, unit)",
+        )
         .eq("dispatch_id", dispatchId);
       setLines((data as any) ?? []);
     })();
@@ -268,6 +306,9 @@ function ExpandedLines({
           {notes && <span>{notes}</span>}
         </div>
       )}
+      {lateEntryReason && (
+        <p className="text-xs text-muted-foreground">Late entry reason: {lateEntryReason}</p>
+      )}
       <div className="rounded-md border bg-background overflow-hidden">
         <table className="w-full text-xs">
           <thead className="bg-muted/50 text-[10px] uppercase text-muted-foreground">
@@ -276,6 +317,7 @@ function ExpandedLines({
               <th className="text-right px-3 py-1.5">Dispatched</th>
               <th className="text-right px-3 py-1.5">Returned</th>
               <th className="text-right px-3 py-1.5">Net at shop</th>
+              <th className="text-left px-3 py-1.5">Central stock</th>
             </tr>
           </thead>
           <tbody className="divide-y">
@@ -291,6 +333,11 @@ function ExpandedLines({
                 <td className="px-3 py-1.5 text-right font-mono">
                   {Number(l.quantity_dispatched) - Number(l.quantity_returned)}{" "}
                   {l.inventory_items?.unit}
+                </td>
+                <td className="px-3 py-1.5">
+                  {l.stock_effect === "already_counted"
+                    ? `Already in ${l.central_stocktakes?.count_number ?? "stocktake"}`
+                    : "Deducted"}
                 </td>
               </tr>
             ))}

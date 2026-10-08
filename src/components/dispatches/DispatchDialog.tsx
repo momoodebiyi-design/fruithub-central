@@ -44,7 +44,42 @@ interface Line {
 
 type Destination = "shop" | "client";
 
-export function DispatchDialog({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }) {
+type CrossedStocktake = {
+  item_id: string;
+  stocktake_id: string;
+  count_number: string;
+  submitted_at: string | null;
+};
+
+function lagosDateTimeInput() {
+  return new Intl.DateTimeFormat("sv-SE", {
+    timeZone: "Africa/Lagos",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  })
+    .format(new Date())
+    .replace(" ", "T");
+}
+
+function dispatchTimeUtc(value: string) {
+  if (!value) return null;
+  const parsed = new Date(`${value}:00+01:00`);
+  return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString();
+}
+
+export function DispatchDialog({
+  onClose,
+  onSaved,
+  canBackdate,
+}: {
+  onClose: () => void;
+  onSaved: () => void;
+  canBackdate: boolean;
+}) {
   const [destination, setDestination] = useState<Destination>("shop");
   const [shops, setShops] = useState<ShopOpt[]>([]);
   const [clients, setClients] = useState<ClientOpt[]>([]);
@@ -54,11 +89,21 @@ export function DispatchDialog({ onClose, onSaved }: { onClose: () => void; onSa
   const [reference, setReference] = useState(`DSP-${Date.now().toString(36).toUpperCase()}`);
   const [vehicle, setVehicle] = useState("");
   const [notes, setNotes] = useState("");
+  const [dispatchedLocal, setDispatchedLocal] = useState(lagosDateTimeInput);
+  const [lateEntryReason, setLateEntryReason] = useState("");
+  const [stocktakeTreatment, setStocktakeTreatment] = useState("");
+  const [crossedStocktakes, setCrossedStocktakes] = useState<CrossedStocktake[]>([]);
+  const [stocktakeCheck, setStocktakeCheck] = useState<"loading" | "ready" | "error">("ready");
   const [invoiceNumber, setInvoiceNumber] = useState("");
   const [invoiceFile, setInvoiceFile] = useState<File | null>(null);
   const [lines, setLines] = useState<Line[]>([{ item_id: "", quantity: "" }]);
   const [saving, setSaving] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+  const todayInLagos = lagosDateTimeInput().slice(0, 10);
+  const isBackdated = dispatchedLocal.slice(0, 10) < todayInLagos;
+  const selectedItemIds = [...new Set(lines.map((line) => line.item_id).filter(Boolean))];
+  const selectedItemKey = selectedItemIds.sort().join(",");
+  const actualDispatchAt = dispatchTimeUtc(dispatchedLocal);
 
   useEffect(() => {
     (async () => {
@@ -85,6 +130,34 @@ export function DispatchDialog({ onClose, onSaved }: { onClose: () => void; onSa
     })();
   }, []);
 
+  useEffect(() => {
+    if (!canBackdate || !actualDispatchAt || !selectedItemKey) {
+      setCrossedStocktakes([]);
+      setStocktakeCheck("ready");
+      return;
+    }
+    let cancelled = false;
+    setStocktakeCheck("loading");
+    const timer = window.setTimeout(async () => {
+      const { data, error } = await supabase.rpc("preview_backdated_dispatch_stocktakes", {
+        _dispatched_at: actualDispatchAt,
+        _item_ids: selectedItemKey.split(","),
+      });
+      if (cancelled) return;
+      if (error) {
+        setCrossedStocktakes([]);
+        setStocktakeCheck("error");
+      } else {
+        setCrossedStocktakes((data as CrossedStocktake[]) ?? []);
+        setStocktakeCheck("ready");
+      }
+    }, 250);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [actualDispatchAt, canBackdate, selectedItemKey]);
+
   function updateLine(idx: number, patch: Partial<Line>) {
     setLines((ls) => ls.map((l, i) => (i === idx ? { ...l, ...patch } : l)));
   }
@@ -94,6 +167,21 @@ export function DispatchDialog({ onClose, onSaved }: { onClose: () => void; onSa
     if (destination === "client" && !clientId) return toast.error("Choose a client");
     const valid = lines.filter((l) => l.item_id && Number(l.quantity) > 0);
     if (valid.length === 0) return toast.error("Add at least one line");
+    if (!actualDispatchAt || new Date(actualDispatchAt).getTime() > Date.now() + 5 * 60_000) {
+      return toast.error("Choose a dispatch date and time that is not in the future");
+    }
+    if (isBackdated && !canBackdate) {
+      return toast.error("Only Management or Admin can record a previous-day dispatch");
+    }
+    if (isBackdated && lateEntryReason.trim().length < 5) {
+      return toast.error("Explain why this dispatch is being recorded late");
+    }
+    if (canBackdate && stocktakeCheck !== "ready") {
+      return toast.error("Wait for the Central stocktake check to complete");
+    }
+    if (crossedStocktakes.length > 0 && !stocktakeTreatment) {
+      return toast.error("Choose how the later Central stocktake affects stock");
+    }
     setSaving(true);
 
     let invoiceUrl: string | null = null;
@@ -113,7 +201,7 @@ export function DispatchDialog({ onClose, onSaved }: { onClose: () => void; onSa
       invoiceUrl = path;
     }
 
-    const { error } = await supabase.rpc("create_dispatch" as any, {
+    const { error } = await supabase.rpc("create_dispatch_with_date", {
       _shop_id: destination === "shop" ? shopId : null,
       _client_id: destination === "client" ? clientId : null,
       _reference: reference.trim(),
@@ -122,6 +210,9 @@ export function DispatchDialog({ onClose, onSaved }: { onClose: () => void; onSa
       _invoice_url: invoiceUrl,
       _invoice_number: invoiceNumber.trim() || null,
       _lines: valid.map((l) => ({ item_id: l.item_id, quantity: Number(l.quantity) })),
+      _dispatched_at: actualDispatchAt,
+      _late_entry_reason: isBackdated ? lateEntryReason.trim() : null,
+      _stocktake_treatment: crossedStocktakes.length > 0 ? stocktakeTreatment : null,
     });
     setSaving(false);
     if (error) return toast.error(error.message);
@@ -180,6 +271,76 @@ export function DispatchDialog({ onClose, onSaved }: { onClose: () => void; onSa
               <Input value={reference} onChange={(e) => setReference(e.target.value)} />
             </div>
           </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="dispatch-time">Date and time dispatched (Lagos time)</Label>
+            <Input
+              id="dispatch-time"
+              type="datetime-local"
+              value={dispatchedLocal}
+              max={lagosDateTimeInput()}
+              onChange={(event) => {
+                setDispatchedLocal(event.target.value);
+                setStocktakeTreatment("");
+              }}
+            />
+            <p className="text-xs text-muted-foreground">
+              The app separately records when you enter this dispatch.
+              {!canBackdate && " Previous-day dates require Management or Admin."}
+            </p>
+          </div>
+
+          {isBackdated && (
+            <div className="space-y-2">
+              <Label htmlFor="late-entry-reason">Reason for recording late</Label>
+              <Input
+                id="late-entry-reason"
+                value={lateEntryReason}
+                onChange={(event) => setLateEntryReason(event.target.value)}
+                placeholder="For example: dispatch sheet was submitted the next morning"
+              />
+            </div>
+          )}
+
+          {canBackdate && selectedItemIds.length > 0 && stocktakeCheck === "loading" && (
+            <p className="text-sm text-muted-foreground">Checking later Central stocktakes…</p>
+          )}
+          {canBackdate && stocktakeCheck === "error" && (
+            <p className="text-sm text-destructive">
+              Central stocktakes could not be checked. Change the dispatch time to retry.
+            </p>
+          )}
+          {crossedStocktakes.length > 0 && (
+            <div className="space-y-3 rounded-md border border-brand-orange/30 bg-brand-orange/5 p-3">
+              <p className="text-sm font-medium">A later Central stocktake covers these items</p>
+              <ul className="list-disc pl-5 text-xs text-muted-foreground">
+                {crossedStocktakes.map((row) => (
+                  <li key={row.item_id}>
+                    {items.find((item) => item.id === row.item_id)?.name ?? "Item"} ·{" "}
+                    {row.count_number}
+                  </li>
+                ))}
+              </ul>
+              <Label>How should these items affect Central stock?</Label>
+              <Select value={stocktakeTreatment} onValueChange={setStocktakeTreatment}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Choose after checking the stocktake" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="already_counted">
+                    Already counted — do not deduct them again
+                  </SelectItem>
+                  <SelectItem value="deduct_now">
+                    Not included in the count — deduct them now
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Items without a later stocktake will always be deducted. Your choice is saved in the
+                audit log.
+              </p>
+            </div>
+          )}
 
           <div className="grid grid-cols-2 gap-3">
             <div>
