@@ -30,6 +30,11 @@ interface ClientOpt {
   id: string;
   name: string;
 }
+interface ChannelOpt {
+  id: string;
+  name: string;
+  default_charge_mode: "chargeable" | "complimentary";
+}
 interface ItemOpt {
   id: string;
   name: string;
@@ -42,7 +47,7 @@ interface Line {
   quantity: string;
 }
 
-type Destination = "shop" | "client";
+type Destination = "shop" | "client" | "channel";
 
 type CrossedStocktake = {
   item_id: string;
@@ -83,9 +88,12 @@ export function DispatchDialog({
   const [destination, setDestination] = useState<Destination>("shop");
   const [shops, setShops] = useState<ShopOpt[]>([]);
   const [clients, setClients] = useState<ClientOpt[]>([]);
+  const [channels, setChannels] = useState<ChannelOpt[]>([]);
   const [items, setItems] = useState<ItemOpt[]>([]);
   const [shopId, setShopId] = useState<string>("");
   const [clientId, setClientId] = useState<string>("");
+  const [channelId, setChannelId] = useState<string>("");
+  const [chargeMode, setChargeMode] = useState<"chargeable" | "complimentary">("chargeable");
   const [reference, setReference] = useState(`DSP-${Date.now().toString(36).toUpperCase()}`);
   const [vehicle, setVehicle] = useState("");
   const [notes, setNotes] = useState("");
@@ -107,17 +115,30 @@ export function DispatchDialog({
 
   useEffect(() => {
     (async () => {
-      const [{ data: s }, { data: c }, { data: i }] = await Promise.all([
-        supabase.from("shops").select("id, name").eq("is_active", true).order("name"),
-        supabase.from("clients").select("id, name").eq("is_active", true).order("name"),
-        (supabase as any)
-          .from("v_central_item_stock")
-          .select("item_id, name, sku, unit, on_hand")
-          .eq("status", "active")
-          .order("name"),
-      ]);
-      setShops((s as ShopOpt[]) ?? []);
+      const [{ data: s }, { data: c }, { data: ch }, { data: locations }, { data: i }] =
+        await Promise.all([
+          supabase.from("shops").select("id, name").eq("is_active", true).order("name"),
+          supabase.from("clients").select("id, name").eq("is_active", true).order("name"),
+          (supabase as any)
+            .from("sales_channels")
+            .select("id, name, default_charge_mode")
+            .eq("is_active", true)
+            .order("name"),
+          supabase
+            .from("locations")
+            .select("shop_id")
+            .eq("status", "active")
+            .not("shop_id", "is", null),
+          (supabase as any)
+            .from("v_central_item_stock")
+            .select("item_id, name, sku, unit, on_hand")
+            .eq("status", "active")
+            .order("name"),
+        ]);
+      const stockedShopIds = new Set((locations ?? []).map((location) => location.shop_id));
+      setShops(((s as ShopOpt[]) ?? []).filter((shop) => stockedShopIds.has(shop.id)));
       setClients((c as ClientOpt[]) ?? []);
+      setChannels((ch as ChannelOpt[]) ?? []);
       setItems(
         ((i as any[]) ?? []).map((r) => ({
           id: r.item_id,
@@ -165,6 +186,7 @@ export function DispatchDialog({
   async function save() {
     if (destination === "shop" && !shopId) return toast.error("Choose a shop");
     if (destination === "client" && !clientId) return toast.error("Choose a client");
+    if (destination === "channel" && !channelId) return toast.error("Choose a sales channel");
     const valid = lines.filter((l) => l.item_id && Number(l.quantity) > 0);
     if (valid.length === 0) return toast.error("Add at least one line");
     if (!actualDispatchAt || new Date(actualDispatchAt).getTime() > Date.now() + 5 * 60_000) {
@@ -185,7 +207,7 @@ export function DispatchDialog({
     setSaving(true);
 
     let invoiceUrl: string | null = null;
-    if (invoiceFile) {
+    if (destination === "client" && invoiceFile) {
       const ext = invoiceFile.name.split(".").pop() ?? "pdf";
       const path = `${new Date().getFullYear()}/${reference.replace(/[^A-Za-z0-9_-]/g, "_")}-${Date.now()}.${ext}`;
       const { error: upErr } = await supabase.storage
@@ -201,19 +223,35 @@ export function DispatchDialog({
       invoiceUrl = path;
     }
 
-    const { error } = await supabase.rpc("create_dispatch_with_date", {
+    const dispatchArgs = {
       _shop_id: destination === "shop" ? shopId : null,
       _client_id: destination === "client" ? clientId : null,
       _reference: reference.trim(),
       _vehicle: vehicle.trim() || null,
       _notes: notes.trim() || null,
       _invoice_url: invoiceUrl,
-      _invoice_number: invoiceNumber.trim() || null,
+      _invoice_number: destination === "client" ? invoiceNumber.trim() || null : null,
       _lines: valid.map((l) => ({ item_id: l.item_id, quantity: Number(l.quantity) })),
       _dispatched_at: actualDispatchAt,
       _late_entry_reason: isBackdated ? lateEntryReason.trim() : null,
       _stocktake_treatment: crossedStocktakes.length > 0 ? stocktakeTreatment : null,
-    });
+    };
+    const { error } =
+      destination === "channel"
+        ? await (supabase as any).rpc("create_sales_channel_dispatch_with_date", {
+            _sales_channel_id: channelId,
+            _charge_mode: chargeMode,
+            _reference: dispatchArgs._reference,
+            _vehicle: dispatchArgs._vehicle,
+            _notes: dispatchArgs._notes,
+            _invoice_url: null,
+            _invoice_number: null,
+            _lines: dispatchArgs._lines,
+            _dispatched_at: dispatchArgs._dispatched_at,
+            _late_entry_reason: dispatchArgs._late_entry_reason,
+            _stocktake_treatment: dispatchArgs._stocktake_treatment,
+          })
+        : await supabase.rpc("create_dispatch_with_date", dispatchArgs);
     setSaving(false);
     if (error) return toast.error(error.message);
     toast.success("Dispatch recorded");
@@ -229,15 +267,22 @@ export function DispatchDialog({
         </DialogHeader>
         <div className="space-y-4">
           <Tabs value={destination} onValueChange={(v) => setDestination(v as Destination)}>
-            <TabsList className="grid grid-cols-2 w-full">
+            <TabsList className="grid grid-cols-3 w-full">
               <TabsTrigger value="shop">To a shop</TabsTrigger>
               <TabsTrigger value="client">To a bulk client</TabsTrigger>
+              <TabsTrigger value="channel">Sales channel</TabsTrigger>
             </TabsList>
           </Tabs>
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <Label>{destination === "shop" ? "Shop" : "Client"}</Label>
+              <Label>
+                {destination === "shop"
+                  ? "Shop"
+                  : destination === "client"
+                    ? "Client"
+                    : "Sales channel"}
+              </Label>
               {destination === "shop" ? (
                 <Select value={shopId} onValueChange={setShopId}>
                   <SelectTrigger>
@@ -251,7 +296,7 @@ export function DispatchDialog({
                     ))}
                   </SelectContent>
                 </Select>
-              ) : (
+              ) : destination === "client" ? (
                 <Select value={clientId} onValueChange={setClientId}>
                   <SelectTrigger>
                     <SelectValue placeholder="Select client" />
@@ -264,6 +309,28 @@ export function DispatchDialog({
                     ))}
                   </SelectContent>
                 </Select>
+              ) : (
+                <Select
+                  value={channelId}
+                  onValueChange={(id) => {
+                    setChannelId(id);
+                    setChargeMode(
+                      channels.find((channel) => channel.id === id)?.default_charge_mode ??
+                        "chargeable",
+                    );
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select sales channel" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {channels.map((channel) => (
+                      <SelectItem key={channel.id} value={channel.id}>
+                        {channel.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               )}
             </div>
             <div>
@@ -271,6 +338,28 @@ export function DispatchDialog({
               <Input value={reference} onChange={(e) => setReference(e.target.value)} />
             </div>
           </div>
+
+          {destination === "channel" && (
+            <div className="space-y-2">
+              <Label>Charge status</Label>
+              <Select
+                value={chargeMode}
+                onValueChange={(value) => setChargeMode(value as typeof chargeMode)}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="chargeable">Chargeable</SelectItem>
+                  <SelectItem value="complimentary">Complimentary / no charge</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Family Entertainment defaults to complimentary. Change this for a paid dispatch.
+                This records the classification; it does not create an invoice.
+              </p>
+            </div>
+          )}
 
           <div className="space-y-2">
             <Label htmlFor="dispatch-time">Date and time dispatched (Lagos time)</Label>

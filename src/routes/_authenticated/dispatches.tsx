@@ -28,8 +28,10 @@ interface DispatchRow {
   invoice_number: string | null;
   invoice_url: string | null;
   replenishment_request_id: string | null;
+  charge_mode: "chargeable" | "complimentary" | null;
   shops: { name: string } | null;
   clients: { name: string } | null;
+  sales_channels: { name: string } | null;
   dispatch_lines: { quantity_dispatched: number; quantity_returned: number }[];
 }
 
@@ -69,7 +71,7 @@ function DispatchesPage() {
     const { data, error } = await supabase
       .from("dispatches")
       .select(
-        "id, reference, dispatched_at, created_at, late_entry_reason, stocktake_treatment, vehicle, notes, status, invoice_number, invoice_url, replenishment_request_id, shops(name), clients(name), dispatch_lines(quantity_dispatched, quantity_returned)",
+        "id, reference, dispatched_at, created_at, late_entry_reason, stocktake_treatment, vehicle, notes, status, invoice_number, invoice_url, replenishment_request_id, charge_mode, shops(name), clients(name), sales_channels(name), dispatch_lines(quantity_dispatched, quantity_returned)",
       )
       .order("dispatched_at", { ascending: false })
       .limit(100);
@@ -88,7 +90,7 @@ function DispatchesPage() {
       _client_reference_id: crypto.randomUUID(),
     });
     if (error) return toast.error(error.message);
-    toast.success("Delivery confirmed. Shop balances remain paused until POS rollout.");
+    toast.success("Delivery confirmed");
     load();
   }
 
@@ -98,8 +100,8 @@ function DispatchesPage() {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Dispatches</h1>
           <p className="text-sm text-muted-foreground">
-            Document factory dispatches, delivery confirmation and inspected returns. Shop balances
-            remain paused until POS rollout.
+            Document factory dispatches, delivery confirmation and inspected returns. Sales channels
+            draw from Central stock without a shop balance. Shop balances remain paused until POS rollout.
           </p>
         </div>
         {canCreateDispatch && (
@@ -165,7 +167,15 @@ function DispatchesPage() {
                       </td>
                       <td className="px-4 py-3 font-mono text-xs">{d.reference}</td>
                       <td className="px-4 py-3">
-                        {d.shops?.name ?? (d.clients?.name ? `${d.clients.name} (bulk)` : "—")}
+                        {d.shops?.name ??
+                          (d.clients?.name
+                            ? `${d.clients.name} (bulk)`
+                            : (d.sales_channels?.name ?? "—"))}
+                        {d.charge_mode && (
+                          <span className="ml-2 text-xs text-muted-foreground">
+                            · {d.charge_mode}
+                          </span>
+                        )}
                         {d.invoice_number && (
                           <span className="ml-2 text-xs text-muted-foreground font-mono">
                             · {d.invoice_number}
@@ -205,7 +215,7 @@ function DispatchesPage() {
                           </Button>
                         )}
                         {canDispatch &&
-                          d.shops &&
+                          (d.shops || d.sales_channels) &&
                           (d.status === "received" || d.status === "reconciled") && (
                             <Button
                               size="sm"
