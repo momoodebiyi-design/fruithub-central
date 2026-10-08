@@ -12,6 +12,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
 
 interface LineRow {
@@ -39,6 +40,7 @@ export function ReturnDialog({
   const [reason, setReason] = useState("");
   const [conditionNotes, setConditionNotes] = useState("");
   const [saving, setSaving] = useState(false);
+  const [rejectionConfirmed, setRejectionConfirmed] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -52,6 +54,7 @@ export function ReturnDialog({
   }, [dispatchId]);
 
   function setValue(id: string, patch: Partial<Values[string]>) {
+    setRejectionConfirmed(false);
     setValues((current) => ({
       ...current,
       [id]: {
@@ -64,6 +67,14 @@ export function ReturnDialog({
 
   async function save() {
     if (!reason.trim()) return toast.error("Enter a return reason");
+    const missingInspection = lines.find(
+      (line) =>
+        Number(values[line.id]?.returned || 0) > 0 &&
+        (values[line.id]?.accepted ?? "").trim() === "",
+    );
+    if (missingInspection) {
+      return toast.error("Enter the accepted quantity for every returned product, including 0");
+    }
     const payload = lines
       .map((line) => {
         const returned = Number(values[line.id]?.returned || 0);
@@ -79,6 +90,9 @@ export function ReturnDialog({
     if (!payload.length) return toast.error("Enter at least one returned quantity");
     if (payload.some((line) => line.quantity_accepted < 0 || line.quantity_rejected < 0))
       return toast.error("Accepted quantity cannot exceed returned quantity");
+    if (payload.some((line) => line.quantity_rejected > 0) && !rejectionConfirmed) {
+      return toast.error("Confirm that rejected units must stay out of Central stock");
+    }
     setSaving(true);
     const { error } = await (supabase as any).rpc("record_factory_return", {
       _dispatch_id: dispatchId,
@@ -93,6 +107,21 @@ export function ReturnDialog({
     onSaved();
     onClose();
   }
+
+  const returnedTotal = lines.reduce(
+    (sum, line) => sum + Number(values[line.id]?.returned || 0),
+    0,
+  );
+  const acceptedTotal = lines.reduce(
+    (sum, line) => sum + Number(values[line.id]?.accepted || 0),
+    0,
+  );
+  const rejectedTotal = Math.max(0, returnedTotal - acceptedTotal);
+  const inspectionComplete = lines.every(
+    (line) =>
+      Number(values[line.id]?.returned || 0) <= 0 ||
+      (values[line.id]?.accepted ?? "").trim() !== "",
+  );
 
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
@@ -109,7 +138,7 @@ export function ReturnDialog({
             <div className="grid grid-cols-[1fr_120px_120px_100px] gap-2 px-2 text-[10px] uppercase tracking-wider text-muted-foreground">
               <div>Product</div>
               <div>Returned</div>
-              <div>Accepted</div>
+              <div>Accepted into Central</div>
               <div>Rejected</div>
             </div>
             {lines.map((line) => {
@@ -133,9 +162,7 @@ export function ReturnDialog({
                     max={remaining}
                     step="0.001"
                     value={values[line.id]?.returned ?? ""}
-                    onChange={(e) =>
-                      setValue(line.id, { returned: e.target.value, accepted: e.target.value })
-                    }
+                    onChange={(e) => setValue(line.id, { returned: e.target.value })}
                     disabled={remaining <= 0}
                     className="font-mono text-right"
                   />
@@ -147,15 +174,44 @@ export function ReturnDialog({
                     value={values[line.id]?.accepted ?? ""}
                     onChange={(e) => setValue(line.id, { accepted: e.target.value })}
                     disabled={returned <= 0}
+                    placeholder="Required"
                     className="font-mono text-right"
                   />
                   <div className="text-right font-mono text-sm pr-2">
-                    {Math.max(0, returned - accepted)}
+                    {(values[line.id]?.accepted ?? "").trim() === ""
+                      ? "—"
+                      : Math.max(0, returned - accepted)}
                   </div>
                 </div>
               );
             })}
           </div>
+          {returnedTotal > 0 && (
+            <div className="rounded-md border bg-muted/30 p-3 space-y-2 text-sm">
+              <p>
+                Returned: <strong>{returnedTotal}</strong> · Accepted into Central:{" "}
+                <strong>{inspectionComplete ? acceptedTotal : "not yet entered"}</strong>
+                {inspectionComplete && (
+                  <>
+                    {" "}
+                    · Rejected: <strong>{rejectedTotal}</strong>
+                  </>
+                )}
+              </p>
+              {inspectionComplete && rejectedTotal > 0 && (
+                <label className="flex items-start gap-2 text-sm text-destructive">
+                  <Checkbox
+                    checked={rejectionConfirmed}
+                    onCheckedChange={(checked) => setRejectionConfirmed(checked === true)}
+                  />
+                  <span>
+                    I confirm that {rejectedTotal} rejected unit(s) will not be added to Central
+                    stock.
+                  </span>
+                </label>
+              )}
+            </div>
+          )}
           <div>
             <Label>Return reason</Label>
             <Textarea
