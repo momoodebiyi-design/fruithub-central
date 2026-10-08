@@ -14,9 +14,8 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Plus } from "lucide-react";
 import { useSession } from "@/hooks/useSession";
-import { CAN_RECORD_PRODUCTION, hasAny } from "@/lib/permissions";
+import { CAN_BACKDATE_PRODUCTION, CAN_RECORD_PRODUCTION, hasAny } from "@/lib/permissions";
 import { RecordProductionDialog } from "@/components/production/RecordProductionDialog";
-import { formatDistanceToNow } from "date-fns";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/production")({
@@ -28,6 +27,9 @@ interface Batch {
   batch_number: string;
   quantity_produced: number;
   produced_at: string;
+  recorded_at: string;
+  late_entry_reason: string | null;
+  output_stock_effect: string;
   status: string;
   qc_notes: string | null;
   product: { name: string; sku: string; unit: string } | null;
@@ -40,6 +42,9 @@ interface ProductionReportRow {
   batch_number: string;
   quantity_produced: number;
   produced_at: string;
+  recorded_at: string;
+  late_entry_reason: string | null;
+  output_stock_effect: string;
   status: string;
   qc_notes: string | null;
   product_name: string;
@@ -49,9 +54,22 @@ interface ProductionReportRow {
   packaging_setup_missing: boolean;
 }
 
+function formatLagosDateTime(value: string) {
+  return new Intl.DateTimeFormat("en-NG", {
+    timeZone: "Africa/Lagos",
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).format(new Date(value));
+}
+
 function ProductionPage() {
   const session = useSession();
   const canRecord = hasAny(session.roles, CAN_RECORD_PRODUCTION);
+  const canBackdate = hasAny(session.roles, CAN_BACKDATE_PRODUCTION);
   const [batches, setBatches] = useState<Batch[]>([]);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
@@ -79,6 +97,9 @@ function ProductionPage() {
         batch_number: row.batch_number,
         quantity_produced: Number(row.quantity_produced),
         produced_at: row.produced_at,
+        recorded_at: row.recorded_at,
+        late_entry_reason: row.late_entry_reason,
+        output_stock_effect: row.output_stock_effect,
         status: row.status,
         qc_notes: row.qc_notes,
         product: {
@@ -172,7 +193,17 @@ function ProductionPage() {
                 </TableCell>
                 <TableCell className="text-xs">{b.staff?.full_name ?? "—"}</TableCell>
                 <TableCell className="text-xs text-muted-foreground">
-                  {formatDistanceToNow(new Date(b.produced_at), { addSuffix: true })}
+                  {formatLagosDateTime(b.produced_at)}
+                  {b.late_entry_reason && (
+                    <div className="text-xs text-brand-orange">
+                      Entered late · recorded {formatLagosDateTime(b.recorded_at)}
+                    </div>
+                  )}
+                  {b.output_stock_effect === "already_counted" && (
+                    <div className="text-xs text-muted-foreground">
+                      Output already in Central count
+                    </div>
+                  )}
                 </TableCell>
               </TableRow>
             ))}
@@ -194,7 +225,13 @@ function ProductionPage() {
         </Table>
       </div>
 
-      {open && <RecordProductionDialog onClose={() => setOpen(false)} onSaved={load} />}
+      {open && (
+        <RecordProductionDialog
+          onClose={() => setOpen(false)}
+          onSaved={load}
+          canBackdate={canBackdate}
+        />
+      )}
     </div>
   );
 }
