@@ -73,6 +73,7 @@ type DispatchRow = {
   status: string;
   destination_type: string;
   destination_name: string;
+  charge_mode: "chargeable" | "complimentary" | null;
   shop_id: string | null;
   client_id: string | null;
   source_location_id: string | null;
@@ -114,6 +115,8 @@ type MovementRow = {
   to_shop_name: string | null;
   from_client_name: string | null;
   to_client_name: string | null;
+  sales_channel_name: string | null;
+  dispatch_charge_mode: string | null;
   performed_by: string | null;
   performed_by_name: string | null;
 };
@@ -177,6 +180,7 @@ type ReturnRow = {
   dispatch_reference: string;
   shop_id: string;
   shop_name: string;
+  destination_name: string;
   source_location_id: string | null;
   source_location: string | null;
   return_line_id: string;
@@ -655,6 +659,7 @@ function ReportsPage() {
         "Reference",
         "Destination type",
         "Destination",
+        "Charge status",
         "SKU",
         "Product",
         "Quantity dispatched",
@@ -678,6 +683,7 @@ function ReportsPage() {
         row.reference,
         row.destination_type,
         row.destination_name,
+        row.charge_mode,
         row.sku,
         row.item_name,
         row.quantity_dispatched,
@@ -732,7 +738,7 @@ function ReportsPage() {
         row.unit,
         row.dispatch_reference,
         row.from_shop_name ?? row.from_client_name,
-        row.to_shop_name ?? row.to_client_name,
+        row.to_shop_name ?? row.to_client_name ?? row.sales_channel_name,
         row.reason,
         row.source,
         row.performed_by_name,
@@ -815,7 +821,7 @@ function ReportsPage() {
         "Recorded at",
         "Return",
         "Dispatch",
-        "Shop",
+        "Destination",
         "SKU",
         "Product",
         "Returned",
@@ -830,7 +836,7 @@ function ReportsPage() {
         row.recorded_at,
         row.return_number,
         row.dispatch_reference,
-        row.shop_name,
+        row.destination_name,
         row.sku,
         row.item_name,
         row.quantity_returned,
@@ -1098,6 +1104,7 @@ function ReportsPage() {
                         <p>{row.destination_name}</p>
                         <p className="text-[11px] text-muted-foreground">
                           {row.destination_location ?? row.destination_type.replace("_", " ")}
+                          {row.charge_mode && ` · ${row.charge_mode}`}
                         </p>
                       </td>
                       <td className="px-3 py-2">
@@ -1492,7 +1499,7 @@ function ReportsPage() {
                 <tr>
                   <th className="px-3 py-2 text-left">Time</th>
                   <th className="px-3 py-2 text-left">Return / dispatch</th>
-                  <th className="px-3 py-2 text-left">Shop</th>
+                  <th className="px-3 py-2 text-left">Destination</th>
                   <th className="px-3 py-2 text-left">Product</th>
                   <th className="px-3 py-2 text-right">Returned</th>
                   <th className="px-3 py-2 text-right">Accepted</th>
@@ -1520,7 +1527,7 @@ function ReportsPage() {
                           {row.dispatch_reference}
                         </p>
                       </td>
-                      <td className="px-3 py-2">{row.shop_name}</td>
+                      <td className="px-3 py-2">{row.destination_name}</td>
                       <td className="px-3 py-2">
                         <p>{row.item_name}</p>
                         <p className="font-mono text-[11px] text-muted-foreground">{row.sku}</p>
