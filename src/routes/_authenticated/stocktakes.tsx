@@ -352,7 +352,9 @@ function StocktakesPage() {
               <div className="rounded-md border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900 dark:bg-amber-950 dark:text-amber-200">
                 Enter an actual count for every item. A blank count is intentionally not converted
                 to zero. Posting updates Central Inventory immediately and the count cannot be
-                edited afterward.
+                edited afterward. “Expected” is a snapshot from when this stocktake was started;
+                later dispatches or returns update current Central Inventory, not this historical
+                count sheet.
               </div>
             )}
             {selected && (
@@ -405,7 +407,7 @@ function StocktakesPage() {
                   <tr className="border-b text-xs uppercase tracking-wider text-muted-foreground">
                     <th className="text-left p-2">Item</th>
                     <th className="text-left p-2">Status</th>
-                    <th className="text-right p-2">Expected</th>
+                    <th className="text-right p-2">Expected at start</th>
                     <th className="text-right p-2 w-32">Counted</th>
                     <th className="text-right p-2">Difference</th>
                     <th className="text-left p-2 min-w-52">Reason if different</th>
