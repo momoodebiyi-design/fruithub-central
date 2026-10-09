@@ -20,6 +20,7 @@ import {
   Lock,
   ChartNoAxesCombined,
   ScanLine,
+  Sparkles,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useSession } from "@/hooks/useSession";
@@ -77,6 +78,12 @@ const FULL_NAV: NavItem[] = [
   { to: "/shops", label: "Shops", icon: Store, roles: CAN_MANAGE_SHOPS },
   { to: "/purchasing", label: "Purchasing", icon: ShoppingCart, roles: CAN_VIEW_PURCHASING },
   { to: "/reports", label: "Reports", icon: ChartNoAxesCombined, roles: CAN_VIEW_REPORTS },
+  {
+    to: "/briefings",
+    label: "Management briefing",
+    icon: Sparkles,
+    roles: ["super_admin", "management", "operations_manager"],
+  },
 ];
 
 const SUPERVISOR_NAV: NavItem[] = [{ to: "/dashboard", label: "Today", icon: LayoutDashboard }];

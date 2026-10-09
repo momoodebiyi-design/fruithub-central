@@ -16,6 +16,9 @@ import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ApiWhatsappWebhookRouteImport } from './routes/api/whatsapp-webhook'
 import { Route as ApiPurchaseNotificationsRouteImport } from './routes/api/purchase-notifications'
+import { Route as ApiManagementBriefingScheduledRouteImport } from './routes/api/management-briefing-scheduled'
+import { Route as ApiManagementBriefingRouteImport } from './routes/api/management-briefing'
+import { Route as ApiManagementAssistantRouteImport } from './routes/api/management-assistant'
 import { Route as ApiInvitesRouteImport } from './routes/api/invites'
 import { Route as AuthenticatedUsersRouteImport } from './routes/_authenticated/users'
 import { Route as AuthenticatedSuppliersRouteImport } from './routes/_authenticated/suppliers'
@@ -33,6 +36,7 @@ import { Route as AuthenticatedInventoryRouteImport } from './routes/_authentica
 import { Route as AuthenticatedDispatchesRouteImport } from './routes/_authenticated/dispatches'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedClientsRouteImport } from './routes/_authenticated/clients'
+import { Route as AuthenticatedBriefingsRouteImport } from './routes/_authenticated/briefings'
 import { Route as AuthenticatedAuditRouteImport } from './routes/_authenticated/audit'
 import { Route as Char91DotwellKnownChar93OauthProtectedResourceRouteImport } from './routes/[.well-known]/oauth-protected-resource'
 import { Route as Char91DotmcpChar93ListToolsRouteImport } from './routes/[.mcp]/list-tools'
@@ -79,6 +83,22 @@ const ApiPurchaseNotificationsRoute =
     path: '/api/purchase-notifications',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiManagementBriefingScheduledRoute =
+  ApiManagementBriefingScheduledRouteImport.update({
+    id: '/api/management-briefing-scheduled',
+    path: '/api/management-briefing-scheduled',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiManagementBriefingRoute = ApiManagementBriefingRouteImport.update({
+  id: '/api/management-briefing',
+  path: '/api/management-briefing',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiManagementAssistantRoute = ApiManagementAssistantRouteImport.update({
+  id: '/api/management-assistant',
+  path: '/api/management-assistant',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiInvitesRoute = ApiInvitesRouteImport.update({
   id: '/api/invites',
   path: '/api/invites',
@@ -166,6 +186,11 @@ const AuthenticatedClientsRoute = AuthenticatedClientsRouteImport.update({
   path: '/clients',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedBriefingsRoute = AuthenticatedBriefingsRouteImport.update({
+  id: '/briefings',
+  path: '/briefings',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedAuditRoute = AuthenticatedAuditRouteImport.update({
   id: '/audit',
   path: '/audit',
@@ -233,6 +258,7 @@ export interface FileRoutesByFullPath {
   '/.mcp/list-tools': typeof Char91DotmcpChar93ListToolsRoute
   '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
   '/audit': typeof AuthenticatedAuditRoute
+  '/briefings': typeof AuthenticatedBriefingsRoute
   '/clients': typeof AuthenticatedClientsRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/dispatches': typeof AuthenticatedDispatchesRoute
@@ -250,6 +276,9 @@ export interface FileRoutesByFullPath {
   '/suppliers': typeof AuthenticatedSuppliersRoute
   '/users': typeof AuthenticatedUsersRoute
   '/api/invites': typeof ApiInvitesRoute
+  '/api/management-assistant': typeof ApiManagementAssistantRoute
+  '/api/management-briefing': typeof ApiManagementBriefingRoute
+  '/api/management-briefing-scheduled': typeof ApiManagementBriefingScheduledRoute
   '/api/purchase-notifications': typeof ApiPurchaseNotificationsRoute
   '/api/whatsapp-webhook': typeof ApiWhatsappWebhookRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
@@ -268,6 +297,7 @@ export interface FileRoutesByTo {
   '/.mcp/list-tools': typeof Char91DotmcpChar93ListToolsRoute
   '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
   '/audit': typeof AuthenticatedAuditRoute
+  '/briefings': typeof AuthenticatedBriefingsRoute
   '/clients': typeof AuthenticatedClientsRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/dispatches': typeof AuthenticatedDispatchesRoute
@@ -283,6 +313,9 @@ export interface FileRoutesByTo {
   '/suppliers': typeof AuthenticatedSuppliersRoute
   '/users': typeof AuthenticatedUsersRoute
   '/api/invites': typeof ApiInvitesRoute
+  '/api/management-assistant': typeof ApiManagementAssistantRoute
+  '/api/management-briefing': typeof ApiManagementBriefingRoute
+  '/api/management-briefing-scheduled': typeof ApiManagementBriefingScheduledRoute
   '/api/purchase-notifications': typeof ApiPurchaseNotificationsRoute
   '/api/whatsapp-webhook': typeof ApiWhatsappWebhookRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
@@ -303,6 +336,7 @@ export interface FileRoutesById {
   '/.mcp/list-tools': typeof Char91DotmcpChar93ListToolsRoute
   '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
   '/_authenticated/audit': typeof AuthenticatedAuditRoute
+  '/_authenticated/briefings': typeof AuthenticatedBriefingsRoute
   '/_authenticated/clients': typeof AuthenticatedClientsRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/dispatches': typeof AuthenticatedDispatchesRoute
@@ -320,6 +354,9 @@ export interface FileRoutesById {
   '/_authenticated/suppliers': typeof AuthenticatedSuppliersRoute
   '/_authenticated/users': typeof AuthenticatedUsersRoute
   '/api/invites': typeof ApiInvitesRoute
+  '/api/management-assistant': typeof ApiManagementAssistantRoute
+  '/api/management-briefing': typeof ApiManagementBriefingRoute
+  '/api/management-briefing-scheduled': typeof ApiManagementBriefingScheduledRoute
   '/api/purchase-notifications': typeof ApiPurchaseNotificationsRoute
   '/api/whatsapp-webhook': typeof ApiWhatsappWebhookRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
@@ -340,6 +377,7 @@ export interface FileRouteTypes {
     | '/.mcp/list-tools'
     | '/.well-known/oauth-protected-resource'
     | '/audit'
+    | '/briefings'
     | '/clients'
     | '/dashboard'
     | '/dispatches'
@@ -357,6 +395,9 @@ export interface FileRouteTypes {
     | '/suppliers'
     | '/users'
     | '/api/invites'
+    | '/api/management-assistant'
+    | '/api/management-briefing'
+    | '/api/management-briefing-scheduled'
     | '/api/purchase-notifications'
     | '/api/whatsapp-webhook'
     | '/.lovable/oauth/consent'
@@ -375,6 +416,7 @@ export interface FileRouteTypes {
     | '/.mcp/list-tools'
     | '/.well-known/oauth-protected-resource'
     | '/audit'
+    | '/briefings'
     | '/clients'
     | '/dashboard'
     | '/dispatches'
@@ -390,6 +432,9 @@ export interface FileRouteTypes {
     | '/suppliers'
     | '/users'
     | '/api/invites'
+    | '/api/management-assistant'
+    | '/api/management-briefing'
+    | '/api/management-briefing-scheduled'
     | '/api/purchase-notifications'
     | '/api/whatsapp-webhook'
     | '/.lovable/oauth/consent'
@@ -409,6 +454,7 @@ export interface FileRouteTypes {
     | '/.mcp/list-tools'
     | '/.well-known/oauth-protected-resource'
     | '/_authenticated/audit'
+    | '/_authenticated/briefings'
     | '/_authenticated/clients'
     | '/_authenticated/dashboard'
     | '/_authenticated/dispatches'
@@ -426,6 +472,9 @@ export interface FileRouteTypes {
     | '/_authenticated/suppliers'
     | '/_authenticated/users'
     | '/api/invites'
+    | '/api/management-assistant'
+    | '/api/management-briefing'
+    | '/api/management-briefing-scheduled'
     | '/api/purchase-notifications'
     | '/api/whatsapp-webhook'
     | '/.lovable/oauth/consent'
@@ -446,6 +495,9 @@ export interface RootRouteChildren {
   Char91DotmcpChar93ListToolsRoute: typeof Char91DotmcpChar93ListToolsRoute
   Char91DotwellKnownChar93OauthProtectedResourceRoute: typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
   ApiInvitesRoute: typeof ApiInvitesRoute
+  ApiManagementAssistantRoute: typeof ApiManagementAssistantRoute
+  ApiManagementBriefingRoute: typeof ApiManagementBriefingRoute
+  ApiManagementBriefingScheduledRoute: typeof ApiManagementBriefingScheduledRoute
   ApiPurchaseNotificationsRoute: typeof ApiPurchaseNotificationsRoute
   ApiWhatsappWebhookRoute: typeof ApiWhatsappWebhookRoute
   DotlovableOauthConsentRoute: typeof DotlovableOauthConsentRoute
@@ -501,6 +553,27 @@ declare module '@tanstack/react-router' {
       path: '/api/purchase-notifications'
       fullPath: '/api/purchase-notifications'
       preLoaderRoute: typeof ApiPurchaseNotificationsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/management-briefing-scheduled': {
+      id: '/api/management-briefing-scheduled'
+      path: '/api/management-briefing-scheduled'
+      fullPath: '/api/management-briefing-scheduled'
+      preLoaderRoute: typeof ApiManagementBriefingScheduledRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/management-briefing': {
+      id: '/api/management-briefing'
+      path: '/api/management-briefing'
+      fullPath: '/api/management-briefing'
+      preLoaderRoute: typeof ApiManagementBriefingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/management-assistant': {
+      id: '/api/management-assistant'
+      path: '/api/management-assistant'
+      fullPath: '/api/management-assistant'
+      preLoaderRoute: typeof ApiManagementAssistantRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/invites': {
@@ -622,6 +695,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedClientsRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/briefings': {
+      id: '/_authenticated/briefings'
+      path: '/briefings'
+      fullPath: '/briefings'
+      preLoaderRoute: typeof AuthenticatedBriefingsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/audit': {
       id: '/_authenticated/audit'
       path: '/audit'
@@ -729,6 +809,7 @@ const AuthenticatedShopCountsRouteWithChildren =
 
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedAuditRoute: typeof AuthenticatedAuditRoute
+  AuthenticatedBriefingsRoute: typeof AuthenticatedBriefingsRoute
   AuthenticatedClientsRoute: typeof AuthenticatedClientsRoute
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
   AuthenticatedDispatchesRoute: typeof AuthenticatedDispatchesRoute
@@ -750,6 +831,7 @@ interface AuthenticatedRouteRouteChildren {
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedAuditRoute: AuthenticatedAuditRoute,
+  AuthenticatedBriefingsRoute: AuthenticatedBriefingsRoute,
   AuthenticatedClientsRoute: AuthenticatedClientsRoute,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
   AuthenticatedDispatchesRoute: AuthenticatedDispatchesRoute,
@@ -782,6 +864,9 @@ const rootRouteChildren: RootRouteChildren = {
   Char91DotwellKnownChar93OauthProtectedResourceRoute:
     Char91DotwellKnownChar93OauthProtectedResourceRoute,
   ApiInvitesRoute: ApiInvitesRoute,
+  ApiManagementAssistantRoute: ApiManagementAssistantRoute,
+  ApiManagementBriefingRoute: ApiManagementBriefingRoute,
+  ApiManagementBriefingScheduledRoute: ApiManagementBriefingScheduledRoute,
   ApiPurchaseNotificationsRoute: ApiPurchaseNotificationsRoute,
   ApiWhatsappWebhookRoute: ApiWhatsappWebhookRoute,
   DotlovableOauthConsentRoute: DotlovableOauthConsentRoute,
