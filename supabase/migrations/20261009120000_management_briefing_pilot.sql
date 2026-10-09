@@ -39,6 +39,9 @@ CREATE INDEX IF NOT EXISTS management_briefing_deliveries_recipient_idx
 
 ALTER TABLE public.management_briefing_pilot ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.management_briefing_deliveries ENABLE ROW LEVEL SECURITY;
+-- Supabase may apply broad default grants to new public tables. Restrict these
+-- explicitly as well as enforcing the own-record SELECT policies below.
+REVOKE ALL ON public.management_briefing_pilot, public.management_briefing_deliveries FROM anon, authenticated;
 GRANT SELECT ON public.management_briefing_pilot, public.management_briefing_deliveries TO authenticated;
 GRANT ALL ON public.management_briefing_pilot, public.management_briefing_deliveries TO service_role;
 
