@@ -16,7 +16,7 @@ The scheduler must target 07:00 UTC = 08:00 Lagos. The endpoint accepts late run
 
 ## Briefing definition
 
-- Production batches, dispatches, returns, and submitted Central stocktakes are counted for the previous Lagos calendar day by their relevant recorded event timestamps.
+- Production batches, dispatches, returns, and posted Central stocktakes (including legacy submitted/approved records) are counted for the previous Lagos calendar day by their relevant recorded event timestamps.
 - Pending purchase approvals and configured Central low-stock alerts are current **as-of** snapshots, not previous-day totals.
 - Missing source data is labelled `unavailable`, not `0`. No submitted stocktake and any uncounted stocktake lines are flagged so management can check whether counting was missed.
 - The WhatsApp summary links to the authenticated briefing page. It does not expose detailed records or allow stock changes or approvals.

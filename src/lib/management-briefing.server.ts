@@ -76,7 +76,7 @@ export async function buildManagementBriefing(
       admin
         .from("central_stocktakes")
         .select("id")
-        .in("status", ["submitted", "approved"])
+        .in("status", ["posted", "submitted", "approved"])
         .gte("submitted_at", start)
         .lt("submitted_at", end),
       countQuery(
