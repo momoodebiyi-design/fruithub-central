@@ -87,8 +87,9 @@ async function sendInviteEmail(
     throw new Error("Reactivate this account before resending access.");
   }
 
-  const { data: existingAuth, error: existingAuthError } =
-    await admin.auth.admin.getUserById(existingProfile.id);
+  const { data: existingAuth, error: existingAuthError } = await admin.auth.admin.getUserById(
+    existingProfile.id,
+  );
   const existingUser = existingAuth?.user;
   if (existingAuthError || !existingUser) {
     throw new Error("The existing login could not be verified. No changes were made.");
@@ -124,18 +125,17 @@ export const Route = createFileRoute("/api/invites")({
         if (authError || !authData.user) return json({ error: "Your session has expired" }, 401);
 
         const actorId = authData.user.id;
-        const [{ data: actorProfile }, { data: managerRole }] = await Promise.all([
-          supabaseAdmin.from("profiles").select("is_active").eq("id", actorId).maybeSingle(),
-          supabaseAdmin
-            .from("user_roles")
-            .select("role")
-            .eq("user_id", actorId)
-            .in("role", [...MANAGER_ROLES])
-            .limit(1)
-            .maybeSingle(),
-        ]);
+        const [{ data: actorProfile }, { data: managerRoles, error: roleError }] =
+          await Promise.all([
+            supabaseAdmin.from("profiles").select("is_active").eq("id", actorId).maybeSingle(),
+            supabaseAdmin
+              .from("user_roles")
+              .select("role")
+              .eq("user_id", actorId)
+              .in("role", [...MANAGER_ROLES]),
+          ]);
 
-        if (!actorProfile?.is_active || !managerRole) {
+        if (!actorProfile?.is_active || roleError || !managerRoles?.length) {
           return json({ error: "You do not have permission to manage users" }, 403);
         }
 
@@ -151,6 +151,17 @@ export const Route = createFileRoute("/api/invites")({
         }
 
         const origin = redirectOrigin(request);
+        const actorIsSuperAdmin = managerRoles.some((r) => r.role === "super_admin");
+        const superAdminDenied = () =>
+          json({ error: "Only a Super Admin may manage Super Admin invitations or access" }, 403);
+        if (!actorIsSuperAdmin && "user_id" in body) {
+          const { data: targetRoles, error: targetRoleError } = await supabaseAdmin
+            .from("user_roles")
+            .select("role")
+            .eq("user_id", body.user_id);
+          if (targetRoleError) return json({ error: "Unable to verify target permissions" }, 503);
+          if (targetRoles?.some((r) => r.role === "super_admin")) return superAdminDenied();
+        }
 
         if (body.action === "list_auth_status") {
           const { data, error } = await supabaseAdmin.auth.admin.listUsers({
@@ -179,6 +190,7 @@ export const Route = createFileRoute("/api/invites")({
             return json({ error: "Enter a valid email address" }, 400);
           }
           if (!APP_ROLES.includes(body.role)) return json({ error: "Select a valid role" }, 400);
+          if (body.role === "super_admin" && !actorIsSuperAdmin) return superAdminDenied();
 
           const { data: existingProfile } = await supabaseAdmin
             .from("profiles")
@@ -199,7 +211,7 @@ export const Route = createFileRoute("/api/invites")({
 
           const { data: pending } = await supabaseAdmin
             .from("user_invites")
-            .select("id, token, send_count")
+            .select("id, token, send_count, role")
             .ilike("email", email)
             .is("accepted_at", null)
             .is("cancelled_at", null)
@@ -210,6 +222,7 @@ export const Route = createFileRoute("/api/invites")({
 
           let invite = pending;
           if (pending) {
+            if (pending.role === "super_admin" && !actorIsSuperAdmin) return superAdminDenied();
             const { data, error } = await supabaseAdmin
               .from("user_invites")
               .update({
@@ -219,7 +232,7 @@ export const Route = createFileRoute("/api/invites")({
                 invited_by: actorId,
               })
               .eq("id", pending.id)
-              .select("id, token, send_count")
+              .select("id, token, send_count, role")
               .single();
             if (error) return json({ error: error.message }, 400);
             invite = data;
@@ -234,7 +247,7 @@ export const Route = createFileRoute("/api/invites")({
                 invited_by: actorId,
                 expires_at: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
               })
-              .select("id, token, send_count")
+              .select("id, token, send_count, role")
               .single();
             if (error) return json({ error: error.message }, 400);
             invite = data;
@@ -285,6 +298,7 @@ export const Route = createFileRoute("/api/invites")({
 
           if (inviteError || !invite)
             return json({ error: "Invitation is invalid or expired" }, 404);
+          if (invite.role === "super_admin" && !actorIsSuperAdmin) return superAdminDenied();
 
           try {
             await sendInviteEmail(
@@ -363,6 +377,7 @@ export const Route = createFileRoute("/api/invites")({
               404,
             );
           }
+          if (pendingInvite.role === "super_admin" && !actorIsSuperAdmin) return superAdminDenied();
 
           try {
             await sendInviteEmail(

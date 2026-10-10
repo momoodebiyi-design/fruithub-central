@@ -7,6 +7,7 @@ DECLARE
   bucket text;
   allowed boolean;
   observed integer;
+  expected_existing integer;
   inserted boolean;
   test_name text;
   seed_owner uuid;
@@ -28,9 +29,19 @@ BEGIN
         THEN ARRAY['super_admin','management','operations_manager','procurement','inventory_officer']
         ELSE ARRAY['super_admin','management','operations_manager','sales','inventory_officer'] END,false);
       test_name := '__storage_rls_test__/' || (account->>'id');
+      SELECT count(*) INTO expected_existing FROM storage.objects o
+      WHERE o.bucket_id=bucket AND o.name NOT LIKE '__storage_rls_test__/%'
+        AND allowed AND (o.owner_id=account->>'id'
+          OR (bucket='dispatch-invoices' AND EXISTS (SELECT 1 FROM public.dispatches d WHERE d.invoice_url=o.name))
+          OR (bucket='purchase-evidence' AND (
+            EXISTS (SELECT 1 FROM public.purchase_orders p WHERE p.quotation_evidence_path=o.name OR p.payment_evidence_path=o.name)
+            OR EXISTS (SELECT 1 FROM public.purchase_receipts r WHERE r.delivery_evidence_path=o.name)
+          )));
       EXECUTE 'SET LOCAL ROLE authenticated';
+      SELECT count(*) INTO observed FROM storage.objects WHERE bucket_id=bucket AND name NOT LIKE '__storage_rls_test__/%';
+      IF observed<>expected_existing THEN RAISE EXCEPTION 'Existing linked evidence access failed'; END IF;
       SELECT count(*) INTO observed FROM storage.objects WHERE bucket_id=bucket AND name='__storage_rls_test__/seed';
-      IF observed <> (CASE WHEN allowed THEN 1 ELSE 0 END) THEN
+      IF observed <> (CASE WHEN allowed AND account->>'id'=seed_owner::text THEN 1 ELSE 0 END) THEN
         RAISE EXCEPTION 'Read test failed for roles %, bucket %',account->'roles',bucket;
       END IF;
       inserted := false;
@@ -75,4 +86,4 @@ BEGIN
   EXECUTE 'RESET ROLE';
 END $$;
 ROLLBACK;
-SELECT 'PASS: existing staff roles, roleless and anonymous reads; upload ownership; immutable evidence; test objects rolled back' AS result;
+SELECT 'PASS: unlinked files owner-only; existing staff roles, roleless and anonymous reads; upload ownership; immutable evidence; test objects rolled back' AS result;
