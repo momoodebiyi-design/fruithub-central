@@ -251,7 +251,7 @@ export function DispatchDialog({
             _late_entry_reason: dispatchArgs._late_entry_reason,
             _stocktake_treatment: dispatchArgs._stocktake_treatment,
           })
-        : await supabase.rpc("create_dispatch_with_date", dispatchArgs);
+        : await supabase.rpc("create_dispatch_with_date", dispatchArgs as never);
     setSaving(false);
     if (error) return toast.error(error.message);
     toast.success("Dispatch recorded");
