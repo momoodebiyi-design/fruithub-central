@@ -4047,6 +4047,7 @@ export type Database = {
         }
         Returns: string
       }
+      is_active_staff: { Args: { _user_id: string }; Returns: boolean }
       issue_replenishment_request: {
         Args: {
           _client_reference_id: string
