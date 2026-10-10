@@ -1,6 +1,14 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
-import { normalisePhone, previousLagosDate, reportBounds } from "./management-briefing-utils";
+import { lagosDate, normalisePhone } from "./management-briefing-utils";
+import {
+  evaluateStockCoverage,
+  type BriefingBalance,
+  type BriefingItem,
+  type BriefingLocation,
+  type BriefingPolicy,
+  type LowStockLine,
+} from "./management-briefing-stock";
 export {
   lagosDate,
   normalisePhone,
@@ -9,6 +17,16 @@ export {
 } from "./management-briefing-utils";
 
 const admin = supabaseAdmin as any;
+
+export const BRIEFING_MANAGEMENT_ROLES = [
+  "super_admin",
+  "management",
+  "operations_manager",
+] as const;
+
+export function hasBriefingRole(roles: Array<{ role: string }> | null | undefined) {
+  return Boolean(roles?.some((row) => BRIEFING_MANAGEMENT_ROLES.some((role) => role === row.role)));
+}
 
 export async function authorisedUser(token: string, roles: string[]) {
   const { data, error } = await supabaseAdmin.auth.getUser(token);
@@ -24,172 +42,129 @@ export async function authorisedUser(token: string, roles: string[]) {
   return profile as { id: string; phone: string | null; is_active: boolean };
 }
 
-type Metric = number | null;
 export type ManagementBriefing = {
   reportDate: string;
   asOf: string;
-  productionBatches: Metric;
-  dispatches: Metric;
-  returns: Metric;
-  stocktakesPosted: Metric;
-  uncountedStocktakeLines: Metric;
-  pendingPurchaseApprovals: Metric;
-  lowStock: Array<{ name: string; onHand: number; reorderLevel: number; critical: boolean }> | null;
+  lowStock: LowStockLine[] | null;
+  trackedPairs: number | null;
+  configuredPairs: number | null;
+  unconfiguredPairs: number | null;
+  locationNames: string[];
   warnings: string[];
 };
 
-async function countQuery(
-  query: PromiseLike<{ count: number | null; error: any }>,
-): Promise<Metric> {
-  const { count, error } = await query;
-  return error ? null : (count ?? 0);
-}
-
 export async function buildManagementBriefing(
-  reportDate = previousLagosDate(),
+  reportDate = lagosDate(),
 ): Promise<ManagementBriefing> {
-  const { start, end } = reportBounds(reportDate);
-  const [productionBatches, dispatches, returns, stocktakeResult, pendingPurchaseApprovals] =
-    await Promise.all([
-      countQuery(
-        admin
-          .from("production_batches")
-          .select("id", { count: "exact", head: true })
-          .in("status", ["completed", "qc_passed"])
-          .gte("produced_at", start)
-          .lt("produced_at", end),
-      ),
-      countQuery(
-        admin
-          .from("dispatches")
-          .select("id", { count: "exact", head: true })
-          .gte("dispatched_at", start)
-          .lt("dispatched_at", end),
-      ),
-      countQuery(
-        admin
-          .from("dispatch_returns")
-          .select("id", { count: "exact", head: true })
-          .gte("recorded_at", start)
-          .lt("recorded_at", end),
-      ),
-      admin
-        .from("central_stocktakes")
-        .select("id")
-        .in("status", ["posted", "submitted", "approved"])
-        .gte("submitted_at", start)
-        .lt("submitted_at", end),
-      countQuery(
-        admin
-          .from("purchase_orders")
-          .select("id", { count: "exact", head: true })
-          .eq("workflow_status", "awaiting_approval"),
-      ),
-    ]);
-  const stocktakesPosted: Metric = stocktakeResult.error
-    ? null
-    : (stocktakeResult.data ?? []).length;
-  const stocktakeIds = (stocktakeResult.data ?? []).map((row: { id: string }) => row.id);
-  const uncountedStocktakeLines: Metric =
-    stocktakeResult.error || stocktakeIds.length === 0
-      ? null
-      : await countQuery(
-          admin
-            .from("central_stocktake_lines")
-            .select("id", { count: "exact", head: true })
-            .in("stocktake_id", stocktakeIds)
-            .is("counted_quantity", null),
-        );
-
+  const asOf = new Date().toISOString();
   const warnings: string[] = [];
-  if (
-    [productionBatches, dispatches, returns, stocktakesPosted, pendingPurchaseApprovals].some(
-      (x) => x === null,
-    ) ||
-    (stocktakeIds.length > 0 && uncountedStocktakeLines === null)
-  ) {
-    warnings.push("Some source records could not be read; unavailable figures are not zero.");
+  // Cover all active inventory locations. At shops, only pairs with an
+  // existing balance or explicit policy are tracked; Central includes every
+  // catalogue item. Missing policies remain unclassified, never "healthy".
+  const scope: "central" | "all" = "all";
+  const [itemResult, locationResult, policyResult, balanceResult] = await Promise.all([
+    admin.from("inventory_items").select("id,sku,name,category,unit").eq("status", "active"),
+    admin.from("locations").select("id,name,is_default").eq("status", "active"),
+    admin
+      .from("stock_level_policies")
+      .select("item_id,location_id,critical_level,reorder_level")
+      .eq("is_active", true),
+    admin.from("v_item_location_stock").select("item_id,location_id,on_hand"),
+  ]);
+  if (itemResult.error || locationResult.error || policyResult.error || balanceResult.error) {
+    warnings.push("Inventory, location, threshold or balance records could not be read.");
+    return {
+      reportDate,
+      asOf,
+      lowStock: null,
+      trackedPairs: null,
+      configuredPairs: null,
+      unconfiguredPairs: null,
+      locationNames: [],
+      warnings,
+    };
   }
-  if (stocktakesPosted === 0)
-    warnings.push("No submitted Central stocktake was found for this date.");
-  if (uncountedStocktakeLines !== null && uncountedStocktakeLines > 0)
-    warnings.push(`${uncountedStocktakeLines} Central stocktake lines were not counted.`);
 
-  let lowStock: ManagementBriefing["lowStock"] = null;
-  const { data: locations, error: centralError } = await admin
-    .from("locations")
-    .select("id,name,is_default")
-    .eq("status", "active")
-    .limit(100);
-  const central =
-    (locations ?? []).find((row: any) => row.is_default) ??
-    (locations ?? []).find((row: any) => String(row.name).toLowerCase() === "main store");
-  if (centralError || !central) {
-    warnings.push("Central location or stock data is unavailable.");
-  } else {
-    const [{ data: policies, error: policiesError }, { data: balances, error: balancesError }] =
-      await Promise.all([
-        admin
-          .from("stock_level_policies")
-          .select("item_id,critical_level,reorder_level,inventory_items(name)")
-          .eq("location_id", central.id)
-          .eq("is_active", true),
-        admin.from("v_item_location_stock").select("item_id,on_hand").eq("location_id", central.id),
-      ]);
-    if (policiesError || balancesError) {
-      warnings.push("Configured Central stock alerts are unavailable.");
-    } else {
-      const onHand = new Map<string, number>(
-        (balances ?? []).map((row: any) => [row.item_id, Number(row.on_hand)]),
-      );
-      lowStock = (policies ?? [])
-        .flatMap((policy: any) => {
-          const quantity = onHand.get(policy.item_id) ?? 0;
-          const reorder = Number(policy.reorder_level);
-          if (quantity > reorder) return [];
-          const item = Array.isArray(policy.inventory_items)
-            ? policy.inventory_items[0]
-            : policy.inventory_items;
-          return [
-            {
-              name: item?.name ?? "Unknown item",
-              onHand: quantity,
-              reorderLevel: reorder,
-              critical: quantity <= Number(policy.critical_level),
-            },
-          ];
-        })
-        .sort(
-          (a: any, b: any) =>
-            Number(b.critical) - Number(a.critical) || a.name.localeCompare(b.name),
-        );
-    }
+  let coverage;
+  try {
+    coverage = evaluateStockCoverage({
+      items: (itemResult.data ?? []) as BriefingItem[],
+      locations: (locationResult.data ?? []) as BriefingLocation[],
+      policies: (policyResult.data ?? []) as BriefingPolicy[],
+      balances: (balanceResult.data ?? []) as BriefingBalance[],
+      scope,
+    });
+  } catch {
+    warnings.push("The active Central location could not be identified.");
+    return {
+      reportDate,
+      asOf,
+      lowStock: null,
+      trackedPairs: null,
+      configuredPairs: null,
+      unconfiguredPairs: null,
+      locationNames: [],
+      warnings,
+    };
+  }
+
+  if (coverage.unconfiguredPairs > 0) {
+    warnings.push(
+      `${coverage.unconfiguredPairs} tracked item/location pairs have no approved reorder policy; they are not classified as low stock.`,
+    );
+  }
+  if (coverage.locationNames.length > 1) {
+    warnings.push(
+      "Shop balances may be stale while point-of-sale stock depletion is not active; verify shop counts before acting on them.",
+    );
   }
 
   return {
     reportDate,
-    asOf: new Date().toISOString(),
-    productionBatches,
-    dispatches,
-    returns,
-    stocktakesPosted,
-    uncountedStocktakeLines,
-    pendingPurchaseApprovals,
-    lowStock,
+    asOf,
+    lowStock: coverage.lowStock,
+    trackedPairs: coverage.trackedPairs,
+    configuredPairs: coverage.configuredPairs,
+    unconfiguredPairs: coverage.unconfiguredPairs,
+    locationNames: coverage.locationNames,
     warnings,
   };
 }
 
-function label(value: Metric) {
-  return value === null ? "unavailable" : String(value);
-}
-
 export function briefingSummary(briefing: ManagementBriefing) {
-  const low = briefing.lowStock === null ? "unavailable" : String(briefing.lowStock.length);
-  const caution = briefing.warnings.length
-    ? " Data warning: open the app to review missing or incomplete records."
-    : "";
-  return `Production batches ${label(briefing.productionBatches)}; dispatches ${label(briefing.dispatches)}; returns ${label(briefing.returns)}; Central stocktakes posted ${label(briefing.stocktakesPosted)}; uncounted lines ${label(briefing.uncountedStocktakeLines)}; low-stock items ${low}; purchase approvals awaiting action ${label(briefing.pendingPurchaseApprovals)}.${caution}`;
+  if (briefing.lowStock === null)
+    return "Low-stock counts are unavailable. Open the app for the data warning.";
+  const asOfLagos = new Date(briefing.asOf).toLocaleString("en-NG", {
+    timeZone: "Africa/Lagos",
+    dateStyle: "medium",
+    timeStyle: "short",
+  });
+  const critical = briefing.lowStock.filter((line) => line.critical).length;
+  const categoryCounts = new Map<string, number>();
+  for (const line of briefing.lowStock) {
+    categoryCounts.set(line.category, (categoryCounts.get(line.category) ?? 0) + 1);
+  }
+  const byCategory = [...categoryCounts]
+    .map(([category, count]) => `${category.replaceAll("_", " ")} ${count}`)
+    .join("; ");
+  let summary = `${briefing.lowStock.length} low-stock item/location counts (${critical} critical) as of ${asOfLagos} Lagos.`;
+  if (byCategory) summary += ` By category: ${byCategory}.`;
+  if (briefing.unconfiguredPairs)
+    summary += ` ${briefing.unconfiguredPairs} need reorder-level setup.`;
+  if (briefing.lowStock.length === 0) return summary;
+
+  let shown = 0;
+  for (const line of briefing.lowStock) {
+    const detail = ` ${line.locationName} / ${line.name}: ${line.onHand} ${line.unit} (reorder ${line.reorderLevel})${line.critical ? " CRITICAL" : ""}.`;
+    // The approved template has one bounded summary placeholder. The app has
+    // every line, while WhatsApp includes as many as fit without cutting one.
+    if (summary.length + detail.length + 32 > 850) break;
+    summary += detail;
+    shown += 1;
+  }
+  if (shown < briefing.lowStock.length)
+    summary += ` ${briefing.lowStock.length - shown} more in the app.`;
+  return summary;
 }
 
 export async function sendWhatsAppBriefing(
@@ -200,6 +175,9 @@ export async function sendWhatsAppBriefing(
   appUrl: string,
   verifiedIncomingPhone?: string,
 ) {
+  if (briefing.lowStock === null) {
+    throw new Error("The low-stock report is unavailable; no WhatsApp briefing was sent");
+  }
   const [{ data: pilot }, { data: roles }] = await Promise.all([
     admin
       .from("management_briefing_pilot")
@@ -208,8 +186,8 @@ export async function sendWhatsAppBriefing(
       .maybeSingle(),
     admin.from("user_roles").select("role").eq("user_id", recipientId),
   ]);
-  if (!pilot?.enabled || !roles?.some((row: { role: string }) => row.role === "super_admin")) {
-    throw new Error("The Super Admin briefing pilot is not enabled");
+  if (!pilot?.enabled || !hasBriefingRole(roles)) {
+    throw new Error("WhatsApp briefings are not enabled for this active management user");
   }
   const phoneNumberId = process.env.WHATSAPP_CLOUD_PHONE_NUMBER_ID?.trim();
   const token = process.env.WHATSAPP_CLOUD_ACCESS_TOKEN?.trim();
@@ -231,7 +209,7 @@ export async function sendWhatsAppBriefing(
         )
       : null;
   if (!savedDestination)
-    throw new Error("The enrolled Super Admin has no valid active WhatsApp number");
+    throw new Error("The enrolled management user has no valid active WhatsApp number");
   const destination =
     verifiedIncomingPhone && triggerType === "whatsapp_request"
       ? normalisePhone(
@@ -240,7 +218,7 @@ export async function sendWhatsAppBriefing(
         )
       : savedDestination;
   if (!destination || destination !== savedDestination) {
-    throw new Error("The requesting WhatsApp number no longer matches the Super Admin profile");
+    throw new Error("The requesting WhatsApp number no longer matches the management profile");
   }
 
   const { data: claimed } = await admin
@@ -262,7 +240,7 @@ export async function sendWhatsAppBriefing(
           type: "text",
           text: {
             preview_url: false,
-            body: `4ruit briefing for ${briefing.reportDate} (as of ${briefing.asOf}):\n${summary}\nReview: ${reviewUrl}`,
+            body: `4ruit low-stock briefing for ${briefing.reportDate}:\n${summary}\nFull report: ${reviewUrl}`,
           },
         }
       : {

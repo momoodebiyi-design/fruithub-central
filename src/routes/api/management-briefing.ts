@@ -2,7 +2,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 
 function json(body: unknown, status = 200) {
-  return Response.json(body, { status });
+  return Response.json(body, { status, headers: { "Cache-Control": "no-store" } });
 }
 
 export const Route = createFileRoute("/api/management-briefing")({
@@ -11,25 +11,57 @@ export const Route = createFileRoute("/api/management-briefing")({
       GET: async ({ request }) => {
         const token = request.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
         if (!token) return json({ error: "Sign in required" }, 401);
-        const [{ authorisedUser, buildManagementBriefing }, { supabaseAdmin }] = await Promise.all([
+        const [
+          { authorisedUser, buildManagementBriefing, BRIEFING_MANAGEMENT_ROLES, normalisePhone },
+          { supabaseAdmin },
+        ] = await Promise.all([
           import("@/lib/management-briefing.server"),
           import("@/integrations/supabase/client.server"),
         ]);
-        const user = await authorisedUser(token, [
-          "super_admin",
-          "management",
-          "operations_manager",
-        ]);
+        const user = await authorisedUser(token, [...BRIEFING_MANAGEMENT_ROLES]);
         if (!user) return json({ error: "Management access required" }, 403);
         const briefing = await buildManagementBriefing();
-        const { data: pilot } = await (supabaseAdmin as any)
-          .from("management_briefing_pilot")
-          .select("enabled,consented_at")
-          .eq("user_id", user.id)
-          .maybeSingle();
+        const admin = supabaseAdmin as any;
+        const [pilotResult, roleResult, profileResult, subscriptionResult] = await Promise.all([
+          admin
+            .from("management_briefing_pilot")
+            .select("enabled,consented_at")
+            .eq("user_id", user.id)
+            .maybeSingle(),
+          admin
+            .from("user_roles")
+            .select("user_id,role")
+            .in("role", [...BRIEFING_MANAGEMENT_ROLES]),
+          admin.from("profiles").select("id,phone").eq("is_active", true),
+          admin.from("management_briefing_pilot").select("user_id").eq("enabled", true),
+        ]);
+        const eligibleIds = new Set(
+          (roleResult.data ?? []).map((row: { user_id: string }) => row.user_id),
+        );
+        const activeManagement = (profileResult.data ?? []).filter((row: { id: string }) =>
+          eligibleIds.has(row.id),
+        );
+        const optedInIds = new Set(
+          (subscriptionResult.data ?? []).map((row: { user_id: string }) => row.user_id),
+        );
+        const readiness =
+          roleResult.error || profileResult.error || subscriptionResult.error
+            ? null
+            : {
+                activeManagement: activeManagement.length,
+                withPhone: activeManagement.filter((row: { phone: string | null }) =>
+                  Boolean(normalisePhone(row.phone ?? "")),
+                ).length,
+                optedIn: activeManagement.filter((row: { id: string }) => optedInIds.has(row.id))
+                  .length,
+              };
         return json({
           briefing,
-          pilot: { enabled: pilot?.enabled === true, hasPhone: Boolean(user.phone) },
+          pilot: {
+            enabled: pilotResult.data?.enabled === true,
+            hasPhone: Boolean(normalisePhone(user.phone ?? "")),
+          },
+          readiness,
         });
       },
       POST: async ({ request }) => {
@@ -37,6 +69,7 @@ export const Route = createFileRoute("/api/management-briefing")({
         if (!token) return json({ error: "Sign in required" }, 401);
         const {
           authorisedUser,
+          BRIEFING_MANAGEMENT_ROLES,
           normalisePhone,
           buildManagementBriefing,
           createBriefingDelivery,
@@ -44,8 +77,8 @@ export const Route = createFileRoute("/api/management-briefing")({
         } = await import("@/lib/management-briefing.server");
         const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
         const admin = supabaseAdmin as any;
-        const user = await authorisedUser(token, ["super_admin"]);
-        if (!user) return json({ error: "Super Admin access required" }, 403);
+        const user = await authorisedUser(token, [...BRIEFING_MANAGEMENT_ROLES]);
+        if (!user) return json({ error: "Management access required" }, 403);
 
         let body: { action?: string };
         try {
@@ -55,10 +88,36 @@ export const Route = createFileRoute("/api/management-briefing")({
         }
         if (body.action === "enrol") {
           if (!normalisePhone(user.phone ?? ""))
-            return json(
-              { error: "Add a valid WhatsApp number to your Super Admin profile first" },
-              400,
-            );
+            return json({ error: "Add a valid WhatsApp number to your profile first" }, 400);
+          // A shared number cannot identify which user's stock briefing or
+          // opt-out an incoming WhatsApp message belongs to.
+          const { data: enabledSubscribers, error: subscribersError } = await admin
+            .from("management_briefing_pilot")
+            .select("user_id")
+            .eq("enabled", true)
+            .neq("user_id", user.id);
+          if (subscribersError) return json({ error: "Unable to verify WhatsApp number" }, 503);
+          if ((enabledSubscribers ?? []).length > 0) {
+            const { data: otherProfiles, error: profilesError } = await admin
+              .from("profiles")
+              .select("id,phone,is_active")
+              .in(
+                "id",
+                enabledSubscribers.map((row: { user_id: string }) => row.user_id),
+              );
+            if (profilesError) return json({ error: "Unable to verify WhatsApp number" }, 503);
+            const thisPhone = normalisePhone(user.phone ?? "");
+            if (
+              (otherProfiles ?? []).some(
+                (profile: { phone: string | null; is_active: boolean }) =>
+                  profile.is_active && normalisePhone(profile.phone ?? "") === thisPhone,
+              )
+            )
+              return json(
+                { error: "This WhatsApp number is already enrolled by another management user" },
+                409,
+              );
+          }
           const { error } = await admin.from("management_briefing_pilot").upsert(
             {
               user_id: user.id,
@@ -68,19 +127,10 @@ export const Route = createFileRoute("/api/management-briefing")({
             },
             { onConflict: "user_id" },
           );
-          if (error)
-            return json(
-              {
-                error:
-                  error.code === "23505"
-                    ? "Another Super Admin is already enrolled in the one-person pilot"
-                    : error.message,
-              },
-              409,
-            );
+          if (error) return json({ error: error.message }, 409);
           await admin.from("audit_log").insert({
             user_id: user.id,
-            action: "management_briefing.pilot_enrolled",
+            action: "management_briefing.subscription_enabled",
             entity: "management_briefing_pilot",
             entity_id: user.id,
             new_value: { schedule: "08:00 Africa/Lagos" },
@@ -95,7 +145,7 @@ export const Route = createFileRoute("/api/management-briefing")({
           if (error) return json({ error: error.message }, 500);
           await admin.from("audit_log").insert({
             user_id: user.id,
-            action: "management_briefing.pilot_disabled",
+            action: "management_briefing.subscription_disabled",
             entity: "management_briefing_pilot",
             entity_id: user.id,
           });
@@ -107,8 +157,10 @@ export const Route = createFileRoute("/api/management-briefing")({
             .select("enabled")
             .eq("user_id", user.id)
             .maybeSingle();
-          if (!pilot?.enabled) return json({ error: "Enable the WhatsApp pilot first" }, 403);
+          if (!pilot?.enabled) return json({ error: "Enable WhatsApp briefings first" }, 403);
           const briefing = await buildManagementBriefing();
+          if (briefing.lowStock === null)
+            return json({ error: "Low-stock report unavailable; nothing sent" }, 503);
           const id = await createBriefingDelivery(user.id, briefing.reportDate, "in_app_request");
           if (!id) return json({ error: "Briefing request limit reached; try again later" }, 429);
           try {

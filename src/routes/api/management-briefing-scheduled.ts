@@ -10,8 +10,9 @@ export const Route = createFileRoute("/api/management-briefing-scheduled")({
           return Response.json({ error: "Unauthorised" }, { status: 401 });
         }
         const {
+          hasBriefingRole,
           lagosDate,
-          previousLagosDate,
+          normalisePhone,
           buildManagementBriefing,
           createBriefingDelivery,
           sendWhatsAppBriefing,
@@ -31,33 +32,82 @@ export const Route = createFileRoute("/api/management-briefing-scheduled")({
             { error: "Scheduled briefings run in the Lagos morning window" },
             { status: 409 },
           );
-        const reportDate = previousLagosDate(now);
-        const { data: pilot, error } = await admin
+        const reportDate = lagosDate(now);
+        const { data: subscriptions, error } = await admin
           .from("management_briefing_pilot")
           .select("user_id")
-          .eq("enabled", true)
-          .maybeSingle();
-        if (error) return Response.json({ error: "Pilot setting unavailable" }, { status: 503 });
-        if (!pilot) return Response.json({ status: "not_enrolled", date: lagosDate(now) });
+          .eq("enabled", true);
+        if (error) return Response.json({ error: "Subscriptions unavailable" }, { status: 503 });
+        if (!subscriptions?.length)
+          return Response.json({ status: "no_opted_in_recipients", reportDate });
 
-        const id = await createBriefingDelivery(pilot.user_id, reportDate, "scheduled");
-        if (!id) return Response.json({ status: "already_queued", reportDate });
-        try {
-          const briefing = await buildManagementBriefing(reportDate);
-          const sent = await sendWhatsAppBriefing(
-            id,
-            pilot.user_id,
-            briefing,
-            "scheduled",
-            new URL(request.url).origin,
-          );
-          return Response.json({ status: sent ? "sent" : "already_processing", reportDate });
-        } catch (sendError) {
+        const ids = subscriptions.map((row: { user_id: string }) => row.user_id);
+        const [{ data: profiles, error: profilesError }, { data: roles, error: rolesError }] =
+          await Promise.all([
+            admin.from("profiles").select("id,phone,is_active").in("id", ids),
+            admin.from("user_roles").select("user_id,role").in("user_id", ids),
+          ]);
+        if (profilesError || rolesError)
+          return Response.json({ error: "Recipient records unavailable" }, { status: 503 });
+        const country = process.env.WHATSAPP_DEFAULT_COUNTRY_CODE?.replace(/\D/g, "") || "234";
+        const recipients = (profiles ?? []).filter(
+          (profile: { id: string; phone: string | null; is_active: boolean }) =>
+            profile.is_active &&
+            Boolean(normalisePhone(profile.phone ?? "", country)) &&
+            hasBriefingRole(
+              (roles ?? []).filter(
+                (role: { user_id: string; role: string }) => role.user_id === profile.id,
+              ),
+            ),
+        );
+        if (recipients.length === 0)
+          return Response.json({
+            status: "no_eligible_recipients",
+            reportDate,
+            skipped: ids.length,
+          });
+
+        const briefing = await buildManagementBriefing(reportDate);
+        if (briefing.lowStock === null)
           return Response.json(
-            { error: sendError instanceof Error ? sendError.message : "Briefing failed" },
+            { error: "Low-stock report unavailable; nothing sent" },
             { status: 503 },
           );
+        let sent = 0;
+        let failed = 0;
+        let alreadyQueued = 0;
+        for (const recipient of recipients) {
+          try {
+            const id = await createBriefingDelivery(recipient.id, reportDate, "scheduled");
+            if (!id) {
+              alreadyQueued += 1;
+              continue;
+            }
+            if (
+              await sendWhatsAppBriefing(
+                id,
+                recipient.id,
+                briefing,
+                "scheduled",
+                new URL(request.url).origin,
+              )
+            )
+              sent += 1;
+          } catch {
+            failed += 1; // The delivery row contains the provider error and audit event.
+          }
         }
+        return Response.json(
+          {
+            status: failed > 0 ? "partial_failure" : "processed",
+            reportDate,
+            sent,
+            failed,
+            alreadyQueued,
+            skipped: ids.length - recipients.length,
+          },
+          { status: failed > 0 ? 503 : 200 },
+        );
       },
     },
   },
