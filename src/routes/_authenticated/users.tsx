@@ -248,7 +248,6 @@ function UsersPage() {
     }
   }
 
-
   function openReasonAction(action: ReasonAction) {
     setReason("");
     setReasonError("");
@@ -575,18 +574,28 @@ function UsersPage() {
         </div>
       </section>
 
-      <AlertDialog open={deleteTarget !== null} onOpenChange={(o) => !o && !deleting && setDeleteTarget(null)}>
+      <AlertDialog
+        open={deleteTarget !== null}
+        onOpenChange={(o) => !o && !deleting && setDeleteTarget(null)}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete {deleteTarget?.full_name ?? deleteTarget?.email}?</AlertDialogTitle>
+            <AlertDialogTitle>
+              Delete {deleteTarget?.full_name ?? deleteTarget?.email}?
+            </AlertDialogTitle>
             <AlertDialogDescription>
-              This permanently removes the login and profile. History (audit log, stock movements) is retained but no longer linked to this user. If the user has purchase orders, recipes or sales, deletion will fail — deactivate instead.
+              This permanently removes the login and profile. History (audit log, stock movements)
+              is retained but no longer linked to this user. If the user has purchase orders,
+              recipes or sales, deletion will fail — deactivate instead.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
             <AlertDialogAction
-              onClick={(e) => { e.preventDefault(); void confirmDelete(); }}
+              onClick={(e) => {
+                e.preventDefault();
+                void confirmDelete();
+              }}
               disabled={deleting}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
@@ -706,6 +715,7 @@ function NewInviteDialog({
   setOpen: (b: boolean) => void;
   onSaved: () => void;
 }) {
+  const session = useSession();
   const [email, setEmail] = useState("");
   const [role, setRole] = useState<AppRole>("production");
   const [fullName, setFullName] = useState("");
@@ -769,7 +779,9 @@ function NewInviteDialog({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {ALL_ROLES.map((r) => (
+                {ALL_ROLES.filter(
+                  (r) => r !== "super_admin" || session.roles.includes("super_admin"),
+                ).map((r) => (
                   <SelectItem key={r} value={r}>
                     {ROLE_LABELS[r]}
                   </SelectItem>

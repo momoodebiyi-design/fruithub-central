@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useSession } from "@/hooks/useSession";
 import { CAN_VIEW_REPORTS, hasAny } from "@/lib/permissions";
+import { escapeCsv } from "@/lib/csv";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -252,11 +253,6 @@ function formatLagosDateTime(value: string) {
     dateStyle: "medium",
     timeStyle: "short",
   }).format(new Date(value));
-}
-
-function escapeCsv(value: unknown) {
-  const text = value === null || value === undefined ? "" : String(value);
-  return `"${text.replaceAll('"', '""')}"`;
 }
 
 function downloadCsv(filename: string, headers: string[], rows: unknown[][]) {
