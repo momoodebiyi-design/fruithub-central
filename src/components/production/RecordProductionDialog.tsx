@@ -272,7 +272,7 @@ export function RecordProductionDialog({
       _produced_at: actualProducedAt,
       _late_entry_reason: isBackdated ? lateEntryReason.trim() : null,
       _stocktake_treatment: crossedStocktakes.length > 0 ? stocktakeTreatment : null,
-    });
+    } as never);
     setSaving(false);
     if (error) return toast.error(error.message);
     toast.success("Batch recorded; Central stock treatment saved");

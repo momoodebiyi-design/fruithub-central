@@ -71,6 +71,169 @@ export type Database = {
         }
         Relationships: []
       }
+      central_stocktake_lines: {
+        Row: {
+          counted_quantity: number | null
+          difference: number | null
+          expected_quantity: number
+          id: string
+          item_id: string
+          stocktake_id: string
+          updated_at: string
+          variance_reason: string | null
+        }
+        Insert: {
+          counted_quantity?: number | null
+          difference?: number | null
+          expected_quantity: number
+          id?: string
+          item_id: string
+          stocktake_id: string
+          updated_at?: string
+          variance_reason?: string | null
+        }
+        Update: {
+          counted_quantity?: number | null
+          difference?: number | null
+          expected_quantity?: number
+          id?: string
+          item_id?: string
+          stocktake_id?: string
+          updated_at?: string
+          variance_reason?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "central_stocktake_lines_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "central_stocktake_lines_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "v_central_item_stock"
+            referencedColumns: ["item_id"]
+          },
+          {
+            foreignKeyName: "central_stocktake_lines_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "v_daily_dispatch_report"
+            referencedColumns: ["item_id"]
+          },
+          {
+            foreignKeyName: "central_stocktake_lines_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "v_inventory_movement_report"
+            referencedColumns: ["item_id"]
+          },
+          {
+            foreignKeyName: "central_stocktake_lines_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "v_item_stock"
+            referencedColumns: ["item_id"]
+          },
+          {
+            foreignKeyName: "central_stocktake_lines_stocktake_id_fkey"
+            columns: ["stocktake_id"]
+            isOneToOne: false
+            referencedRelation: "central_stocktakes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      central_stocktakes: {
+        Row: {
+          client_reference_id: string
+          count_number: string
+          created_at: string
+          created_by: string | null
+          id: string
+          location_id: string
+          notes: string | null
+          rejection_reason: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          scope: string
+          status: string
+          submitted_at: string | null
+          submitted_by: string | null
+        }
+        Insert: {
+          client_reference_id: string
+          count_number?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          location_id: string
+          notes?: string | null
+          rejection_reason?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          scope: string
+          status?: string
+          submitted_at?: string | null
+          submitted_by?: string | null
+        }
+        Update: {
+          client_reference_id?: string
+          count_number?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          location_id?: string
+          notes?: string | null
+          rejection_reason?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          scope?: string
+          status?: string
+          submitted_at?: string | null
+          submitted_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "central_stocktakes_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "central_stocktakes_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "central_stocktakes_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "v_central_item_stock"
+            referencedColumns: ["location_id"]
+          },
+          {
+            foreignKeyName: "central_stocktakes_reviewed_by_fkey"
+            columns: ["reviewed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "central_stocktakes_submitted_by_fkey"
+            columns: ["submitted_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       clients: {
         Row: {
           address: string | null
@@ -191,18 +354,18 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "dispatch_lines_linked_stocktake_id_fkey"
-            columns: ["linked_stocktake_id"]
+            foreignKeyName: "dispatch_lines_dispatch_id_fkey"
+            columns: ["dispatch_id"]
             isOneToOne: false
-            referencedRelation: "central_stocktakes"
+            referencedRelation: "dispatches"
             referencedColumns: ["id"]
           },
           {
             foreignKeyName: "dispatch_lines_dispatch_id_fkey"
             columns: ["dispatch_id"]
             isOneToOne: false
-            referencedRelation: "dispatches"
-            referencedColumns: ["id"]
+            referencedRelation: "v_daily_dispatch_report"
+            referencedColumns: ["dispatch_id"]
           },
           {
             foreignKeyName: "dispatch_lines_item_id_fkey"
@@ -215,13 +378,191 @@ export type Database = {
             foreignKeyName: "dispatch_lines_item_id_fkey"
             columns: ["item_id"]
             isOneToOne: false
+            referencedRelation: "v_central_item_stock"
+            referencedColumns: ["item_id"]
+          },
+          {
+            foreignKeyName: "dispatch_lines_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "v_daily_dispatch_report"
+            referencedColumns: ["item_id"]
+          },
+          {
+            foreignKeyName: "dispatch_lines_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "v_inventory_movement_report"
+            referencedColumns: ["item_id"]
+          },
+          {
+            foreignKeyName: "dispatch_lines_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
             referencedRelation: "v_item_stock"
             referencedColumns: ["item_id"]
+          },
+          {
+            foreignKeyName: "dispatch_lines_linked_stocktake_id_fkey"
+            columns: ["linked_stocktake_id"]
+            isOneToOne: false
+            referencedRelation: "central_stocktakes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      dispatch_return_lines: {
+        Row: {
+          dispatch_line_id: string
+          id: string
+          item_id: string
+          quantity_accepted: number
+          quantity_rejected: number
+          quantity_returned: number
+          return_id: string
+        }
+        Insert: {
+          dispatch_line_id: string
+          id?: string
+          item_id: string
+          quantity_accepted: number
+          quantity_rejected: number
+          quantity_returned: number
+          return_id: string
+        }
+        Update: {
+          dispatch_line_id?: string
+          id?: string
+          item_id?: string
+          quantity_accepted?: number
+          quantity_rejected?: number
+          quantity_returned?: number
+          return_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dispatch_return_lines_dispatch_line_id_fkey"
+            columns: ["dispatch_line_id"]
+            isOneToOne: false
+            referencedRelation: "dispatch_lines"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dispatch_return_lines_dispatch_line_id_fkey"
+            columns: ["dispatch_line_id"]
+            isOneToOne: false
+            referencedRelation: "v_daily_dispatch_report"
+            referencedColumns: ["dispatch_line_id"]
+          },
+          {
+            foreignKeyName: "dispatch_return_lines_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dispatch_return_lines_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "v_central_item_stock"
+            referencedColumns: ["item_id"]
+          },
+          {
+            foreignKeyName: "dispatch_return_lines_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "v_daily_dispatch_report"
+            referencedColumns: ["item_id"]
+          },
+          {
+            foreignKeyName: "dispatch_return_lines_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "v_inventory_movement_report"
+            referencedColumns: ["item_id"]
+          },
+          {
+            foreignKeyName: "dispatch_return_lines_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "v_item_stock"
+            referencedColumns: ["item_id"]
+          },
+          {
+            foreignKeyName: "dispatch_return_lines_return_id_fkey"
+            columns: ["return_id"]
+            isOneToOne: false
+            referencedRelation: "dispatch_returns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dispatch_return_lines_return_id_fkey"
+            columns: ["return_id"]
+            isOneToOne: false
+            referencedRelation: "v_dispatch_return_report"
+            referencedColumns: ["return_id"]
+          },
+        ]
+      }
+      dispatch_returns: {
+        Row: {
+          client_reference_id: string
+          condition_notes: string | null
+          dispatch_id: string
+          id: string
+          reason: string
+          recorded_at: string
+          recorded_by: string | null
+          return_number: string
+        }
+        Insert: {
+          client_reference_id: string
+          condition_notes?: string | null
+          dispatch_id: string
+          id?: string
+          reason: string
+          recorded_at?: string
+          recorded_by?: string | null
+          return_number?: string
+        }
+        Update: {
+          client_reference_id?: string
+          condition_notes?: string | null
+          dispatch_id?: string
+          id?: string
+          reason?: string
+          recorded_at?: string
+          recorded_by?: string | null
+          return_number?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dispatch_returns_dispatch_id_fkey"
+            columns: ["dispatch_id"]
+            isOneToOne: false
+            referencedRelation: "dispatches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dispatch_returns_dispatch_id_fkey"
+            columns: ["dispatch_id"]
+            isOneToOne: false
+            referencedRelation: "v_daily_dispatch_report"
+            referencedColumns: ["dispatch_id"]
+          },
+          {
+            foreignKeyName: "dispatch_returns_recorded_by_fkey"
+            columns: ["recorded_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
           },
         ]
       }
       dispatches: {
         Row: {
+          charge_mode: string | null
           client_id: string | null
           client_reference_id: string | null
           created_at: string
@@ -237,6 +578,7 @@ export type Database = {
           received_by: string | null
           reference: string
           replenishment_request_id: string | null
+          sales_channel_id: string | null
           shop_id: string | null
           source_location_id: string | null
           status: Database["public"]["Enums"]["dispatch_status"]
@@ -245,6 +587,7 @@ export type Database = {
           vehicle: string | null
         }
         Insert: {
+          charge_mode?: string | null
           client_id?: string | null
           client_reference_id?: string | null
           created_at?: string
@@ -260,6 +603,7 @@ export type Database = {
           received_by?: string | null
           reference: string
           replenishment_request_id?: string | null
+          sales_channel_id?: string | null
           shop_id?: string | null
           source_location_id?: string | null
           status?: Database["public"]["Enums"]["dispatch_status"]
@@ -268,6 +612,7 @@ export type Database = {
           vehicle?: string | null
         }
         Update: {
+          charge_mode?: string | null
           client_id?: string | null
           client_reference_id?: string | null
           created_at?: string
@@ -283,6 +628,7 @@ export type Database = {
           received_by?: string | null
           reference?: string
           replenishment_request_id?: string | null
+          sales_channel_id?: string | null
           shop_id?: string | null
           source_location_id?: string | null
           status?: Database["public"]["Enums"]["dispatch_status"]
@@ -306,6 +652,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "dispatches_destination_location_id_fkey"
+            columns: ["destination_location_id"]
+            isOneToOne: false
+            referencedRelation: "v_central_item_stock"
+            referencedColumns: ["location_id"]
+          },
+          {
             foreignKeyName: "dispatches_dispatched_by_fkey"
             columns: ["dispatched_by"]
             isOneToOne: false
@@ -327,6 +680,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "dispatches_sales_channel_id_fkey"
+            columns: ["sales_channel_id"]
+            isOneToOne: false
+            referencedRelation: "sales_channels"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "dispatches_shop_id_fkey"
             columns: ["shop_id"]
             isOneToOne: false
@@ -340,7 +700,35 @@ export type Database = {
             referencedRelation: "locations"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "dispatches_source_location_id_fkey"
+            columns: ["source_location_id"]
+            isOneToOne: false
+            referencedRelation: "v_central_item_stock"
+            referencedColumns: ["location_id"]
+          },
         ]
+      }
+      go_live_reset_archives: {
+        Row: {
+          created_at: string
+          id: string
+          reset_key: string
+          snapshot: Json
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          reset_key: string
+          snapshot: Json
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          reset_key?: string
+          snapshot?: Json
+        }
+        Relationships: []
       }
       inventory_batches: {
         Row: {
@@ -374,6 +762,27 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "inventory_items"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_batches_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "v_central_item_stock"
+            referencedColumns: ["item_id"]
+          },
+          {
+            foreignKeyName: "inventory_batches_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "v_daily_dispatch_report"
+            referencedColumns: ["item_id"]
+          },
+          {
+            foreignKeyName: "inventory_batches_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "v_inventory_movement_report"
+            referencedColumns: ["item_id"]
           },
           {
             foreignKeyName: "inventory_batches_item_id_fkey"
@@ -475,6 +884,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "inventory_items_default_location_id_fkey"
+            columns: ["default_location_id"]
+            isOneToOne: false
+            referencedRelation: "v_central_item_stock"
+            referencedColumns: ["location_id"]
+          },
+          {
             foreignKeyName: "inventory_items_supplier_id_fkey"
             columns: ["supplier_id"]
             isOneToOne: false
@@ -554,6 +970,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "inventory_movements_dispatch_id_fkey"
+            columns: ["dispatch_id"]
+            isOneToOne: false
+            referencedRelation: "v_daily_dispatch_report"
+            referencedColumns: ["dispatch_id"]
+          },
+          {
             foreignKeyName: "inventory_movements_from_client_id_fkey"
             columns: ["from_client_id"]
             isOneToOne: false
@@ -578,6 +1001,27 @@ export type Database = {
             foreignKeyName: "inventory_movements_item_id_fkey"
             columns: ["item_id"]
             isOneToOne: false
+            referencedRelation: "v_central_item_stock"
+            referencedColumns: ["item_id"]
+          },
+          {
+            foreignKeyName: "inventory_movements_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "v_daily_dispatch_report"
+            referencedColumns: ["item_id"]
+          },
+          {
+            foreignKeyName: "inventory_movements_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "v_inventory_movement_report"
+            referencedColumns: ["item_id"]
+          },
+          {
+            foreignKeyName: "inventory_movements_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
             referencedRelation: "v_item_stock"
             referencedColumns: ["item_id"]
           },
@@ -587,6 +1031,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "locations"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_movements_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "v_central_item_stock"
+            referencedColumns: ["location_id"]
           },
           {
             foreignKeyName: "inventory_movements_to_client_id_fkey"
@@ -651,6 +1102,85 @@ export type Database = {
           },
         ]
       }
+      management_briefing_deliveries: {
+        Row: {
+          created_at: string
+          id: string
+          inbound_message_id: string | null
+          last_error: string | null
+          provider_message_id: string | null
+          recipient_user_id: string
+          report_date: string
+          sent_at: string | null
+          status: string
+          trigger_type: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          inbound_message_id?: string | null
+          last_error?: string | null
+          provider_message_id?: string | null
+          recipient_user_id: string
+          report_date: string
+          sent_at?: string | null
+          status?: string
+          trigger_type: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          inbound_message_id?: string | null
+          last_error?: string | null
+          provider_message_id?: string | null
+          recipient_user_id?: string
+          report_date?: string
+          sent_at?: string | null
+          status?: string
+          trigger_type?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "management_briefing_deliveries_recipient_user_id_fkey"
+            columns: ["recipient_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      management_briefing_pilot: {
+        Row: {
+          consented_at: string | null
+          enabled: boolean
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          consented_at?: string | null
+          enabled?: boolean
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          consented_at?: string | null
+          enabled?: boolean
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "management_briefing_pilot_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       notifications: {
         Row: {
           body: string | null
@@ -690,6 +1220,38 @@ export type Database = {
         }
         Relationships: []
       }
+      operational_feature_flags: {
+        Row: {
+          enabled: boolean
+          feature_key: string
+          reason: string | null
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          enabled?: boolean
+          feature_key: string
+          reason?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          enabled?: boolean
+          feature_key?: string
+          reason?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "operational_feature_flags_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       production_batches: {
         Row: {
           batch_number: string
@@ -698,6 +1260,9 @@ export type Database = {
           late_entry_reason: string | null
           output_linked_stocktake_id: string | null
           output_stock_effect: string
+          packaging_exception_reason: string | null
+          packaging_setup_id: string | null
+          packaging_setup_missing: boolean
           produced_at: string
           product_item_id: string
           qc_notes: string | null
@@ -713,6 +1278,9 @@ export type Database = {
           late_entry_reason?: string | null
           output_linked_stocktake_id?: string | null
           output_stock_effect?: string
+          packaging_exception_reason?: string | null
+          packaging_setup_id?: string | null
+          packaging_setup_missing?: boolean
           produced_at?: string
           product_item_id: string
           qc_notes?: string | null
@@ -728,6 +1296,9 @@ export type Database = {
           late_entry_reason?: string | null
           output_linked_stocktake_id?: string | null
           output_stock_effect?: string
+          packaging_exception_reason?: string | null
+          packaging_setup_id?: string | null
+          packaging_setup_missing?: boolean
           produced_at?: string
           product_item_id?: string
           qc_notes?: string | null
@@ -738,6 +1309,20 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "production_batches_output_linked_stocktake_id_fkey"
+            columns: ["output_linked_stocktake_id"]
+            isOneToOne: false
+            referencedRelation: "central_stocktakes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "production_batches_packaging_setup_id_fkey"
+            columns: ["packaging_setup_id"]
+            isOneToOne: false
+            referencedRelation: "recipes"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "production_batches_product_item_id_fkey"
             columns: ["product_item_id"]
             isOneToOne: false
@@ -748,42 +1333,65 @@ export type Database = {
             foreignKeyName: "production_batches_product_item_id_fkey"
             columns: ["product_item_id"]
             isOneToOne: false
-            referencedRelation: "v_item_stock"
+            referencedRelation: "v_central_item_stock"
             referencedColumns: ["item_id"]
           },
           {
-            foreignKeyName: "production_batches_output_linked_stocktake_id_fkey"
-            columns: ["output_linked_stocktake_id"]
+            foreignKeyName: "production_batches_product_item_id_fkey"
+            columns: ["product_item_id"]
             isOneToOne: false
-            referencedRelation: "central_stocktakes"
-            referencedColumns: ["id"]
+            referencedRelation: "v_daily_dispatch_report"
+            referencedColumns: ["item_id"]
+          },
+          {
+            foreignKeyName: "production_batches_product_item_id_fkey"
+            columns: ["product_item_id"]
+            isOneToOne: false
+            referencedRelation: "v_inventory_movement_report"
+            referencedColumns: ["item_id"]
+          },
+          {
+            foreignKeyName: "production_batches_product_item_id_fkey"
+            columns: ["product_item_id"]
+            isOneToOne: false
+            referencedRelation: "v_item_stock"
+            referencedColumns: ["item_id"]
           },
         ]
       }
       production_consumption: {
         Row: {
+          expected_quantity: number | null
           id: string
           item_id: string
           linked_stocktake_id: string | null
           production_batch_id: string
           quantity_used: number
           stock_effect: string
+          variance_reason: string | null
+          waste_quantity: number
         }
         Insert: {
+          expected_quantity?: number | null
           id?: string
           item_id: string
           linked_stocktake_id?: string | null
           production_batch_id: string
           quantity_used: number
           stock_effect?: string
+          variance_reason?: string | null
+          waste_quantity?: number
         }
         Update: {
+          expected_quantity?: number | null
           id?: string
           item_id?: string
           linked_stocktake_id?: string | null
           production_batch_id?: string
           quantity_used?: number
           stock_effect?: string
+          variance_reason?: string | null
+          waste_quantity?: number
         }
         Relationships: [
           {
@@ -797,8 +1405,36 @@ export type Database = {
             foreignKeyName: "production_consumption_item_id_fkey"
             columns: ["item_id"]
             isOneToOne: false
+            referencedRelation: "v_central_item_stock"
+            referencedColumns: ["item_id"]
+          },
+          {
+            foreignKeyName: "production_consumption_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "v_daily_dispatch_report"
+            referencedColumns: ["item_id"]
+          },
+          {
+            foreignKeyName: "production_consumption_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "v_inventory_movement_report"
+            referencedColumns: ["item_id"]
+          },
+          {
+            foreignKeyName: "production_consumption_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
             referencedRelation: "v_item_stock"
             referencedColumns: ["item_id"]
+          },
+          {
+            foreignKeyName: "production_consumption_linked_stocktake_id_fkey"
+            columns: ["linked_stocktake_id"]
+            isOneToOne: false
+            referencedRelation: "central_stocktakes"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "production_consumption_production_batch_id_fkey"
@@ -808,11 +1444,11 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "production_consumption_linked_stocktake_id_fkey"
-            columns: ["linked_stocktake_id"]
+            foreignKeyName: "production_consumption_production_batch_id_fkey"
+            columns: ["production_batch_id"]
             isOneToOne: false
-            referencedRelation: "central_stocktakes"
-            referencedColumns: ["id"]
+            referencedRelation: "v_production_report"
+            referencedColumns: ["batch_id"]
           },
         ]
       }
@@ -1054,6 +1690,27 @@ export type Database = {
             foreignKeyName: "purchase_needs_item_id_fkey"
             columns: ["item_id"]
             isOneToOne: false
+            referencedRelation: "v_central_item_stock"
+            referencedColumns: ["item_id"]
+          },
+          {
+            foreignKeyName: "purchase_needs_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "v_daily_dispatch_report"
+            referencedColumns: ["item_id"]
+          },
+          {
+            foreignKeyName: "purchase_needs_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "v_inventory_movement_report"
+            referencedColumns: ["item_id"]
+          },
+          {
+            foreignKeyName: "purchase_needs_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
             referencedRelation: "v_item_stock"
             referencedColumns: ["item_id"]
           },
@@ -1063,6 +1720,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "locations"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchase_needs_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "v_central_item_stock"
+            referencedColumns: ["location_id"]
           },
           {
             foreignKeyName: "purchase_needs_policy_id_fkey"
@@ -1083,6 +1747,76 @@ export type Database = {
             columns: ["source_location_id"]
             isOneToOne: false
             referencedRelation: "locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchase_needs_source_location_id_fkey"
+            columns: ["source_location_id"]
+            isOneToOne: false
+            referencedRelation: "v_central_item_stock"
+            referencedColumns: ["location_id"]
+          },
+        ]
+      }
+      purchase_notification_deliveries: {
+        Row: {
+          attempt_count: number
+          channel: string
+          created_at: string
+          destination: string | null
+          id: string
+          last_attempt_at: string | null
+          last_error: string | null
+          provider_message_id: string | null
+          purchase_order_id: string
+          recipient_user_id: string
+          sent_at: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          attempt_count?: number
+          channel: string
+          created_at?: string
+          destination?: string | null
+          id?: string
+          last_attempt_at?: string | null
+          last_error?: string | null
+          provider_message_id?: string | null
+          purchase_order_id: string
+          recipient_user_id: string
+          sent_at?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          attempt_count?: number
+          channel?: string
+          created_at?: string
+          destination?: string | null
+          id?: string
+          last_attempt_at?: string | null
+          last_error?: string | null
+          provider_message_id?: string | null
+          purchase_order_id?: string
+          recipient_user_id?: string
+          sent_at?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "purchase_notification_deliveries_purchase_order_id_fkey"
+            columns: ["purchase_order_id"]
+            isOneToOne: false
+            referencedRelation: "purchase_orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchase_notification_deliveries_recipient_user_id_fkey"
+            columns: ["recipient_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -1145,6 +1879,27 @@ export type Database = {
             foreignKeyName: "purchase_order_items_item_id_fkey"
             columns: ["item_id"]
             isOneToOne: false
+            referencedRelation: "v_central_item_stock"
+            referencedColumns: ["item_id"]
+          },
+          {
+            foreignKeyName: "purchase_order_items_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "v_daily_dispatch_report"
+            referencedColumns: ["item_id"]
+          },
+          {
+            foreignKeyName: "purchase_order_items_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "v_inventory_movement_report"
+            referencedColumns: ["item_id"]
+          },
+          {
+            foreignKeyName: "purchase_order_items_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
             referencedRelation: "v_item_stock"
             referencedColumns: ["item_id"]
           },
@@ -1154,6 +1909,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "locations"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchase_order_items_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "v_central_item_stock"
+            referencedColumns: ["location_id"]
           },
           {
             foreignKeyName: "purchase_order_items_purchase_need_id_fkey"
@@ -1343,6 +2105,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "purchase_receipt_lines_inventory_movement_id_fkey"
+            columns: ["inventory_movement_id"]
+            isOneToOne: false
+            referencedRelation: "v_inventory_movement_report"
+            referencedColumns: ["movement_id"]
+          },
+          {
             foreignKeyName: "purchase_receipt_lines_purchase_order_item_id_fkey"
             columns: ["purchase_order_item_id"]
             isOneToOne: false
@@ -1500,6 +2269,27 @@ export type Database = {
             foreignKeyName: "recipe_ingredients_ingredient_item_id_fkey"
             columns: ["ingredient_item_id"]
             isOneToOne: false
+            referencedRelation: "v_central_item_stock"
+            referencedColumns: ["item_id"]
+          },
+          {
+            foreignKeyName: "recipe_ingredients_ingredient_item_id_fkey"
+            columns: ["ingredient_item_id"]
+            isOneToOne: false
+            referencedRelation: "v_daily_dispatch_report"
+            referencedColumns: ["item_id"]
+          },
+          {
+            foreignKeyName: "recipe_ingredients_ingredient_item_id_fkey"
+            columns: ["ingredient_item_id"]
+            isOneToOne: false
+            referencedRelation: "v_inventory_movement_report"
+            referencedColumns: ["item_id"]
+          },
+          {
+            foreignKeyName: "recipe_ingredients_ingredient_item_id_fkey"
+            columns: ["ingredient_item_id"]
+            isOneToOne: false
             referencedRelation: "v_item_stock"
             referencedColumns: ["item_id"]
           },
@@ -1570,6 +2360,27 @@ export type Database = {
             foreignKeyName: "recipes_product_item_id_fkey"
             columns: ["product_item_id"]
             isOneToOne: false
+            referencedRelation: "v_central_item_stock"
+            referencedColumns: ["item_id"]
+          },
+          {
+            foreignKeyName: "recipes_product_item_id_fkey"
+            columns: ["product_item_id"]
+            isOneToOne: false
+            referencedRelation: "v_daily_dispatch_report"
+            referencedColumns: ["item_id"]
+          },
+          {
+            foreignKeyName: "recipes_product_item_id_fkey"
+            columns: ["product_item_id"]
+            isOneToOne: false
+            referencedRelation: "v_inventory_movement_report"
+            referencedColumns: ["item_id"]
+          },
+          {
+            foreignKeyName: "recipes_product_item_id_fkey"
+            columns: ["product_item_id"]
+            isOneToOne: false
             referencedRelation: "v_item_stock"
             referencedColumns: ["item_id"]
           },
@@ -1633,11 +2444,39 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "replenishment_discrepancies_dispatch_id_fkey"
+            columns: ["dispatch_id"]
+            isOneToOne: false
+            referencedRelation: "v_daily_dispatch_report"
+            referencedColumns: ["dispatch_id"]
+          },
+          {
             foreignKeyName: "replenishment_discrepancies_item_id_fkey"
             columns: ["item_id"]
             isOneToOne: false
             referencedRelation: "inventory_items"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "replenishment_discrepancies_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "v_central_item_stock"
+            referencedColumns: ["item_id"]
+          },
+          {
+            foreignKeyName: "replenishment_discrepancies_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "v_daily_dispatch_report"
+            referencedColumns: ["item_id"]
+          },
+          {
+            foreignKeyName: "replenishment_discrepancies_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "v_inventory_movement_report"
+            referencedColumns: ["item_id"]
           },
           {
             foreignKeyName: "replenishment_discrepancies_item_id_fkey"
@@ -1665,6 +2504,41 @@ export type Database = {
             columns: ["resolved_by"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sales_channels: {
+        Row: {
+          created_at: string
+          default_charge_mode: string
+          id: string
+          is_active: boolean
+          legacy_shop_id: string | null
+          name: string
+        }
+        Insert: {
+          created_at?: string
+          default_charge_mode?: string
+          id?: string
+          is_active?: boolean
+          legacy_shop_id?: string | null
+          name: string
+        }
+        Update: {
+          created_at?: string
+          default_charge_mode?: string
+          id?: string
+          is_active?: boolean
+          legacy_shop_id?: string | null
+          name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sales_channels_legacy_shop_id_fkey"
+            columns: ["legacy_shop_id"]
+            isOneToOne: true
+            referencedRelation: "shops"
             referencedColumns: ["id"]
           },
         ]
@@ -1701,6 +2575,27 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "inventory_items"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sales_order_items_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "v_central_item_stock"
+            referencedColumns: ["item_id"]
+          },
+          {
+            foreignKeyName: "sales_order_items_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "v_daily_dispatch_report"
+            referencedColumns: ["item_id"]
+          },
+          {
+            foreignKeyName: "sales_order_items_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "v_inventory_movement_report"
+            referencedColumns: ["item_id"]
           },
           {
             foreignKeyName: "sales_order_items_item_id_fkey"
@@ -1811,6 +2706,27 @@ export type Database = {
             foreignKeyName: "shop_assortments_item_id_fkey"
             columns: ["item_id"]
             isOneToOne: false
+            referencedRelation: "v_central_item_stock"
+            referencedColumns: ["item_id"]
+          },
+          {
+            foreignKeyName: "shop_assortments_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "v_daily_dispatch_report"
+            referencedColumns: ["item_id"]
+          },
+          {
+            foreignKeyName: "shop_assortments_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "v_inventory_movement_report"
+            referencedColumns: ["item_id"]
+          },
+          {
+            foreignKeyName: "shop_assortments_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
             referencedRelation: "v_item_stock"
             referencedColumns: ["item_id"]
           },
@@ -1887,6 +2803,27 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "inventory_items"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shop_stock_count_lines_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "v_central_item_stock"
+            referencedColumns: ["item_id"]
+          },
+          {
+            foreignKeyName: "shop_stock_count_lines_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "v_daily_dispatch_report"
+            referencedColumns: ["item_id"]
+          },
+          {
+            foreignKeyName: "shop_stock_count_lines_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "v_inventory_movement_report"
+            referencedColumns: ["item_id"]
           },
           {
             foreignKeyName: "shop_stock_count_lines_item_id_fkey"
@@ -2053,6 +2990,27 @@ export type Database = {
             foreignKeyName: "stock_level_policies_item_id_fkey"
             columns: ["item_id"]
             isOneToOne: false
+            referencedRelation: "v_central_item_stock"
+            referencedColumns: ["item_id"]
+          },
+          {
+            foreignKeyName: "stock_level_policies_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "v_daily_dispatch_report"
+            referencedColumns: ["item_id"]
+          },
+          {
+            foreignKeyName: "stock_level_policies_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "v_inventory_movement_report"
+            referencedColumns: ["item_id"]
+          },
+          {
+            foreignKeyName: "stock_level_policies_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
             referencedRelation: "v_item_stock"
             referencedColumns: ["item_id"]
           },
@@ -2064,11 +3022,25 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "stock_level_policies_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "v_central_item_stock"
+            referencedColumns: ["location_id"]
+          },
+          {
             foreignKeyName: "stock_level_policies_source_location_id_fkey"
             columns: ["source_location_id"]
             isOneToOne: false
             referencedRelation: "locations"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stock_level_policies_source_location_id_fkey"
+            columns: ["source_location_id"]
+            isOneToOne: false
+            referencedRelation: "v_central_item_stock"
+            referencedColumns: ["location_id"]
           },
         ]
       }
@@ -2179,6 +3151,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "stock_requests_destination_location_id_fkey"
+            columns: ["destination_location_id"]
+            isOneToOne: false
+            referencedRelation: "v_central_item_stock"
+            referencedColumns: ["location_id"]
+          },
+          {
             foreignKeyName: "stock_requests_destination_shop_id_fkey"
             columns: ["destination_shop_id"]
             isOneToOne: false
@@ -2193,6 +3172,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "stock_requests_dispatch_id_fkey"
+            columns: ["dispatch_id"]
+            isOneToOne: false
+            referencedRelation: "v_daily_dispatch_report"
+            referencedColumns: ["dispatch_id"]
+          },
+          {
             foreignKeyName: "stock_requests_fulfilled_movement_id_fkey"
             columns: ["fulfilled_movement_id"]
             isOneToOne: false
@@ -2200,11 +3186,39 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "stock_requests_fulfilled_movement_id_fkey"
+            columns: ["fulfilled_movement_id"]
+            isOneToOne: false
+            referencedRelation: "v_inventory_movement_report"
+            referencedColumns: ["movement_id"]
+          },
+          {
             foreignKeyName: "stock_requests_item_id_fkey"
             columns: ["item_id"]
             isOneToOne: false
             referencedRelation: "inventory_items"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stock_requests_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "v_central_item_stock"
+            referencedColumns: ["item_id"]
+          },
+          {
+            foreignKeyName: "stock_requests_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "v_daily_dispatch_report"
+            referencedColumns: ["item_id"]
+          },
+          {
+            foreignKeyName: "stock_requests_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "v_inventory_movement_report"
+            referencedColumns: ["item_id"]
           },
           {
             foreignKeyName: "stock_requests_item_id_fkey"
@@ -2240,6 +3254,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "locations"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stock_requests_source_location_id_fkey"
+            columns: ["source_location_id"]
+            isOneToOne: false
+            referencedRelation: "v_central_item_stock"
+            referencedColumns: ["location_id"]
           },
         ]
       }
@@ -2353,6 +3374,263 @@ export type Database = {
       }
     }
     Views: {
+      v_central_item_stock: {
+        Row: {
+          category: Database["public"]["Enums"]["inventory_category"] | null
+          incoming_quantity: number | null
+          item_code: string | null
+          item_id: string | null
+          location_id: string | null
+          min_level: number | null
+          name: string | null
+          on_hand: number | null
+          projected_quantity: number | null
+          reorder_level: number | null
+          sku: string | null
+          status: string | null
+          subcategory: string | null
+          unit: string | null
+        }
+        Relationships: []
+      }
+      v_daily_dispatch_report: {
+        Row: {
+          charge_mode: string | null
+          client_id: string | null
+          destination_location: string | null
+          destination_location_id: string | null
+          destination_name: string | null
+          destination_type: string | null
+          dispatch_id: string | null
+          dispatch_line_id: string | null
+          dispatched_at: string | null
+          dispatched_by_name: string | null
+          entered_late: boolean | null
+          item_id: string | null
+          item_name: string | null
+          late_entry_reason: string | null
+          linked_stocktake_number: string | null
+          net_quantity: number | null
+          quantity_dispatched: number | null
+          quantity_returned: number | null
+          received_at: string | null
+          received_by_name: string | null
+          recorded_at: string | null
+          reference: string | null
+          sales_channel_id: string | null
+          shop_id: string | null
+          sku: string | null
+          source_location: string | null
+          source_location_id: string | null
+          status: Database["public"]["Enums"]["dispatch_status"] | null
+          stock_effect: string | null
+          unit: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dispatches_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dispatches_destination_location_id_fkey"
+            columns: ["destination_location_id"]
+            isOneToOne: false
+            referencedRelation: "locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dispatches_destination_location_id_fkey"
+            columns: ["destination_location_id"]
+            isOneToOne: false
+            referencedRelation: "v_central_item_stock"
+            referencedColumns: ["location_id"]
+          },
+          {
+            foreignKeyName: "dispatches_sales_channel_id_fkey"
+            columns: ["sales_channel_id"]
+            isOneToOne: false
+            referencedRelation: "sales_channels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dispatches_shop_id_fkey"
+            columns: ["shop_id"]
+            isOneToOne: false
+            referencedRelation: "shops"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dispatches_source_location_id_fkey"
+            columns: ["source_location_id"]
+            isOneToOne: false
+            referencedRelation: "locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dispatches_source_location_id_fkey"
+            columns: ["source_location_id"]
+            isOneToOne: false
+            referencedRelation: "v_central_item_stock"
+            referencedColumns: ["location_id"]
+          },
+        ]
+      }
+      v_dispatch_return_report: {
+        Row: {
+          condition_notes: string | null
+          destination_name: string | null
+          destination_type: string | null
+          dispatch_id: string | null
+          dispatch_reference: string | null
+          dispatched_at: string | null
+          item_id: string | null
+          item_name: string | null
+          quantity_accepted: number | null
+          quantity_rejected: number | null
+          quantity_returned: number | null
+          reason: string | null
+          recorded_at: string | null
+          recorded_by: string | null
+          recorded_by_name: string | null
+          return_id: string | null
+          return_line_id: string | null
+          return_number: string | null
+          shop_id: string | null
+          shop_name: string | null
+          sku: string | null
+          source_location: string | null
+          source_location_id: string | null
+          unit: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dispatch_return_lines_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dispatch_return_lines_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "v_central_item_stock"
+            referencedColumns: ["item_id"]
+          },
+          {
+            foreignKeyName: "dispatch_return_lines_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "v_daily_dispatch_report"
+            referencedColumns: ["item_id"]
+          },
+          {
+            foreignKeyName: "dispatch_return_lines_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "v_inventory_movement_report"
+            referencedColumns: ["item_id"]
+          },
+          {
+            foreignKeyName: "dispatch_return_lines_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "v_item_stock"
+            referencedColumns: ["item_id"]
+          },
+          {
+            foreignKeyName: "dispatch_returns_dispatch_id_fkey"
+            columns: ["dispatch_id"]
+            isOneToOne: false
+            referencedRelation: "dispatches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dispatch_returns_dispatch_id_fkey"
+            columns: ["dispatch_id"]
+            isOneToOne: false
+            referencedRelation: "v_daily_dispatch_report"
+            referencedColumns: ["dispatch_id"]
+          },
+          {
+            foreignKeyName: "dispatch_returns_recorded_by_fkey"
+            columns: ["recorded_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dispatches_shop_id_fkey"
+            columns: ["shop_id"]
+            isOneToOne: false
+            referencedRelation: "shops"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dispatches_source_location_id_fkey"
+            columns: ["source_location_id"]
+            isOneToOne: false
+            referencedRelation: "locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dispatches_source_location_id_fkey"
+            columns: ["source_location_id"]
+            isOneToOne: false
+            referencedRelation: "v_central_item_stock"
+            referencedColumns: ["location_id"]
+          },
+        ]
+      }
+      v_inventory_movement_report: {
+        Row: {
+          created_at: string | null
+          direction: string | null
+          dispatch_charge_mode: string | null
+          dispatch_reference: string | null
+          entered_late: boolean | null
+          from_client_name: string | null
+          from_shop_name: string | null
+          item_id: string | null
+          item_name: string | null
+          location_id: string | null
+          location_name: string | null
+          movement_date: string | null
+          movement_id: string | null
+          occurred_at: string | null
+          performed_by: string | null
+          performed_by_name: string | null
+          quantity: number | null
+          reason: string | null
+          sales_channel_name: string | null
+          signed_quantity: number | null
+          sku: string | null
+          source: string | null
+          to_client_name: string | null
+          to_shop_name: string | null
+          type: Database["public"]["Enums"]["movement_type"] | null
+          unit: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inventory_movements_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_movements_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "v_central_item_stock"
+            referencedColumns: ["location_id"]
+          },
+        ]
+      }
       v_item_location_stock: {
         Row: {
           item_id: string | null
@@ -2371,6 +3649,27 @@ export type Database = {
             foreignKeyName: "inventory_movements_item_id_fkey"
             columns: ["item_id"]
             isOneToOne: false
+            referencedRelation: "v_central_item_stock"
+            referencedColumns: ["item_id"]
+          },
+          {
+            foreignKeyName: "inventory_movements_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "v_daily_dispatch_report"
+            referencedColumns: ["item_id"]
+          },
+          {
+            foreignKeyName: "inventory_movements_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "v_inventory_movement_report"
+            referencedColumns: ["item_id"]
+          },
+          {
+            foreignKeyName: "inventory_movements_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
             referencedRelation: "v_item_stock"
             referencedColumns: ["item_id"]
           },
@@ -2380,6 +3679,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "locations"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_movements_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "v_central_item_stock"
+            referencedColumns: ["location_id"]
           },
         ]
       }
@@ -2398,6 +3704,127 @@ export type Database = {
           unit: string | null
         }
         Relationships: []
+      }
+      v_production_report: {
+        Row: {
+          batch_id: string | null
+          batch_number: string | null
+          consumption_id: string | null
+          entered_late: boolean | null
+          expected_quantity: number | null
+          late_entry_reason: string | null
+          location_id: string | null
+          location_name: string | null
+          material_category:
+            | Database["public"]["Enums"]["inventory_category"]
+            | null
+          material_item_id: string | null
+          material_name: string | null
+          material_sku: string | null
+          material_unit: string | null
+          output_linked_stocktake_number: string | null
+          output_stock_effect: string | null
+          packaging_exception_reason: string | null
+          packaging_linked_stocktake_number: string | null
+          packaging_setup_id: string | null
+          packaging_setup_missing: boolean | null
+          packaging_stock_effect: string | null
+          packaging_variance: number | null
+          produced_at: string | null
+          product_item_id: string | null
+          product_name: string | null
+          product_sku: string | null
+          product_unit: string | null
+          qc_notes: string | null
+          quantity_produced: number | null
+          quantity_used: number | null
+          recorded_at: string | null
+          staff_id: string | null
+          staff_name: string | null
+          status: Database["public"]["Enums"]["batch_status"] | null
+          stocktake_treatment: string | null
+          variance_reason: string | null
+          waste_quantity: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "production_batches_packaging_setup_id_fkey"
+            columns: ["packaging_setup_id"]
+            isOneToOne: false
+            referencedRelation: "recipes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "production_batches_product_item_id_fkey"
+            columns: ["product_item_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "production_batches_product_item_id_fkey"
+            columns: ["product_item_id"]
+            isOneToOne: false
+            referencedRelation: "v_central_item_stock"
+            referencedColumns: ["item_id"]
+          },
+          {
+            foreignKeyName: "production_batches_product_item_id_fkey"
+            columns: ["product_item_id"]
+            isOneToOne: false
+            referencedRelation: "v_daily_dispatch_report"
+            referencedColumns: ["item_id"]
+          },
+          {
+            foreignKeyName: "production_batches_product_item_id_fkey"
+            columns: ["product_item_id"]
+            isOneToOne: false
+            referencedRelation: "v_inventory_movement_report"
+            referencedColumns: ["item_id"]
+          },
+          {
+            foreignKeyName: "production_batches_product_item_id_fkey"
+            columns: ["product_item_id"]
+            isOneToOne: false
+            referencedRelation: "v_item_stock"
+            referencedColumns: ["item_id"]
+          },
+          {
+            foreignKeyName: "production_consumption_item_id_fkey"
+            columns: ["material_item_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "production_consumption_item_id_fkey"
+            columns: ["material_item_id"]
+            isOneToOne: false
+            referencedRelation: "v_central_item_stock"
+            referencedColumns: ["item_id"]
+          },
+          {
+            foreignKeyName: "production_consumption_item_id_fkey"
+            columns: ["material_item_id"]
+            isOneToOne: false
+            referencedRelation: "v_daily_dispatch_report"
+            referencedColumns: ["item_id"]
+          },
+          {
+            foreignKeyName: "production_consumption_item_id_fkey"
+            columns: ["material_item_id"]
+            isOneToOne: false
+            referencedRelation: "v_inventory_movement_report"
+            referencedColumns: ["item_id"]
+          },
+          {
+            foreignKeyName: "production_consumption_item_id_fkey"
+            columns: ["material_item_id"]
+            isOneToOne: false
+            referencedRelation: "v_item_stock"
+            referencedColumns: ["item_id"]
+          },
+        ]
       }
       v_shop_daily_balance: {
         Row: {
@@ -2463,6 +3890,10 @@ export type Database = {
       }
     }
     Functions: {
+      approve_central_stocktake: {
+        Args: { _stocktake_id: string }
+        Returns: undefined
+      }
       approve_recipe: { Args: { _recipe_id: string }; Returns: undefined }
       approve_replenishment_request: {
         Args: {
@@ -2489,6 +3920,10 @@ export type Database = {
         Args: { _invite_id: string; _reason: string }
         Returns: undefined
       }
+      confirm_dispatch_receipt: {
+        Args: { _client_reference_id: string; _dispatch_id: string }
+        Returns: string
+      }
       confirm_replenishment_receipt: {
         Args: {
           _client_reference_id: string
@@ -2496,6 +3931,10 @@ export type Database = {
           _received_quantity: number
           _request_id: string
         }
+        Returns: string
+      }
+      create_central_stocktake: {
+        Args: { _client_reference_id: string; _notes: string; _scope: string }
         Returns: string
       }
       create_dispatch: {
@@ -2513,17 +3952,17 @@ export type Database = {
       }
       create_dispatch_with_date: {
         Args: {
-          _shop_id: string | null
-          _client_id: string | null
-          _reference: string
-          _vehicle: string | null
-          _notes: string | null
-          _invoice_url: string | null
-          _invoice_number: string | null
-          _lines: Json
+          _client_id: string
           _dispatched_at: string
-          _late_entry_reason: string | null
-          _stocktake_treatment: string | null
+          _invoice_number: string
+          _invoice_url: string
+          _late_entry_reason: string
+          _lines: Json
+          _notes: string
+          _reference: string
+          _shop_id: string
+          _stocktake_treatment: string
+          _vehicle: string
         }
         Returns: string
       }
@@ -2548,6 +3987,22 @@ export type Database = {
           _quotation_evidence_path: string
           _quotation_reference: string
           _supplier_id: string
+        }
+        Returns: string
+      }
+      create_sales_channel_dispatch_with_date: {
+        Args: {
+          _charge_mode: string
+          _dispatched_at: string
+          _invoice_number: string
+          _invoice_url: string
+          _late_entry_reason: string
+          _lines: Json
+          _notes: string
+          _reference: string
+          _sales_channel_id: string
+          _stocktake_treatment: string
+          _vehicle: string
         }
         Returns: string
       }
@@ -2592,6 +4047,7 @@ export type Database = {
         }
         Returns: string
       }
+      is_active_staff: { Args: { _user_id: string }; Returns: boolean }
       issue_replenishment_request: {
         Args: {
           _client_reference_id: string
@@ -2611,6 +4067,11 @@ export type Database = {
         }
         Returns: string
       }
+      operational_feature_enabled: {
+        Args: { _feature_key: string }
+        Returns: boolean
+      }
+      perform_go_live_reset: { Args: { _confirmation: string }; Returns: Json }
       prepare_morning_replenishment: {
         Args: { _client_reference_id: string; _need_id: string }
         Returns: string
@@ -2618,20 +4079,30 @@ export type Database = {
       preview_backdated_dispatch_stocktakes: {
         Args: { _dispatched_at: string; _item_ids: string[] }
         Returns: {
+          count_number: string
           item_id: string
           stocktake_id: string
-          count_number: string
-          submitted_at: string | null
+          submitted_at: string
         }[]
       }
       preview_backdated_production_stocktakes: {
-        Args: { _produced_at: string; _item_ids: string[] }
+        Args: { _item_ids: string[]; _produced_at: string }
         Returns: {
+          count_number: string
           item_id: string
           stocktake_id: string
-          count_number: string
-          submitted_at: string | null
+          submitted_at: string
         }[]
+      }
+      record_factory_return: {
+        Args: {
+          _client_reference_id: string
+          _condition_notes?: string
+          _dispatch_id: string
+          _lines: Json
+          _reason: string
+        }
+        Returns: string
       }
       record_location_stock_count: {
         Args: {
@@ -2652,10 +4123,11 @@ export type Database = {
         }
         Returns: string
       }
-      record_production: {
+      record_packaged_production: {
         Args: {
           _batch_number: string
           _consumption: Json
+          _packaging_exception_reason?: string
           _product_item_id: string
           _qc_notes?: string
           _quantity: number
@@ -2664,15 +4136,25 @@ export type Database = {
       }
       record_packaged_production_with_date: {
         Args: {
-          _product_item_id: string
-          _quantity: number
           _batch_number: string
           _consumption: Json
-          _packaging_exception_reason: string | null
-          _qc_notes: string | null
+          _late_entry_reason: string
+          _packaging_exception_reason: string
           _produced_at: string
-          _late_entry_reason: string | null
-          _stocktake_treatment: string | null
+          _product_item_id: string
+          _qc_notes: string
+          _quantity: number
+          _stocktake_treatment: string
+        }
+        Returns: string
+      }
+      record_production: {
+        Args: {
+          _batch_number: string
+          _consumption: Json
+          _product_item_id: string
+          _qc_notes?: string
+          _quantity: number
         }
         Returns: string
       }
@@ -2707,12 +4189,24 @@ export type Database = {
         }
         Returns: string
       }
+      reject_central_stocktake: {
+        Args: { _reason: string; _stocktake_id: string }
+        Returns: undefined
+      }
       reject_stock_request: {
         Args: { _notes: string; _request_id: string }
         Returns: undefined
       }
+      save_central_stocktake_lines: {
+        Args: { _lines: Json; _stocktake_id: string }
+        Returns: undefined
+      }
       set_user_active_status: {
         Args: { _is_active: boolean; _reason: string; _target_user_id: string }
+        Returns: undefined
+      }
+      submit_central_stocktake: {
+        Args: { _stocktake_id: string }
         Returns: undefined
       }
       submit_quoted_purchase_order: {
@@ -2827,12 +4321,12 @@ export type Tables<
   DefaultSchemaTableNameOrOptions extends
     | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
         DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -2856,11 +4350,11 @@ export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -2881,11 +4375,11 @@ export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -2906,11 +4400,11 @@ export type Enums<
   DefaultSchemaEnumNameOrOptions extends
     | keyof DefaultSchema["Enums"]
     | { schema: keyof DatabaseWithoutInternals },
-  EnumName extends DefaultSchemaEnumNameOrOptions extends {
+  EnumName extends (DefaultSchemaEnumNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaEnumNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -2923,11 +4417,11 @@ export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
     | keyof DefaultSchema["CompositeTypes"]
     | { schema: keyof DatabaseWithoutInternals },
-  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
+  CompositeTypeName extends (PublicCompositeTypeNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
-    : never = never,
+    : never) = never,
 > = PublicCompositeTypeNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
