@@ -99,9 +99,9 @@ function PrivacyPage() {
           <p>
             Enrolled recipients may receive management briefings and request updates by message.
             WhatsApp is not required to use the main application. You can withdraw from the briefing
-            pilot in the app, send STOP to our connected WhatsApp sender, or contact us. Withdrawal
-            stops future optional briefings, but does not automatically erase business records
-            retained on another lawful basis.
+            service in the app, send STOP to our connected WhatsApp sender, or contact us.
+            Withdrawal stops future optional briefings, but does not automatically erase business
+            records retained on another lawful basis.
           </p>
           <p>
             App links in messages still require appropriate sign-in and permissions. Copies of

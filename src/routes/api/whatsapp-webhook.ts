@@ -176,12 +176,13 @@ export const Route = createFileRoute("/api/whatsapp-webhook")({
           updated += 1;
         }
 
-        // Only a verified, enrolled Super Admin phone can request the read-only
-        // briefing. Other WhatsApp conversations are deliberately ignored.
+        // Only an enrolled management user's own saved number can request the
+        // read-only briefing. Ambiguous/shared numbers are ignored.
         let replied = 0;
         const {
+          hasBriefingRole,
           normalisePhone,
-          previousLagosDate,
+          lagosDate,
           buildManagementBriefing,
           createBriefingDelivery,
           sendWhatsAppBriefing,
@@ -195,53 +196,60 @@ export const Route = createFileRoute("/api/whatsapp-webhook")({
             !["briefing", "stop", "unsubscribe"].includes(command ?? "")
           )
             continue;
-          const { data: pilot } = await admin
+          const { data: subscriptions, error: subscriptionsError } = await admin
             .from("management_briefing_pilot")
             .select("user_id")
-            .eq("enabled", true)
-            .maybeSingle();
-          if (!pilot) continue;
-          const [{ data: profile }, { data: roles }] = await Promise.all([
-            admin.from("profiles").select("phone,is_active").eq("id", pilot.user_id).maybeSingle(),
-            admin.from("user_roles").select("role").eq("user_id", pilot.user_id),
+            .eq("enabled", true);
+          if (subscriptionsError || !subscriptions?.length) continue;
+          const ids = subscriptions.map((row: { user_id: string }) => row.user_id);
+          const [{ data: profiles }, { data: roles }] = await Promise.all([
+            admin.from("profiles").select("id,phone,is_active").in("id", ids),
+            admin.from("user_roles").select("user_id,role").in("user_id", ids),
           ]);
           const country = process.env.WHATSAPP_DEFAULT_COUNTRY_CODE?.replace(/\D/g, "") || "234";
-          if (
-            !profile?.is_active ||
-            !roles?.some((row: { role: string }) => row.role === "super_admin") ||
-            normalisePhone(profile.phone ?? "", country) !== normalisePhone(message.from, country)
-          )
-            continue;
+          const sender = normalisePhone(message.from, country);
+          if (!sender) continue;
+          const matches = (profiles ?? []).filter(
+            (profile: { id: string; phone: string | null; is_active: boolean }) =>
+              profile.is_active &&
+              normalisePhone(profile.phone ?? "", country) === sender &&
+              hasBriefingRole(
+                (roles ?? []).filter((row: { user_id: string }) => row.user_id === profile.id),
+              ),
+          );
+          if (matches.length !== 1) continue;
+          const recipientId = matches[0].id as string;
 
           if (command === "stop" || command === "unsubscribe") {
             await admin
               .from("management_briefing_pilot")
               .update({ enabled: false, updated_at: new Date().toISOString() })
-              .eq("user_id", pilot.user_id)
+              .eq("user_id", recipientId)
               .eq("enabled", true);
             await admin.from("audit_log").insert({
-              user_id: pilot.user_id,
-              action: "management_briefing.pilot_disabled_by_whatsapp",
+              user_id: recipientId,
+              action: "management_briefing.subscription_disabled_by_whatsapp",
               entity: "management_briefing_pilot",
-              entity_id: pilot.user_id,
+              entity_id: recipientId,
               new_value: { inbound_message_id: message.id },
             });
             continue;
           }
 
-          const reportDate = previousLagosDate();
+          const reportDate = lagosDate();
+          const briefing = await buildManagementBriefing(reportDate);
+          if (briefing.lowStock === null) continue;
           const id = await createBriefingDelivery(
-            pilot.user_id,
+            recipientId,
             reportDate,
             "whatsapp_request",
             message.id,
           );
           if (!id) continue; // Meta redelivery of the same incoming message.
           try {
-            const briefing = await buildManagementBriefing(reportDate);
             const sent = await sendWhatsAppBriefing(
               id,
-              pilot.user_id,
+              recipientId,
               briefing,
               "whatsapp_request",
               new URL(request.url).origin,

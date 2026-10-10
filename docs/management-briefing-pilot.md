@@ -1,31 +1,27 @@
-# Management briefing pilot
+# Daily low-stock management briefing
 
-This pilot is intentionally limited to one active Super Admin who explicitly enables it on the **Management briefing** page. The number is read from that user's active profile at send time; it is not copied into code or the database configuration. Disabling the pilot immediately prevents new sends and inbound replies.
+The management briefing is a current low-stock snapshot of active inventory, not a general operations recap. It covers every active catalogue item in Central and every active item/location pair already represented by a stock balance or an approved stock-level policy at other active locations. An item without a location-specific policy is shown in the **threshold setup required** count; no reorder level is invented. Shop balances may be stale until POS stock depletion is live, so shop alerts must be checked against physical counts.
+
+Active users with the `super_admin`, `management` or `operations_manager` role can view the briefing. Each person must save a unique WhatsApp number and explicitly opt in on the **Management briefing** page before receiving the daily message. `STOP` from that saved number disables future sends. Do not enroll shared accounts or add phone numbers on someone's behalf without consent.
 
 ## Deployment order
 
-1. Apply migration `20261009120000_management_briefing_pilot.sql` before publishing the app code.
-2. Configure server-side `WHATSAPP_CLOUD_PHONE_NUMBER_ID`, `WHATSAPP_CLOUD_ACCESS_TOKEN`, `WHATSAPP_APP_SECRET`, and `WHATSAPP_WEBHOOK_VERIFY_TOKEN`. Reuse the existing WhatsApp webhook subscription, but ensure it subscribes to incoming `messages` as well as status changes.
-3. Submit and obtain approval for a WhatsApp utility template. Set `WHATSAPP_BRIEFING_TEMPLATE_NAME` to its exact name and `WHATSAPP_TEMPLATE_LANGUAGE` to the approved language (default `en`). The template body must have three text placeholders, in order: report date, summary, and secure app link. Suggested wording: `4ruit management briefing for {{1}}: {{2}} Review details in the app: {{3}}`.
-4. Set a long random `BRIEFING_CRON_SECRET` in the app's server environment. Configure a reliable external scheduler to send `POST https://fruithub-central.lovable.app/api/management-briefing-scheduled` daily at **07:00 UTC**, with the secret in the `x-briefing-cron-secret` header. Do not put the secret in source code. The connected GitHub token currently lacks `workflow` scope, so the proposed GitHub Actions workflow is held locally until that permission is granted or another scheduler is configured.
-5. For the in-app read-only assistant, configure server-only `OPENAI_API_KEY` and `OPENAI_MODEL`. The assistant will show a setup message until both are present. Each question sends the database-derived briefing and the user's question to the configured OpenAI API; the UI discloses this. The assistant cannot run writes.
-6. Sign in as the intended Super Admin, verify their profile phone, open **Management briefing**, and select **I consent — enable pilot**. There can be only one active enrollee. Do not enable for a shared account.
-7. Test a manual send, delivery status, an inbound `briefing` message from the enrolled number, a duplicate inbound webhook, an unauthorised number, and `STOP` from the enrolled number. Verify that no other recipient is messaged and `STOP` disables future sends.
+1. Apply `20261010190000_management_low_stock_subscribers.sql`. It removes the former one-recipient restriction without automatically enrolling anyone. Keep the prior `20261009120000_management_briefing_pilot.sql` migration in place.
+2. Set server-only `WHATSAPP_CLOUD_PHONE_NUMBER_ID`, a durable `WHATSAPP_CLOUD_ACCESS_TOKEN` from the appropriate Meta system user, `WHATSAPP_APP_SECRET`, and `WHATSAPP_WEBHOOK_VERIFY_TOKEN`. Limit the system user to the relevant app and WhatsApp business account. Never paste the token into source, chat or a public issue.
+3. Obtain approval for the WhatsApp utility template. Set `WHATSAPP_BRIEFING_TEMPLATE_NAME` and `WHATSAPP_TEMPLATE_LANGUAGE` (default `en`). Its three body placeholders must be, in order: date, bounded low-stock summary, and authenticated app link. Daily sends cannot run until the template is approved. On-demand replies to an inbound `briefing` message are free-form within the conversation window.
+4. Set a long random `BRIEFING_CRON_SECRET` on the app server. Schedule `POST https://fruithub-central.lovable.app/api/management-briefing-scheduled` for **07:00 UTC daily = 08:00 Africa/Lagos**, with that secret in the `x-briefing-cron-secret` header. A database scheduler using `pg_cron` and `pg_net`, with its secret in Supabase Vault, is suitable. Do not commit the secret to SQL or Git. The endpoint accepts delayed runs until 11:59 Lagos time and deduplicates by recipient/date.
+5. Save individual management WhatsApp numbers and have each intended recipient opt in. The app displays active-user, valid-phone and opted-in counts. The schedule cannot reach all management users until those counts match.
+6. Run an authorised manual send for one opted-in user. Verify Meta accepts the template, the provider status becomes delivered, an inbound `briefing` returns the current snapshot, duplicate webhook IDs do not send twice, `STOP` works, and a non-management/shared/unconsented number receives no briefing.
+7. Inspect a physical low-stock sample at Central and each included shop. Configure approved thresholds for the remaining item/location pairs. The current briefing explicitly says how many are unconfigured; it must not be represented as comprehensive until coverage is sufficient.
 
-The scheduler must target 07:00 UTC = 08:00 Lagos. The endpoint accepts late runs until 11:59 Lagos time, sends at most once for one report date, and marks late deliveries with their actual timestamp. A failed send is retained for investigation; it is not blindly retried because a provider timeout could have delivered the first attempt. No automatic briefing is active until a scheduler is configured.
+The optional read-only assistant additionally requires server-only `OPENAI_API_KEY` and `OPENAI_MODEL`. It can explain the displayed low-stock snapshot but cannot change stock or approvals.
 
-## Briefing definition
+## Delivery safeguards
 
-- Production batches, dispatches, returns, and posted Central stocktakes (including legacy submitted/approved records) are counted for the previous Lagos calendar day by their relevant recorded event timestamps.
-- Pending purchase approvals and configured Central low-stock alerts are current **as-of** snapshots, not previous-day totals.
-- Missing source data is labelled `unavailable`, not `0`. No submitted stocktake and any uncounted stocktake lines are flagged so management can check whether counting was missed.
-- The WhatsApp summary links to the authenticated briefing page. It does not expose detailed records or allow stock changes or approvals.
-- The assistant is limited to answering questions about the displayed briefing. Detailed item-level or historical questions should direct the user to reports.
-
-## Acceptance checks
-
-- Only an active Super Admin with a valid saved phone can opt in; one-person limit is enforced by the database.
-- The scheduled job sends only to the opted-in profile, once per date, during the 08:00 Lagos hour.
-- Only `briefing` from the opted-in phone receives an on-demand reply; duplicate Meta message IDs receive no second reply.
-- Unknown or inactive users receive nothing. Disabling the pilot stops both scheduled and requested messages.
-- Delivery status and consent changes are auditable. API secrets never reach the browser.
+- The briefing uses live location-aware `v_item_location_stock` balances, not legacy global item quantities.
+- Database-read failure aborts sending; it is never converted to zero stock.
+- A configured pair with no balance row is treated as zero, because no stock movement has established a positive balance.
+- Scheduled sends require the cron secret, an active opted-in management account, a unique valid saved number, and an approved template.
+- Each scheduled delivery is recorded once per recipient and Lagos date. Provider failures are recorded for investigation; retries are not automatic because a timeout may conceal a successful send.
+- The WhatsApp body is bounded and may show only a subset of low-stock lines; the authenticated app page contains the full list and coverage warning.
+- No automatic daily briefing is live until the scheduler, durable Meta credentials, template approval and recipient opt-ins are confirmed.
