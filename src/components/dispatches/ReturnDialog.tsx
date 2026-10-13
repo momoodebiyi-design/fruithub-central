@@ -14,6 +14,10 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
+import { OperationalDateField } from "@/components/shared/OperationalDateField";
+import { useSession } from "@/hooks/useSession";
+import { CAN_BACKDATE_OPERATIONS, hasAny } from "@/lib/permissions";
+import { lagosDateTimeInput, validatedOperationalDate } from "@/lib/operational-dates";
 
 interface LineRow {
   id: string;
@@ -35,12 +39,18 @@ export function ReturnDialog({
   onClose: () => void;
   onSaved: () => void;
 }) {
+  const { roles } = useSession();
+  const canBackdate = hasAny(roles, CAN_BACKDATE_OPERATIONS);
   const [lines, setLines] = useState<LineRow[]>([]);
   const [values, setValues] = useState<Values>({});
   const [reason, setReason] = useState("");
   const [conditionNotes, setConditionNotes] = useState("");
   const [saving, setSaving] = useState(false);
   const [rejectionConfirmed, setRejectionConfirmed] = useState(false);
+  const [returnedLocal, setReturnedLocal] = useState(lagosDateTimeInput);
+  const [lateEntryReason, setLateEntryReason] = useState("");
+  const [overrideLaterCount, setOverrideLaterCount] = useState(false);
+  const [clientReferenceId] = useState(() => crypto.randomUUID());
 
   useEffect(() => {
     (async () => {
@@ -93,13 +103,27 @@ export function ReturnDialog({
     if (payload.some((line) => line.quantity_rejected > 0) && !rejectionConfirmed) {
       return toast.error("Confirm that rejected units must stay out of Central stock");
     }
+    let actualDate: ReturnType<typeof validatedOperationalDate>;
+    try {
+      actualDate = validatedOperationalDate(
+        returnedLocal,
+        lateEntryReason,
+        canBackdate,
+        overrideLaterCount,
+      );
+    } catch (error) {
+      return toast.error(error instanceof Error ? error.message : "Invalid return date");
+    }
     setSaving(true);
-    const { error } = await (supabase as any).rpc("record_factory_return", {
+    const { error } = await (supabase as any).rpc("record_factory_return_with_date", {
       _dispatch_id: dispatchId,
-      _client_reference_id: crypto.randomUUID(),
+      _client_reference_id: clientReferenceId,
       _lines: payload,
       _reason: reason.trim(),
       _condition_notes: conditionNotes.trim() || null,
+      _returned_at: actualDate.occurredAt,
+      _late_entry_reason: actualDate.lateEntryReason,
+      _override_later_count: overrideLaterCount,
     });
     setSaving(false);
     if (error) return toast.error(error.message);
@@ -134,6 +158,16 @@ export function ReturnDialog({
             Record what physically came back and what Inventory accepted. Rejected or damaged units
             do not increase Central stock.
           </div>
+          <OperationalDateField
+            label="Date and time goods returned"
+            value={returnedLocal}
+            onChange={setReturnedLocal}
+            lateEntryReason={lateEntryReason}
+            onLateEntryReasonChange={setLateEntryReason}
+            canBackdate={canBackdate}
+            overrideLaterCount={overrideLaterCount}
+            onOverrideLaterCountChange={setOverrideLaterCount}
+          />
           <div className="space-y-2">
             <div className="grid grid-cols-[1fr_120px_120px_100px] gap-2 px-2 text-[10px] uppercase tracking-wider text-muted-foreground">
               <div>Product</div>

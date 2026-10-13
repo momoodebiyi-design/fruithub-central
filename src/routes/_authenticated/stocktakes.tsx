@@ -5,7 +5,9 @@ import { ClipboardCheck, FileDown, Loader2, Plus, Search, Send } from "lucide-re
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useSession } from "@/hooks/useSession";
-import { CAN_WRITE_INVENTORY, hasAny } from "@/lib/permissions";
+import { CAN_BACKDATE_OPERATIONS, CAN_WRITE_INVENTORY, hasAny } from "@/lib/permissions";
+import { OperationalDateField } from "@/components/shared/OperationalDateField";
+import { lagosDateTimeInput, validatedOperationalDate } from "@/lib/operational-dates";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -37,6 +39,8 @@ type Stocktake = {
   notes: string | null;
   rejection_reason: string | null;
   created_at: string;
+  counted_at: string | null;
+  late_entry_reason: string | null;
 };
 
 type Line = {
@@ -51,6 +55,7 @@ type Line = {
 function StocktakesPage() {
   const { roles } = useSession();
   const canCount = hasAny(roles, CAN_WRITE_INVENTORY);
+  const canBackdate = hasAny(roles, CAN_BACKDATE_OPERATIONS);
   const [stocktakes, setStocktakes] = useState<Stocktake[]>([]);
   const [selected, setSelected] = useState<Stocktake | null>(null);
   const [lines, setLines] = useState<Line[]>([]);
@@ -60,14 +65,20 @@ function StocktakesPage() {
   const [creating, setCreating] = useState(false);
   const [scope, setScope] = useState("all");
   const [notes, setNotes] = useState("");
+  const [countedLocal, setCountedLocal] = useState(lagosDateTimeInput);
+  const [lateEntryReason, setLateEntryReason] = useState("");
+  const [overrideLaterCount, setOverrideLaterCount] = useState(false);
+  const [clientReference, setClientReference] = useState(() => crypto.randomUUID());
   const [busy, setBusy] = useState(false);
   const [exportingPdf, setExportingPdf] = useState(false);
 
   async function loadStocktakes(preselect?: string) {
     const { data, error } = await (supabase as any)
       .from("central_stocktakes")
-      .select("id, count_number, scope, status, notes, rejection_reason, created_at")
-      .order("created_at", { ascending: false });
+      .select(
+        "id, count_number, scope, status, notes, rejection_reason, created_at, counted_at, late_entry_reason",
+      )
+      .order("counted_at", { ascending: false });
     if (error) return toast.error(error.message);
     const next = (data ?? []) as Stocktake[];
     setStocktakes(next);
@@ -147,17 +158,35 @@ function StocktakesPage() {
   }
 
   async function createStocktake() {
+    let event;
+    try {
+      event = validatedOperationalDate(
+        countedLocal,
+        lateEntryReason,
+        canBackdate,
+        overrideLaterCount,
+      );
+    } catch (error) {
+      return toast.error(error instanceof Error ? error.message : "Invalid count date");
+    }
     setBusy(true);
-    const { data, error } = await (supabase as any).rpc("create_central_stocktake", {
+    const { data, error } = await (supabase as any).rpc("create_central_stocktake_with_date", {
       _scope: scope,
       _notes: notes,
-      _client_reference_id: crypto.randomUUID(),
+      _client_reference_id: clientReference,
+      _counted_at: event.occurredAt,
+      _late_entry_reason: event.lateEntryReason,
+      _override_later_count: overrideLaterCount,
     });
     setBusy(false);
     if (error) return toast.error(error.message);
     setCreating(false);
     setNotes("");
     setScope("all");
+    setCountedLocal(lagosDateTimeInput());
+    setLateEntryReason("");
+    setOverrideLaterCount(false);
+    setClientReference(crypto.randomUUID());
     toast.success("Central stocktake started");
     await loadStocktakes(data as string);
   }
@@ -174,7 +203,7 @@ function StocktakesPage() {
       const filename = await downloadStocktakePdf({
         countNumber: selected.count_number,
         category: categoryFilter,
-        preparedAt: new Date(),
+        preparedAt: new Date(selected.counted_at ?? selected.created_at),
         notes: selected.notes,
         lines: printableLines.map((line) => ({
           name: line.inventory_items?.name ?? "Unnamed product",
@@ -244,13 +273,25 @@ function StocktakesPage() {
       return toast.error(saveError.message);
     }
 
-    const { error } = await (supabase as any).rpc("submit_central_stocktake", {
+    const { error } = await (supabase as any).rpc("submit_central_stocktake_with_date", {
       _stocktake_id: selected.id,
     });
     setBusy(false);
     if (error) return toast.error(error.message);
     toast.success("Stocktake posted — Central stock updated");
     await loadStocktakes(selected.id);
+  }
+
+  async function refreshExpected() {
+    if (!selected) return;
+    setBusy(true);
+    const { error } = await (supabase as any).rpc("refresh_central_stocktake_expected", {
+      _stocktake_id: selected.id,
+    });
+    setBusy(false);
+    if (error) return toast.error(error.message);
+    toast.success("Expected stock refreshed; review all variances before posting");
+    await loadLines(selected.id);
   }
 
   const counted = lines.filter((line) => line.counted_quantity != null).length;
@@ -299,7 +340,8 @@ function StocktakesPage() {
                   <Status status={row.status} />
                 </div>
                 <p className="text-xs text-muted-foreground mt-1 capitalize">
-                  {row.scope.replace("_", " ")} · {new Date(row.created_at).toLocaleDateString()}
+                  {row.scope.replace("_", " ")} ·{" "}
+                  {new Date(row.counted_at ?? row.created_at).toLocaleDateString()}
                 </p>
               </button>
             ))}
@@ -316,6 +358,12 @@ function StocktakesPage() {
                 {selected && (
                   <p className="text-xs text-muted-foreground mt-1">
                     {counted}/{lines.length} counted · {varianceLines} variances
+                  </p>
+                )}
+                {selected && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Counted {new Date(selected.counted_at ?? selected.created_at).toLocaleString()}{" "}
+                    · Entered {new Date(selected.created_at).toLocaleString()}
                   </p>
                 )}
               </div>
@@ -336,6 +384,9 @@ function StocktakesPage() {
                 )}
                 {selected?.status === "draft" && canCount && (
                   <>
+                    <Button variant="outline" onClick={refreshExpected} disabled={busy}>
+                      Refresh expected
+                    </Button>
                     <Button variant="outline" onClick={save} disabled={busy}>
                       Save
                     </Button>
@@ -352,9 +403,9 @@ function StocktakesPage() {
               <div className="rounded-md border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900 dark:bg-amber-950 dark:text-amber-200">
                 Enter an actual count for every item. A blank count is intentionally not converted
                 to zero. Posting updates Central Inventory immediately and the count cannot be
-                edited afterward. “Expected” is a snapshot from when this stocktake was started;
-                later dispatches or returns update current Central Inventory, not this historical
-                count sheet.
+                edited afterward. “Expected” is a snapshot at the actual count time; later
+                dispatches or returns update current Central Inventory, not this historical count
+                sheet.
               </div>
             )}
             {selected && (
@@ -501,6 +552,16 @@ function StocktakesPage() {
             <DialogTitle>Start Central stocktake</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
+            <OperationalDateField
+              label="Physical count completed"
+              value={countedLocal}
+              onChange={setCountedLocal}
+              lateEntryReason={lateEntryReason}
+              onLateEntryReasonChange={setLateEntryReason}
+              canBackdate={canBackdate}
+              overrideLaterCount={overrideLaterCount}
+              onOverrideLaterCountChange={setOverrideLaterCount}
+            />
             <div>
               <Label>Items to count</Label>
               <Select value={scope} onValueChange={setScope}>

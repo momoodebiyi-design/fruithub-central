@@ -42,6 +42,8 @@ type StocktakeLineRow = {
     status: string;
     location_id: string;
     created_at: string;
+    counted_at: string | null;
+    late_entry_reason: string | null;
   } | null;
 };
 
@@ -55,6 +57,8 @@ type StocktakeCoverageRow = {
   countNumber: string | null;
   stocktakeStatus: string | null;
   countedAt: string | null;
+  recordedAt: string | null;
+  lateEntryReason: string | null;
   expected: number | null;
   counted: number | null;
   difference: number | null;
@@ -175,6 +179,8 @@ type ReturnRow = {
   return_id: string;
   return_number: string;
   recorded_at: string;
+  returned_at: string;
+  late_entry_reason: string | null;
   reason: string;
   condition_notes: string | null;
   dispatch_id: string;
@@ -337,18 +343,18 @@ function ReportsPage() {
       (supabase as any)
         .from("v_dispatch_return_report")
         .select("*")
-        .gte("recorded_at", start)
-        .lt("recorded_at", endExclusive)
-        .order("recorded_at", { ascending: false })
+        .gte("returned_at", start)
+        .lt("returned_at", endExclusive)
+        .order("returned_at", { ascending: false })
         .limit(10000),
       (supabase as any)
         .from("central_stocktake_lines")
         .select(
-          "stocktake_id, item_id, expected_quantity, counted_quantity, difference, variance_reason, central_stocktakes!inner(count_number, scope, status, location_id, created_at)",
+          "stocktake_id, item_id, expected_quantity, counted_quantity, difference, variance_reason, central_stocktakes!inner(count_number, scope, status, location_id, created_at, counted_at, late_entry_reason)",
         )
-        .gte("central_stocktakes.created_at", start)
-        .lt("central_stocktakes.created_at", endExclusive)
-        .order("created_at", { referencedTable: "central_stocktakes", ascending: false })
+        .gte("central_stocktakes.counted_at", start)
+        .lt("central_stocktakes.counted_at", endExclusive)
+        .order("counted_at", { referencedTable: "central_stocktakes", ascending: false })
         .limit(10000),
     ]);
 
@@ -457,8 +463,12 @@ function ReportsPage() {
     const latestByItem = new Map<string, StocktakeLineRow>();
     const orderedLines = [...stocktakeLines].sort(
       (a, b) =>
-        new Date(b.central_stocktakes?.created_at ?? 0).getTime() -
-        new Date(a.central_stocktakes?.created_at ?? 0).getTime(),
+        new Date(
+          b.central_stocktakes?.counted_at ?? b.central_stocktakes?.created_at ?? 0,
+        ).getTime() -
+        new Date(
+          a.central_stocktakes?.counted_at ?? a.central_stocktakes?.created_at ?? 0,
+        ).getTime(),
     );
 
     for (const line of orderedLines) {
@@ -484,7 +494,10 @@ function ReportsPage() {
           countStatus: counted == null ? "not_counted" : "counted",
           countNumber: line?.central_stocktakes?.count_number ?? null,
           stocktakeStatus: line?.central_stocktakes?.status ?? null,
-          countedAt: line?.central_stocktakes?.created_at ?? null,
+          countedAt:
+            line?.central_stocktakes?.counted_at ?? line?.central_stocktakes?.created_at ?? null,
+          recordedAt: line?.central_stocktakes?.created_at ?? null,
+          lateEntryReason: line?.central_stocktakes?.late_entry_reason ?? null,
           expected: line ? Number(line.expected_quantity) : null,
           counted,
           difference: line?.difference == null ? null : Number(line.difference),
@@ -814,6 +827,7 @@ function ReportsPage() {
     downloadCsv(
       `factory-return-report-${fromDate}-to-${toDate}.csv`,
       [
+        "Returned at",
         "Recorded at",
         "Return",
         "Dispatch",
@@ -827,8 +841,10 @@ function ReportsPage() {
         "Reason",
         "Condition notes",
         "Recorded by",
+        "Late-entry reason",
       ],
       filteredReturns.map((row) => [
+        row.returned_at,
         row.recorded_at,
         row.return_number,
         row.dispatch_reference,
@@ -842,6 +858,7 @@ function ReportsPage() {
         row.reason,
         row.condition_notes,
         row.recorded_by_name,
+        row.late_entry_reason,
       ]),
     );
   }
@@ -856,7 +873,9 @@ function ReportsPage() {
         "Count status",
         "Stocktake",
         "Stocktake workflow status",
-        "Stocktake started at",
+        "Counted at",
+        "Entered at",
+        "Late-entry reason",
         "Expected quantity",
         "Counted quantity",
         "Difference",
@@ -871,6 +890,8 @@ function ReportsPage() {
         row.countNumber,
         row.stocktakeStatus,
         row.countedAt,
+        row.recordedAt,
+        row.lateEntryReason,
         row.expected,
         row.counted,
         row.difference,
@@ -1066,7 +1087,7 @@ function ReportsPage() {
             <table className="w-full min-w-[1250px] text-sm">
               <thead className="bg-muted/50 text-xs uppercase text-muted-foreground">
                 <tr>
-                  <th className="px-3 py-2 text-left">Time</th>
+                  <th className="px-3 py-2 text-left">Returned / entered</th>
                   <th className="px-3 py-2 text-left">Recorded</th>
                   <th className="px-3 py-2 text-left">Reference</th>
                   <th className="px-3 py-2 text-left">Destination</th>
@@ -1515,7 +1536,12 @@ function ReportsPage() {
                   filteredReturns.map((row) => (
                     <tr key={row.return_line_id}>
                       <td className="px-3 py-2 whitespace-nowrap">
-                        {formatLagosDateTime(row.recorded_at)}
+                        {formatLagosDateTime(row.returned_at)}
+                        {row.returned_at !== row.recorded_at && (
+                          <p className="text-[11px] text-muted-foreground">
+                            Entered {formatLagosDateTime(row.recorded_at)}
+                          </p>
+                        )}
                       </td>
                       <td className="px-3 py-2">
                         <p className="font-mono text-xs">{row.return_number}</p>
