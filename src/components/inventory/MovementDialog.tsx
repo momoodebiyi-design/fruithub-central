@@ -1,5 +1,10 @@
 import { useEffect, useState } from "react";
-import { fetchOnHandAtLocation, fetchStockLocations, StockLocation, StockReadError } from "@/lib/stock";
+import {
+  fetchOnHandAtLocation,
+  fetchStockLocations,
+  StockLocation,
+  StockReadError,
+} from "@/lib/stock";
 import { supabase } from "@/integrations/supabase/client";
 import {
   Dialog,
@@ -20,6 +25,10 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
+import { useSession } from "@/hooks/useSession";
+import { CAN_BACKDATE_OPERATIONS, hasAny } from "@/lib/permissions";
+import { lagosDateTimeInput, validatedOperationalDate } from "@/lib/operational-dates";
+import { OperationalDateField } from "@/components/shared/OperationalDateField";
 
 // Transfer is intentionally excluded — dispatches/transfers must go through
 // the dedicated balanced source→destination workflow, never as a raw movement.
@@ -27,7 +36,11 @@ type MovementType = "stock_in" | "stock_out" | "adjustment" | "damaged" | "expir
 
 const TYPES: { v: MovementType; label: string; hint: string }[] = [
   { v: "stock_in", label: "Receive stock (+)", hint: "Goods received from supplier or return" },
-  { v: "stock_out", label: "Use / Stock out (−)", hint: "General consumption not tied to production" },
+  {
+    v: "stock_out",
+    label: "Use / Stock out (−)",
+    hint: "General consumption not tied to production",
+  },
   { v: "damaged", label: "Damaged (−)", hint: "Breakage, spoilage, unusable" },
   { v: "expired", label: "Expired (−)", hint: "Past expiry, discarded" },
   { v: "wastage", label: "Wasted (−)", hint: "Production spillage, loss" },
@@ -43,10 +56,16 @@ export function MovementDialog({
   onClose: () => void;
   onSaved: () => void;
 }) {
+  const { roles } = useSession();
+  const canBackdate = hasAny(roles, CAN_BACKDATE_OPERATIONS);
   const [type, setType] = useState<MovementType>("stock_in");
   const [qty, setQty] = useState("");
   const [reason, setReason] = useState("");
   const [saving, setSaving] = useState(false);
+  const [occurredLocal, setOccurredLocal] = useState(lagosDateTimeInput);
+  const [lateEntryReason, setLateEntryReason] = useState("");
+  const [overrideLaterCount, setOverrideLaterCount] = useState(false);
+  const [clientReferenceId] = useState(() => crypto.randomUUID());
   const [locations, setLocations] = useState<StockLocation[]>([]);
   const [locationId, setLocationId] = useState<string>("");
   const [onHand, setOnHand] = useState<number | null>(null);
@@ -60,7 +79,9 @@ export function MovementDialog({
         const def = locs.find((l) => l.is_default) ?? locs[0];
         if (def) setLocationId(def.id);
       })
-      .catch((e) => toast.error(e instanceof StockReadError ? e.message : "Unable to load locations"));
+      .catch((e) =>
+        toast.error(e instanceof StockReadError ? e.message : "Unable to load locations"),
+      );
   }, []);
 
   useEffect(() => {
@@ -69,27 +90,52 @@ export function MovementDialog({
     setLoadingOnHand(true);
     setOnHandError(null);
     fetchOnHandAtLocation(item.id, locationId)
-      .then((v) => { if (!cancelled) { setOnHand(v); setLoadingOnHand(false); } })
+      .then((v) => {
+        if (!cancelled) {
+          setOnHand(v);
+          setLoadingOnHand(false);
+        }
+      })
       .catch((e) => {
         if (!cancelled) {
-          setOnHand(null); setLoadingOnHand(false);
+          setOnHand(null);
+          setLoadingOnHand(false);
           setOnHandError(e instanceof StockReadError ? e.message : "On-hand unavailable");
         }
       });
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [item.id, locationId]);
 
   async function save() {
     if (!locationId) return toast.error("Select a stock location");
     const n = Number(qty);
     if (!n || (type !== "adjustment" && n <= 0)) return toast.error("Enter a quantity");
+    let actualDate;
+    try {
+      actualDate = validatedOperationalDate(
+        occurredLocal,
+        lateEntryReason,
+        canBackdate,
+        overrideLaterCount,
+      );
+    } catch (error) {
+      return toast.error(error instanceof Error ? error.message : "Invalid movement date");
+    }
     setSaving(true);
-    const { error } = await (supabase as any).rpc("record_manual_movement", {
+    // The RPC is introduced by the accompanying migration, ahead of generated types.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { error } = await (supabase as any).rpc("record_manual_movement_with_date", {
       _item_id: item.id,
       _location_id: locationId,
       _type: type,
       _quantity: n,
       _reason: reason || null,
+      _occurred_at: actualDate.occurredAt,
+      _late_entry_reason: actualDate.lateEntryReason,
+      _client_reference_id: clientReferenceId,
+      _override_later_count: overrideLaterCount,
     });
     setSaving(false);
     if (error) return toast.error(error.message);
@@ -99,14 +145,17 @@ export function MovementDialog({
   }
 
   const active = TYPES.find((t) => t.v === type);
-  const locLabel = onHandError !== null || onHand === null
-    ? "On-hand unavailable"
-    : `${onHand.toLocaleString()} ${item.unit} at location`;
+  const locLabel =
+    onHandError !== null || onHand === null
+      ? "On-hand unavailable"
+      : `${onHand.toLocaleString()} ${item.unit} at location`;
 
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-w-md">
-        <DialogHeader><DialogTitle>Record movement</DialogTitle></DialogHeader>
+        <DialogHeader>
+          <DialogTitle>Record movement</DialogTitle>
+        </DialogHeader>
         <div className="space-y-4">
           <div className="bg-muted rounded-md p-3">
             <p className="text-sm font-medium">{item.name}</p>
@@ -117,38 +166,64 @@ export function MovementDialog({
           <div>
             <Label>Location</Label>
             <Select value={locationId} onValueChange={setLocationId}>
-              <SelectTrigger><SelectValue placeholder="Choose location…" /></SelectTrigger>
+              <SelectTrigger>
+                <SelectValue placeholder="Choose location…" />
+              </SelectTrigger>
               <SelectContent>
                 {locations.map((l) => (
                   <SelectItem key={l.id} value={l.id}>
-                    {l.name}{l.is_default ? " (default)" : ""}
+                    {l.name}
+                    {l.is_default ? " (default)" : ""}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
             <p className="text-[11px] text-muted-foreground mt-1">
-              Balances and validation are scoped to this location. Transfers between locations use the Dispatch workflow.
+              Balances and validation are scoped to this location. Transfers between locations use
+              the Dispatch workflow.
             </p>
           </div>
           <div>
             <Label>Movement type</Label>
             <Select value={type} onValueChange={(v) => setType(v as MovementType)}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>{TYPES.map((t) => <SelectItem key={t.v} value={t.v}>{t.label}</SelectItem>)}</SelectContent>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {TYPES.map((t) => (
+                  <SelectItem key={t.v} value={t.v}>
+                    {t.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
             </Select>
             {active && <p className="text-[11px] text-muted-foreground mt-1">{active.hint}</p>}
           </div>
           <div>
-            <Label>Quantity ({item.unit}){type === "adjustment" && " — use negative to reduce"}</Label>
+            <Label>
+              Quantity ({item.unit}){type === "adjustment" && " — use negative to reduce"}
+            </Label>
             <Input type="number" step="0.01" value={qty} onChange={(e) => setQty(e.target.value)} />
           </div>
           <div>
             <Label>Reason / notes</Label>
             <Textarea value={reason} onChange={(e) => setReason(e.target.value)} rows={2} />
           </div>
+          <OperationalDateField
+            label="Date and time stock moved"
+            value={occurredLocal}
+            onChange={setOccurredLocal}
+            lateEntryReason={lateEntryReason}
+            onLateEntryReasonChange={setLateEntryReason}
+            canBackdate={canBackdate}
+            overrideLaterCount={overrideLaterCount}
+            onOverrideLaterCountChange={setOverrideLaterCount}
+          />
         </div>
         <DialogFooter>
-          <Button variant="ghost" onClick={onClose}>Cancel</Button>
+          <Button variant="ghost" onClick={onClose}>
+            Cancel
+          </Button>
           <Button
             onClick={save}
             disabled={saving || !locationId}

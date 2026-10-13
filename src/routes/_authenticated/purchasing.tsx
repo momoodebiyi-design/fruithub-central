@@ -44,6 +44,9 @@ import {
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
+import { OperationalDateField } from "@/components/shared/OperationalDateField";
+import { lagosDateTimeInput, validatedOperationalDate } from "@/lib/operational-dates";
+import { CAN_BACKDATE_OPERATIONS } from "@/lib/permissions";
 
 export const Route = createFileRoute("/_authenticated/purchasing")({
   validateSearch: (search: Record<string, unknown>) => ({
@@ -67,6 +70,7 @@ type Need = {
   status: string;
   stock_recovered_at: string | null;
   created_at: string;
+  observed_at: string | null;
   inventory_items: { name: string; unit: string; sku: string | null } | null;
   locations: { name: string } | null;
 };
@@ -83,12 +87,14 @@ type Order = {
   payment_reference: string | null;
   payment_evidence_path: string | null;
   created_at: string;
+  quoted_at: string | null;
   created_by: string | null;
   submitted_by: string | null;
   submitted_at: string | null;
   approved_by: string | null;
   approved_at: string | null;
   payment_recorded_at: string | null;
+  placed_at: string | null;
   delivered_at: string | null;
   suppliers: { name: string } | null;
   purchase_notification_deliveries?: Array<{
@@ -121,6 +127,14 @@ type Receipt = {
     quantity_delivered: number;
     purchase_order_items: { inventory_items: { name: string; unit: string } | null } | null;
   }>;
+};
+type ReceiptTimeline = {
+  id: string;
+  receipt_number: string;
+  arrived_at: string | null;
+  recorded_at: string;
+  inspected_effective_at: string | null;
+  inspected_at: string | null;
 };
 
 type OrderAction = "details" | "submit" | "approve" | "reject" | "payment" | "delivery" | "receive";
@@ -246,7 +260,7 @@ function PurchasingPage() {
       (supabase as any)
         .from("purchase_needs")
         .select(
-          "id, need_number, item_id, location_id, source, available_stock_snapshot, suggested_quantity, requested_quantity, required_date, priority, reason, status, stock_recovered_at, created_at, inventory_items(name, unit, sku), locations:locations!purchase_needs_location_id_fkey(name)",
+          "id, need_number, item_id, location_id, source, available_stock_snapshot, suggested_quantity, requested_quantity, required_date, priority, reason, status, stock_recovered_at, created_at, observed_at, inventory_items(name, unit, sku), locations:locations!purchase_needs_location_id_fkey(name)",
         )
         .eq("source_type", "purchasing")
         .in("status", ["draft", "ready", "sourcing", "ordered"])
@@ -254,7 +268,7 @@ function PurchasingPage() {
       (supabase as any)
         .from("purchase_orders")
         .select(
-          "id, po_number, supplier_id, expected_date, workflow_status, quoted_total, quotation_reference, quotation_evidence_path, payment_reference, payment_evidence_path, created_at, created_by, submitted_by, submitted_at, approved_by, approved_at, payment_recorded_at, delivered_at, suppliers(name), purchase_notification_deliveries(status, last_error, sent_at)",
+          "id, po_number, supplier_id, expected_date, workflow_status, quoted_total, quotation_reference, quotation_evidence_path, payment_reference, payment_evidence_path, created_at, quoted_at, placed_at, created_by, submitted_by, submitted_at, approved_by, approved_at, payment_recorded_at, delivered_at, suppliers(name), purchase_notification_deliveries(status, last_error, sent_at)",
         )
         .order("created_at", { ascending: false })
         .limit(150),
@@ -391,6 +405,8 @@ function ManualNeedDialog({
   onClose: () => void;
   onDone: () => Promise<void>;
 }) {
+  const { roles } = useSession();
+  const canBackdate = hasAny(roles, CAN_BACKDATE_OPERATIONS);
   const [items, setItems] = useState<Array<{ id: string; name: string; unit: string }>>([]);
   const [locations, setLocations] = useState<Array<{ id: string; name: string }>>([]);
   const [itemId, setItemId] = useState("");
@@ -400,6 +416,9 @@ function ManualNeedDialog({
   const [priority, setPriority] = useState("normal");
   const [reason, setReason] = useState("");
   const [saving, setSaving] = useState(false);
+  const [observedLocal, setObservedLocal] = useState(lagosDateTimeInput);
+  const [lateEntryReason, setLateEntryReason] = useState("");
+  const [clientReferenceId] = useState(() => crypto.randomUUID());
 
   useEffect(() => {
     (async () => {
@@ -422,15 +441,23 @@ function ManualNeedDialog({
   }, []);
 
   async function save() {
+    let actualDate: ReturnType<typeof validatedOperationalDate>;
+    try {
+      actualDate = validatedOperationalDate(observedLocal, lateEntryReason, canBackdate);
+    } catch (error) {
+      return toast.error(error instanceof Error ? error.message : "Invalid observation date");
+    }
     setSaving(true);
-    const { error } = await (supabase as any).rpc("create_manual_purchase_need", {
-      _client_reference_id: crypto.randomUUID(),
+    const { error } = await (supabase as any).rpc("create_manual_purchase_need_with_date", {
+      _client_reference_id: clientReferenceId,
       _item_id: itemId,
       _location_id: locationId,
       _quantity: Number(quantity),
       _required_date: date || null,
       _priority: priority,
       _reason: reason.trim(),
+      _observed_at: actualDate.occurredAt,
+      _late_entry_reason: actualDate.lateEntryReason,
     });
     setSaving(false);
     if (error) return toast.error(error.message);
@@ -508,6 +535,14 @@ function ManualNeedDialog({
             <Label>Business reason</Label>
             <Textarea value={reason} onChange={(event) => setReason(event.target.value)} />
           </div>
+          <OperationalDateField
+            label="Date and time need was identified"
+            value={observedLocal}
+            onChange={setObservedLocal}
+            lateEntryReason={lateEntryReason}
+            onLateEntryReasonChange={setLateEntryReason}
+            canBackdate={canBackdate}
+          />
         </div>
         <DialogFooter>
           <Button variant="ghost" onClick={onClose}>
@@ -570,7 +605,8 @@ function NeedsTable({
                 <td className="px-4 py-3 font-mono text-xs">
                   {need.need_number}
                   <p className="mt-1 font-sans text-muted-foreground">
-                    {format(new Date(need.created_at), "d MMM, HH:mm")}
+                    Identified{" "}
+                    {format(new Date(need.observed_at ?? need.created_at), "d MMM, HH:mm")}
                   </p>
                 </td>
                 <td className="px-4 py-3">
@@ -884,6 +920,8 @@ function QuotedOrderDialog({
   onClose: () => void;
   onDone: () => Promise<void>;
 }) {
+  const { roles } = useSession();
+  const canBackdate = hasAny(roles, CAN_BACKDATE_OPERATIONS);
   const [supplierId, setSupplierId] = useState("");
   const [expected, setExpected] = useState("");
   const [reference, setReference] = useState("");
@@ -891,6 +929,9 @@ function QuotedOrderDialog({
   const [file, setFile] = useState<File | null>(null);
   const [selected, setSelected] = useState<Record<string, { quantity: string; cost: string }>>({});
   const [saving, setSaving] = useState(false);
+  const [quotedLocal, setQuotedLocal] = useState(lagosDateTimeInput);
+  const [lateEntryReason, setLateEntryReason] = useState("");
+  const [clientReferenceId] = useState(() => crypto.randomUUID());
   function toggle(need: Need, checked: boolean) {
     setSelected((current) => {
       const next = { ...current };
@@ -900,6 +941,12 @@ function QuotedOrderDialog({
     });
   }
   async function save() {
+    let actualDate: ReturnType<typeof validatedOperationalDate>;
+    try {
+      actualDate = validatedOperationalDate(quotedLocal, lateEntryReason, canBackdate);
+    } catch (error) {
+      return toast.error(error instanceof Error ? error.message : "Invalid quotation date");
+    }
     const lines = Object.entries(selected).map(([need_id, values]) => ({
       need_id,
       quantity: Number(values.quantity),
@@ -917,14 +964,16 @@ function QuotedOrderDialog({
     setSaving(true);
     try {
       const evidence = await uploadEvidence(file, "quotes");
-      const { error } = await (supabase as any).rpc("create_quoted_purchase_order", {
-        _client_reference_id: crypto.randomUUID(),
+      const { error } = await (supabase as any).rpc("create_quoted_purchase_order_with_date", {
+        _client_reference_id: clientReferenceId,
         _supplier_id: supplierId,
         _expected_date: expected || null,
         _quotation_reference: reference.trim(),
         _quotation_evidence_path: evidence || null,
         _notes: notes.trim() || null,
         _lines: lines,
+        _quoted_at: actualDate.occurredAt,
+        _late_entry_reason: actualDate.lateEntryReason,
       });
       if (error) throw error;
       toast.success("Quoted order created as a draft");
@@ -943,6 +992,14 @@ function QuotedOrderDialog({
           <DialogTitle>Create quoted purchase order</DialogTitle>
         </DialogHeader>
         <div className="space-y-4">
+          <OperationalDateField
+            label="Date and time supplier quote was received"
+            value={quotedLocal}
+            onChange={setQuotedLocal}
+            lateEntryReason={lateEntryReason}
+            onLateEntryReasonChange={setLateEntryReason}
+            canBackdate={canBackdate}
+          />
           <div className="grid gap-3 sm:grid-cols-2">
             <div>
               <Label>Supplier</Label>
@@ -1074,11 +1131,19 @@ function OrderActionDialog({
   const [file, setFile] = useState<File | null>(null);
   const [lines, setLines] = useState<OrderLine[]>([]);
   const [receipt, setReceipt] = useState<Receipt | null>(null);
+  const [receiptTimeline, setReceiptTimeline] = useState<ReceiptTimeline[]>([]);
   const [quantities, setQuantities] = useState<
     Record<string, { delivered?: string; accepted?: string; rejected?: string; notes?: string }>
   >({});
   const [saving, setSaving] = useState(false);
   const [retryingWhatsApp, setRetryingWhatsApp] = useState(false);
+  const { roles } = useSession();
+  const canBackdate = hasAny(roles, CAN_BACKDATE_OPERATIONS);
+  const [eventLocal, setEventLocal] = useState(lagosDateTimeInput);
+  const [lateEntryReason, setLateEntryReason] = useState("");
+  const [deliveryReference] = useState(() => crypto.randomUUID());
+  const [inspectionReference] = useState(() => crypto.randomUUID());
+  const [overrideLaterCount, setOverrideLaterCount] = useState(false);
   useEffect(() => {
     (async () => {
       const { data } = await (supabase as any)
@@ -1089,6 +1154,16 @@ function OrderActionDialog({
         .eq("purchase_order_id", order.id);
       const orderLines = (data as OrderLine[]) ?? [];
       setLines(orderLines);
+      if (action === "details") {
+        const { data: history } = await (supabase as any)
+          .from("purchase_receipts")
+          .select(
+            "id, receipt_number, arrived_at, recorded_at, inspected_effective_at, inspected_at",
+          )
+          .eq("purchase_order_id", order.id)
+          .order("recorded_at", { ascending: true });
+        setReceiptTimeline((history as ReceiptTimeline[]) ?? []);
+      }
       if (action === "delivery")
         setQuantities(
           Object.fromEntries(
@@ -1178,6 +1253,9 @@ function OrderActionDialog({
     if (action === "details") return;
     setSaving(true);
     try {
+      const event = ["payment", "delivery", "receive"].includes(action)
+        ? validatedOperationalDate(eventLocal, lateEntryReason, canBackdate, overrideLaterCount)
+        : null;
       let error: { message: string } | null = null;
       if (action === "submit")
         ({ error } = await (supabase as any).rpc("submit_quoted_purchase_order", {
@@ -1191,19 +1269,23 @@ function OrderActionDialog({
         }));
       if (action === "payment") {
         const path = await uploadEvidence(file, "payments");
-        ({ error } = await (supabase as any).rpc("record_purchase_payment", {
+        ({ error } = await (supabase as any).rpc("record_purchase_payment_with_date", {
           _purchase_order_id: order.id,
           _payment_reference: reference.trim(),
           _payment_evidence_path: path,
+          _placed_at: event!.occurredAt,
+          _late_entry_reason: event!.lateEntryReason,
         }));
       }
       if (action === "delivery") {
         const path = await uploadEvidence(file, "deliveries");
-        ({ error } = await (supabase as any).rpc("record_purchase_delivery", {
+        ({ error } = await (supabase as any).rpc("record_purchase_delivery_with_date", {
           _purchase_order_id: order.id,
-          _client_reference_id: crypto.randomUUID(),
+          _client_reference_id: deliveryReference,
           _delivery_evidence_path: path,
           _notes: notes.trim() || null,
+          _arrived_at: event!.occurredAt,
+          _late_entry_reason: event!.lateEntryReason,
           _lines: lines.map((line) => ({
             line_id: line.id,
             delivered: Number(quantities[line.id]?.delivered ?? 0),
@@ -1212,10 +1294,13 @@ function OrderActionDialog({
       }
       if (action === "receive") {
         if (!receipt) throw new Error("No delivery is awaiting inspection");
-        ({ error } = await (supabase as any).rpc("inspect_purchase_receipt", {
+        ({ error } = await (supabase as any).rpc("inspect_purchase_receipt_with_date", {
           _purchase_receipt_id: receipt.id,
-          _client_reference_id: crypto.randomUUID(),
+          _client_reference_id: inspectionReference,
           _quality_notes: notes.trim() || null,
+          _inspected_at: event!.occurredAt,
+          _late_entry_reason: event!.lateEntryReason,
+          _override_later_count: overrideLaterCount,
           _lines: receipt.purchase_receipt_lines.map((line) => ({
             receipt_line_id: line.id,
             accepted: Number(quantities[line.id]?.accepted ?? 0),
@@ -1329,12 +1414,26 @@ function OrderActionDialog({
           {action === "details" && (
             <>
               <div className="grid gap-2 rounded-md border p-3 text-sm sm:grid-cols-2">
-                <TimelineRow label="Created" value={order.created_at} />
+                <TimelineRow label="Quote received" value={order.quoted_at} />
+                <TimelineRow label="Entered" value={order.created_at} />
                 <TimelineRow label="Submitted" value={order.submitted_at} />
                 <TimelineRow label="Approved" value={order.approved_at} />
-                <TimelineRow label="Order placed" value={order.payment_recorded_at} />
+                <TimelineRow label="Order placed" value={order.placed_at} />
+                <TimelineRow label="Placement entered" value={order.payment_recorded_at} />
                 <TimelineRow label="Delivery recorded" value={order.delivered_at} />
               </div>
+              {receiptTimeline.map((entry) => (
+                <div
+                  key={entry.id}
+                  className="grid gap-2 rounded-md border p-3 text-sm sm:grid-cols-2"
+                >
+                  <p className="font-medium sm:col-span-2">{entry.receipt_number}</p>
+                  <TimelineRow label="Arrived" value={entry.arrived_at} />
+                  <TimelineRow label="Delivery entered" value={entry.recorded_at} />
+                  <TimelineRow label="Inspected" value={entry.inspected_effective_at} />
+                  <TimelineRow label="Inspection entered" value={entry.inspected_at} />
+                </div>
+              ))}
               {order.workflow_status === "awaiting_approval" && (
                 <div className="flex flex-col gap-3 rounded-md border p-3 text-sm sm:flex-row sm:items-center sm:justify-between">
                   <div>
@@ -1374,6 +1473,28 @@ function OrderActionDialog({
               <Label>Rejection reason</Label>
               <Textarea value={notes} onChange={(event) => setNotes(event.target.value)} />
             </div>
+          )}
+          {["payment", "delivery", "receive"].includes(action) && (
+            <OperationalDateField
+              label={
+                action === "payment"
+                  ? "Order placed / payment made"
+                  : action === "delivery"
+                    ? "Delivery arrived"
+                    : "Inventory inspected"
+              }
+              value={eventLocal}
+              onChange={setEventLocal}
+              lateEntryReason={lateEntryReason}
+              onLateEntryReasonChange={setLateEntryReason}
+              canBackdate={canBackdate}
+              {...(action === "receive"
+                ? {
+                    overrideLaterCount,
+                    onOverrideLaterCountChange: setOverrideLaterCount,
+                  }
+                : {})}
+            />
           )}
           {action === "payment" && (
             <>
