@@ -151,9 +151,12 @@ export type Database = {
         Row: {
           client_reference_id: string
           count_number: string
+          counted_at: string | null
           created_at: string
           created_by: string | null
           id: string
+          late_entry_reason: string | null
+          later_count_override_authorised: boolean
           location_id: string
           notes: string | null
           rejection_reason: string | null
@@ -167,9 +170,12 @@ export type Database = {
         Insert: {
           client_reference_id: string
           count_number?: string
+          counted_at?: string | null
           created_at?: string
           created_by?: string | null
           id?: string
+          late_entry_reason?: string | null
+          later_count_override_authorised?: boolean
           location_id: string
           notes?: string | null
           rejection_reason?: string | null
@@ -183,9 +189,12 @@ export type Database = {
         Update: {
           client_reference_id?: string
           count_number?: string
+          counted_at?: string | null
           created_at?: string
           created_by?: string | null
           id?: string
+          late_entry_reason?: string | null
+          later_count_override_authorised?: boolean
           location_id?: string
           notes?: string | null
           rejection_reason?: string | null
@@ -511,30 +520,36 @@ export type Database = {
           condition_notes: string | null
           dispatch_id: string
           id: string
+          late_entry_reason: string | null
           reason: string
           recorded_at: string
           recorded_by: string | null
           return_number: string
+          returned_at: string | null
         }
         Insert: {
           client_reference_id: string
           condition_notes?: string | null
           dispatch_id: string
           id?: string
+          late_entry_reason?: string | null
           reason: string
           recorded_at?: string
           recorded_by?: string | null
           return_number?: string
+          returned_at?: string | null
         }
         Update: {
           client_reference_id?: string
           condition_notes?: string | null
           dispatch_id?: string
           id?: string
+          late_entry_reason?: string | null
           reason?: string
           recorded_at?: string
           recorded_by?: string | null
           return_number?: string
+          returned_at?: string | null
         }
         Relationships: [
           {
@@ -902,6 +917,7 @@ export type Database = {
       inventory_movements: {
         Row: {
           batch_id: string | null
+          client_reference_id: string | null
           created_at: string
           dispatch_id: string | null
           from_client_id: string | null
@@ -909,6 +925,7 @@ export type Database = {
           id: string
           item_id: string
           location_id: string | null
+          occurred_at: string | null
           performed_by: string | null
           quantity: number
           reason: string | null
@@ -920,6 +937,7 @@ export type Database = {
         }
         Insert: {
           batch_id?: string | null
+          client_reference_id?: string | null
           created_at?: string
           dispatch_id?: string | null
           from_client_id?: string | null
@@ -927,6 +945,7 @@ export type Database = {
           id?: string
           item_id: string
           location_id?: string | null
+          occurred_at?: string | null
           performed_by?: string | null
           quantity: number
           reason?: string | null
@@ -938,6 +957,7 @@ export type Database = {
         }
         Update: {
           batch_id?: string | null
+          client_reference_id?: string | null
           created_at?: string
           dispatch_id?: string | null
           from_client_id?: string | null
@@ -945,6 +965,7 @@ export type Database = {
           id?: string
           item_id?: string
           location_id?: string | null
+          occurred_at?: string | null
           performed_by?: string | null
           quantity?: number
           reason?: string | null
@@ -1598,6 +1619,8 @@ export type Database = {
           item_id: string
           location_id: string
           need_number: string
+          observation_late_entry_reason: string | null
+          observed_at: string | null
           policy_id: string | null
           priority: string
           reason: string | null
@@ -1626,6 +1649,8 @@ export type Database = {
           item_id: string
           location_id: string
           need_number?: string
+          observation_late_entry_reason?: string | null
+          observed_at?: string | null
           policy_id?: string | null
           priority?: string
           reason?: string | null
@@ -1654,6 +1679,8 @@ export type Database = {
           item_id?: string
           location_id?: string
           need_number?: string
+          observation_late_entry_reason?: string | null
+          observed_at?: string | null
           policy_id?: string | null
           priority?: string
           reason?: string | null
@@ -1953,9 +1980,13 @@ export type Database = {
           payment_recorded_at: string | null
           payment_recorded_by: string | null
           payment_reference: string | null
+          placed_at: string | null
+          placement_late_entry_reason: string | null
           po_number: string
           quotation_evidence_path: string | null
           quotation_reference: string | null
+          quote_late_entry_reason: string | null
+          quoted_at: string | null
           quoted_total: number
           rejection_reason: string | null
           status: Database["public"]["Enums"]["purchase_order_status"]
@@ -1984,9 +2015,13 @@ export type Database = {
           payment_recorded_at?: string | null
           payment_recorded_by?: string | null
           payment_reference?: string | null
+          placed_at?: string | null
+          placement_late_entry_reason?: string | null
           po_number: string
           quotation_evidence_path?: string | null
           quotation_reference?: string | null
+          quote_late_entry_reason?: string | null
+          quoted_at?: string | null
           quoted_total?: number
           rejection_reason?: string | null
           status?: Database["public"]["Enums"]["purchase_order_status"]
@@ -2015,9 +2050,13 @@ export type Database = {
           payment_recorded_at?: string | null
           payment_recorded_by?: string | null
           payment_reference?: string | null
+          placed_at?: string | null
+          placement_late_entry_reason?: string | null
           po_number?: string
           quotation_evidence_path?: string | null
           quotation_reference?: string | null
+          quote_late_entry_reason?: string | null
+          quoted_at?: string | null
           quoted_total?: number
           rejection_reason?: string | null
           status?: Database["public"]["Enums"]["purchase_order_status"]
@@ -2129,12 +2168,16 @@ export type Database = {
       }
       purchase_receipts: {
         Row: {
+          arrival_late_entry_reason: string | null
+          arrived_at: string | null
           client_reference_id: string
           delivery_evidence_path: string
           delivery_notes: string | null
           id: string
           inspected_at: string | null
           inspected_by: string | null
+          inspected_effective_at: string | null
+          inspection_late_entry_reason: string | null
           purchase_order_id: string
           quality_notes: string | null
           receipt_number: string
@@ -2143,12 +2186,16 @@ export type Database = {
           status: string
         }
         Insert: {
+          arrival_late_entry_reason?: string | null
+          arrived_at?: string | null
           client_reference_id: string
           delivery_evidence_path: string
           delivery_notes?: string | null
           id?: string
           inspected_at?: string | null
           inspected_by?: string | null
+          inspected_effective_at?: string | null
+          inspection_late_entry_reason?: string | null
           purchase_order_id: string
           quality_notes?: string | null
           receipt_number: string
@@ -2157,12 +2204,16 @@ export type Database = {
           status?: string
         }
         Update: {
+          arrival_late_entry_reason?: string | null
+          arrived_at?: string | null
           client_reference_id?: string
           delivery_evidence_path?: string
           delivery_notes?: string | null
           id?: string
           inspected_at?: string | null
           inspected_by?: string | null
+          inspected_effective_at?: string | null
+          inspection_late_entry_reason?: string | null
           purchase_order_id?: string
           quality_notes?: string | null
           receipt_number?: string
@@ -3488,6 +3539,7 @@ export type Database = {
           dispatched_at: string | null
           item_id: string | null
           item_name: string | null
+          late_entry_reason: string | null
           quantity_accepted: number | null
           quantity_rejected: number | null
           quantity_returned: number | null
@@ -3498,6 +3550,7 @@ export type Database = {
           return_id: string | null
           return_line_id: string | null
           return_number: string | null
+          returned_at: string | null
           shop_id: string | null
           shop_name: string | null
           sku: string | null
@@ -3907,6 +3960,16 @@ export type Database = {
         Args: { _notes?: string; _request_id: string }
         Returns: string
       }
+      assert_no_later_central_count: {
+        Args: {
+          _item_id: string
+          _location_id: string
+          _manager_override?: boolean
+          _occurred_at: string
+          _override_reason?: string
+        }
+        Returns: string
+      }
       bootstrap_allowed: { Args: never; Returns: boolean }
       cancel_purchase_order: {
         Args: { _purchase_order_id: string; _reason: string }
@@ -3935,6 +3998,17 @@ export type Database = {
       }
       create_central_stocktake: {
         Args: { _client_reference_id: string; _notes: string; _scope: string }
+        Returns: string
+      }
+      create_central_stocktake_with_date: {
+        Args: {
+          _client_reference_id: string
+          _counted_at: string
+          _late_entry_reason: string
+          _notes: string
+          _override_later_count?: boolean
+          _scope: string
+        }
         Returns: string
       }
       create_dispatch: {
@@ -3978,6 +4052,20 @@ export type Database = {
         }
         Returns: string
       }
+      create_manual_purchase_need_with_date: {
+        Args: {
+          _client_reference_id: string
+          _item_id: string
+          _late_entry_reason: string
+          _location_id: string
+          _observed_at: string
+          _priority: string
+          _quantity: number
+          _reason: string
+          _required_date: string
+        }
+        Returns: string
+      }
       create_quoted_purchase_order: {
         Args: {
           _client_reference_id: string
@@ -3986,6 +4074,20 @@ export type Database = {
           _notes: string
           _quotation_evidence_path: string
           _quotation_reference: string
+          _supplier_id: string
+        }
+        Returns: string
+      }
+      create_quoted_purchase_order_with_date: {
+        Args: {
+          _client_reference_id: string
+          _expected_date: string
+          _late_entry_reason: string
+          _lines: Json
+          _notes: string
+          _quotation_evidence_path: string
+          _quotation_reference: string
+          _quoted_at: string
           _supplier_id: string
         }
         Returns: string
@@ -4047,6 +4149,18 @@ export type Database = {
         }
         Returns: string
       }
+      inspect_purchase_receipt_with_date: {
+        Args: {
+          _client_reference_id: string
+          _inspected_at: string
+          _late_entry_reason: string
+          _lines: Json
+          _override_later_count?: boolean
+          _purchase_receipt_id: string
+          _quality_notes: string
+        }
+        Returns: string
+      }
       is_active_staff: { Args: { _user_id: string }; Returns: boolean }
       issue_replenishment_request: {
         Args: {
@@ -4094,6 +4208,16 @@ export type Database = {
           submitted_at: string
         }[]
       }
+      preview_stock_on_hand_at: {
+        Args: {
+          _item_id: string
+          _late_entry_reason?: string
+          _location_id: string
+          _occurred_at: string
+          _override_later_count?: boolean
+        }
+        Returns: number
+      }
       record_factory_return: {
         Args: {
           _client_reference_id: string
@@ -4104,6 +4228,30 @@ export type Database = {
         }
         Returns: string
       }
+      record_factory_return_with_date: {
+        Args: {
+          _client_reference_id: string
+          _condition_notes: string
+          _dispatch_id: string
+          _late_entry_reason: string
+          _lines: Json
+          _override_later_count?: boolean
+          _reason: string
+          _returned_at: string
+        }
+        Returns: string
+      }
+      record_later_count_reconciliation: {
+        Args: {
+          _count_number: string
+          _delta: number
+          _item_id: string
+          _location_id: string
+          _movement_id: string
+          _override_reason: string
+        }
+        Returns: undefined
+      }
       record_location_stock_count: {
         Args: {
           _item_id: string
@@ -4113,10 +4261,37 @@ export type Database = {
         }
         Returns: string
       }
+      record_location_stock_count_with_date: {
+        Args: {
+          _client_reference_id: string
+          _item_id: string
+          _late_entry_reason: string
+          _location_id: string
+          _occurred_at: string
+          _override_later_count?: boolean
+          _physical_qty: number
+          _reason: string
+        }
+        Returns: string
+      }
       record_manual_movement: {
         Args: {
           _item_id: string
           _location_id: string
+          _quantity: number
+          _reason: string
+          _type: Database["public"]["Enums"]["movement_type"]
+        }
+        Returns: string
+      }
+      record_manual_movement_with_date: {
+        Args: {
+          _client_reference_id: string
+          _item_id: string
+          _late_entry_reason: string
+          _location_id: string
+          _occurred_at: string
+          _override_later_count?: boolean
           _quantity: number
           _reason: string
           _type: Database["public"]["Enums"]["movement_type"]
@@ -4168,10 +4343,32 @@ export type Database = {
         }
         Returns: string
       }
+      record_purchase_delivery_with_date: {
+        Args: {
+          _arrived_at: string
+          _client_reference_id: string
+          _delivery_evidence_path: string
+          _late_entry_reason: string
+          _lines: Json
+          _notes: string
+          _purchase_order_id: string
+        }
+        Returns: string
+      }
       record_purchase_payment: {
         Args: {
           _payment_evidence_path: string
           _payment_reference: string
+          _purchase_order_id: string
+        }
+        Returns: string
+      }
+      record_purchase_payment_with_date: {
+        Args: {
+          _late_entry_reason: string
+          _payment_evidence_path: string
+          _payment_reference: string
+          _placed_at: string
           _purchase_order_id: string
         }
         Returns: string
@@ -4189,6 +4386,10 @@ export type Database = {
         }
         Returns: string
       }
+      refresh_central_stocktake_expected: {
+        Args: { _stocktake_id: string }
+        Returns: undefined
+      }
       reject_central_stocktake: {
         Args: { _reason: string; _stocktake_id: string }
         Returns: undefined
@@ -4205,7 +4406,15 @@ export type Database = {
         Args: { _is_active: boolean; _reason: string; _target_user_id: string }
         Returns: undefined
       }
+      stock_on_hand_at: {
+        Args: { _item_id: string; _location_id: string; _occurred_at: string }
+        Returns: number
+      }
       submit_central_stocktake: {
+        Args: { _stocktake_id: string }
+        Returns: undefined
+      }
+      submit_central_stocktake_with_date: {
         Args: { _stocktake_id: string }
         Returns: undefined
       }
@@ -4228,6 +4437,10 @@ export type Database = {
           _target_level: number
         }
         Returns: string
+      }
+      validate_operational_event_time: {
+        Args: { _late_entry_reason: string; _occurred_at: string }
+        Returns: boolean
       }
       validate_user_invite: {
         Args: { _token: string }
